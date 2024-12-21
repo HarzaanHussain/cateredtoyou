@@ -44,7 +44,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   }
 
    // In AddStaffScreen
-Future _handleAddStaff() async {
+Future<void> _handleAddStaff() async {
   if (!_formKey.currentState!.validate()) return;
 
   setState(() {
@@ -54,6 +54,17 @@ Future _handleAddStaff() async {
 
   try {
     final staffService = Provider.of<StaffService>(context, listen: false);
+    
+    // Show loading overlay
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const Center(
+          child: CircularProgressIndicator(),
+        );
+      },
+    );
     
     final success = await staffService.createStaffMember(
       email: _emailController.text.trim(),
@@ -66,17 +77,21 @@ Future _handleAddStaff() async {
 
     if (!mounted) return;
 
+    // Close loading overlay
+    Navigator.of(context).pop();
+
     if (success) {
-      // Show success message
+      // Show success message and navigate
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Staff member added successfully'),
           backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: 2),
         ),
       );
 
-      // Navigate back to staff list using replacement to prevent going back
+      // Use replaceTo to prevent going back
       if (mounted) {
         context.go('/staff');
       }
@@ -84,16 +99,32 @@ Future _handleAddStaff() async {
   } catch (e) {
     if (!mounted) return;
 
+    // Close loading overlay if it's still shown
+    if (Navigator.canPop(context)) {
+      Navigator.of(context).pop();
+    }
+
+    // Format error message
+    final errorMessage = e.toString().replaceAll(RegExp(r'^Exception: '), '');
+    
     setState(() {
-      _error = e.toString();
+      _error = errorMessage;
     });
 
-    // Show error message
+    // Show error in snackbar
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Error: ${e.toString()}'),
+        content: Text(errorMessage),
         backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 4),
+        action: SnackBarAction(
+          label: 'Dismiss',
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+          textColor: Colors.white,
+        ),
       ),
     );
   } finally {
@@ -104,7 +135,6 @@ Future _handleAddStaff() async {
     }
   }
 }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

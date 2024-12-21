@@ -216,8 +216,8 @@ class StaffListItem extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: isActive
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.red.withOpacity(0.1),
+                        ? Colors.green.withAlpha((0.1 * 255).toInt())
+                        : Colors.red.withAlpha((0.1 * 255).toInt()),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(

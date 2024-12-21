@@ -296,7 +296,7 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
                         }
                       });
                     },
-                    selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                    selectedColor: Theme.of(context).colorScheme.primary.withAlpha((0.2 * 255).toInt()),
                     checkmarkColor: Theme.of(context).colorScheme.primary,
                   );
                 }).toList(),

@@ -1,9 +1,7 @@
-// lib/services/auth_service.dart
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cateredtoyou/models/user.dart';
 import 'package:flutter/foundation.dart';
+import 'package:cateredtoyou/models/user.dart';
 
 class AuthResult {
   final bool success;
@@ -23,6 +21,110 @@ class AuthService {
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
   User? get currentUser => _auth.currentUser;
+
+  // Register with email and password
+  Future<AuthResult> register({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String phoneNumber,
+  }) async {
+    try {
+      debugPrint('Starting registration process...');
+      
+      // 1. Create Firebase Auth user
+      final UserCredential authResult = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      if (authResult.user == null) {
+        throw 'Failed to create user account';
+      }
+
+      final uid = authResult.user!.uid;
+      debugPrint('Created auth user with ID: $uid');
+
+      try {
+        final now = DateTime.now();
+
+        // 2. Create organization
+        debugPrint('Creating organization...');
+        final orgRef = _firestore.collection('organizations').doc();
+        final orgId = orgRef.id;
+        await orgRef.set({
+          'name': '$firstName $lastName\'s Organization',
+          'ownerId': uid,
+          'createdAt': now,
+          'updatedAt': now,
+          'contactEmail': email,
+          'contactPhone': phoneNumber,
+        });
+
+        // 3. Create user document
+        debugPrint('Creating user document...');
+        final userRef = _firestore.collection('users').doc(uid);
+        final UserModel newUser = UserModel(
+          uid: uid,
+          email: email,
+          firstName: firstName,
+          lastName: lastName,
+          phoneNumber: phoneNumber,
+          role: 'client',
+          employmentStatus: 'active',
+          organizationId: orgId,
+          createdBy: uid,
+          createdAt: now,
+          updatedAt: now,
+        );
+        await userRef.set(newUser.toMap());
+
+        // 4. Create permissions document
+        debugPrint('Creating permissions...');
+        final permissionRef = _firestore.collection('permissions').doc(uid);
+        await permissionRef.set({
+          'role': 'client',
+          'permissions': [
+            'manage_staff',
+            'view_staff',
+            'manage_events',
+            'view_events',
+            'manage_inventory',
+            'view_inventory',
+            'manage_tasks',
+            'view_tasks',
+          ],
+          'organizationId': orgId,
+          'createdAt': now,
+          'updatedAt': now,
+        });
+
+        debugPrint('Registration completed successfully');
+        return AuthResult(
+          success: true,
+          user: newUser,
+        );
+      } catch (e) {
+        // If Firestore operations fail, clean up the auth user
+        debugPrint('Error during Firestore operations, cleaning up auth user...');
+        await authResult.user?.delete();
+        rethrow;
+      }
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Auth Error: ${e.code}');
+      return AuthResult(
+        success: false,
+        error: _getReadableError(e.code),
+      );
+    } catch (e) {
+      debugPrint('Error during registration: $e');
+      return AuthResult(
+        success: false,
+        error: 'Registration failed: ${e.toString()}',
+      );
+    }
+  }
 
   // Sign in with email and password
   Future<AuthResult> signIn(String email, String password) async {
@@ -82,97 +184,6 @@ class AuthService {
     }
   }
 
-  // Register with email and password
-  Future<AuthResult> register({
-  required String email,
-  required String password,
-  required String firstName,
-  required String lastName,
-  required String phoneNumber,
-}) async {
-  try {
-    debugPrint('Starting registration process...');
-    
-    final UserCredential result = await _auth.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-
-    if (result.user != null) {
-      // Create organization first
-      final orgRef = _firestore.collection('organizations').doc();
-      final now = DateTime.now();
-      
-      // Use a batch to ensure all writes succeed or fail together
-      final batch = _firestore.batch();
-      
-      debugPrint('Creating organization...');
-      batch.set(orgRef, {
-        'name': '$firstName $lastName\'s Organization',
-        'ownerId': result.user!.uid,
-        'createdAt': now,
-        'updatedAt': now,
-        'contactEmail': email,
-        'contactPhone': phoneNumber,
-      });
-
-      // Create user document
-      debugPrint('Creating user document...');
-      final userRef = _firestore.collection('users').doc(result.user!.uid);
-      final UserModel newUser = UserModel(
-        uid: result.user!.uid,
-        email: email,
-        firstName: firstName,
-        lastName: lastName,
-        phoneNumber: phoneNumber,
-        role: 'client',
-        employmentStatus: 'active',
-        organizationId: orgRef.id,
-        createdBy: result.user!.uid,
-        createdAt: now,
-        updatedAt: now,
-      );
-      batch.set(userRef, newUser.toMap());
-
-      // Create initial permissions - THIS IS THE KEY FIX
-      debugPrint('Creating permissions...');
-      final permissionRef = _firestore.collection('permissions').doc(result.user!.uid);
-      batch.set(permissionRef, {
-        'role': 'client',
-        'permissions': [
-          'manage_staff',
-          'view_staff',
-          'manage_events',
-          'view_events',
-          'manage_inventory',
-          'view_inventory',
-          'manage_tasks',
-          'view_tasks',
-        ],
-        'organizationId': orgRef.id,
-        'createdAt': now,
-        'updatedAt': now,
-      });
-
-      // Commit all changes
-      await batch.commit();
-      debugPrint('Registration completed successfully');
-
-      return AuthResult(
-        success: true,
-        user: newUser,
-      );
-    }
-
-    return AuthResult(
-      success: false,
-      error: 'Failed to create account',
-    );
-  } catch (e) {
-    debugPrint('Error during registration: $e');
-    rethrow;
-  }
-}
   // Sign out
   Future<void> signOut() async {
     await _auth.signOut();
@@ -208,6 +219,8 @@ class AuthService {
         return 'Email/password accounts are not enabled. Please contact support.';
       case 'too-many-requests':
         return 'Too many failed attempts. Please try again later.';
+      case 'requires-recent-login':
+        return 'Please sign out and sign in again to perform this action';
       default:
         return 'An error occurred. Please try again';
     }

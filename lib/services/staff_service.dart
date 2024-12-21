@@ -1,5 +1,3 @@
-// lib/services/staff_service.dart
-
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -22,7 +20,7 @@ class StaffService extends ChangeNotifier {
         return;
       }
 
-      // First, get the user's organization ID
+      // Get the user's organization ID
       final userDoc = await _firestore
           .collection('users')
           .doc(currentUser.uid)
@@ -36,20 +34,15 @@ class StaffService extends ChangeNotifier {
       final organizationId = userDoc.data()?['organizationId'];
       debugPrint('Getting staff for organization: $organizationId');
 
-      // Now listen to users collection filtered by organizationId
+      // Listen to users collection filtered by organizationId
       yield* _firestore
           .collection('users')
           .where('organizationId', isEqualTo: organizationId)
           .snapshots()
           .map((snapshot) {
-            debugPrint('Got ${snapshot.docs.length} staff members');
             return snapshot.docs
-                .map((doc) {
-                  final data = doc.data();
-                  debugPrint('Processing staff member: ${data['email']}');
-                  return UserModel.fromMap(data);
-                })
-                .where((user) => user.role != 'client') // Exclude clients from the list
+                .map((doc) => UserModel.fromMap(doc.data()))
+                .where((user) => user.role != 'client') // Exclude clients
                 .toList();
           });
 
@@ -60,83 +53,117 @@ class StaffService extends ChangeNotifier {
   }
 
   Future<bool> createStaffMember({
-  required String email,
-  required String password,
-  required String firstName,
-  required String lastName,
-  required String phoneNumber,
-  required String role,
-}) async {
-  final authInstance = FirebaseAuth.instance;
-  final currentUser = authInstance.currentUser;
-  
-  if (currentUser == null) throw 'Not authenticated';
-  
-  try {
-    debugPrint('Starting staff creation process...');
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String phoneNumber,
+    required String role,
+  }) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) throw 'Not authenticated';
     
-    // 1. Get organization ID from current user
-    final orgDoc = await _firestore
-        .collection('users')
-        .doc(currentUser.uid)
-        .get();
-
-    if (!orgDoc.exists) throw 'Organization data not found';
-    final organizationId = orgDoc.get('organizationId');
-    
-    // 2. Create the staff account using admin SDK
-    debugPrint('Creating staff authentication...');
-    await _firestore.runTransaction((transaction) async {
-      // Create user document first
-      final userRef = _firestore.collection('users').doc();
-      final now = DateTime.now();
+    try {
+      debugPrint('Starting staff creation process...');
       
-      // Create user document
-      transaction.set(userRef, {
-        'uid': userRef.id,
-        'email': email,
-        'firstName': firstName,
-        'lastName': lastName,
-        'phoneNumber': phoneNumber,
-        'role': role,
-        'employmentStatus': 'active',
-        'organizationId': organizationId,
-        'createdBy': currentUser.uid,
-        'createdAt': now,
-        'updatedAt': now,
+      // 1. Check organization access
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (!userDoc.exists) throw 'User data not found';
+      final organizationId = userDoc.get('organizationId');
+      final userRole = userDoc.get('role');
+
+      // 2. Verify permissions
+      if (!['admin', 'client', 'manager'].contains(userRole)) {
+        throw 'Insufficient permissions to create staff members';
+      }
+
+      // 3. Create Firebase Auth user
+      debugPrint('Creating Firebase Auth user...');
+      final UserCredential authResult = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      if (authResult.user == null) {
+        throw 'Failed to create authentication account';
+      }
+
+      final uid = authResult.user!.uid;
+      debugPrint('Created user with UID: $uid');
+
+      // 4. Create Firestore documents in a transaction
+      await _firestore.runTransaction((transaction) async {
+        final now = DateTime.now();
+
+        // Create user document
+        final userRef = _firestore.collection('users').doc(uid);
+        transaction.set(userRef, {
+          'uid': uid,
+          'email': email,
+          'firstName': firstName,
+          'lastName': lastName,
+          'phoneNumber': phoneNumber,
+          'role': role,
+          'employmentStatus': 'active',
+          'organizationId': organizationId,
+          'createdBy': currentUser.uid,
+          'createdAt': now,
+          'updatedAt': now,
+        });
+
+        // Create permissions document
+        final permissionRef = _firestore.collection('permissions').doc(uid);
+        transaction.set(permissionRef, {
+          'role': role,
+          'permissions': _getDefaultPermissions(role),
+          'organizationId': organizationId,
+          'createdAt': now,
+          'updatedAt': now,
+        });
       });
 
-      // Create permissions document
-      final permissionRef = _firestore.collection('permissions').doc(userRef.id);
-      transaction.set(permissionRef, {
-        'role': role,
-        'permissions': _getDefaultPermissions(role),
-        'organizationId': organizationId,
-        'createdAt': now,
-        'updatedAt': now,
-      });
-    });
+      debugPrint('Staff member created successfully');
+      notifyListeners();
+      return true;
 
-    debugPrint('Staff member created successfully');
-    notifyListeners();
-    return true;
-
-  } catch (e) {
-    debugPrint('Error creating staff member: $e');
-    rethrow;
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Auth Error: ${e.code}');
+      // Clean up if auth was created but Firestore failed
+      final user = _auth.currentUser;
+      if (user != null && user.uid != currentUser.uid) {
+        await user.delete();
+      }
+      
+      if (e.code == 'email-already-in-use') {
+        throw 'An account with this email already exists';
+      }
+      throw 'Failed to create staff account: ${e.message}';
+    } catch (e) {
+      debugPrint('Error creating staff member: $e');
+      // Clean up if auth was created but Firestore failed
+      final user = _auth.currentUser;
+      if (user != null && user.uid != currentUser.uid) {
+        await user.delete();
+      }
+      rethrow;
+    }
   }
-}
 
   List<String> _getDefaultPermissions(String role) {
     switch (role) {
       case 'manager':
         return [
-          'view_events',
+          'view_staff',
           'manage_events',
-          'view_inventory',
+          'view_events',
           'manage_inventory',
-          'view_tasks',
+          'view_inventory',
           'manage_tasks',
+          'view_tasks',
         ];
       case 'chef':
         return [
@@ -144,26 +171,28 @@ class StaffService extends ChangeNotifier {
           'view_inventory',
           'manage_inventory',
           'view_tasks',
+          'manage_kitchen_tasks',
         ];
       case 'server':
         return [
           'view_events',
           'view_tasks',
-          'update_tasks',
+          'update_service_tasks',
+          'view_inventory',
         ];
       case 'driver':
         return [
           'view_events',
           'view_tasks',
-          'update_tasks',
+          'update_delivery_tasks',
+          'view_inventory',
         ];
-        case 'staff':
+      case 'staff':
         return [
           'view_events',
           'view_tasks',
-          'update_tasks',
           'view_inventory',
-          
+          'update_assigned_tasks',
         ];
       default:
         return [
@@ -175,42 +204,57 @@ class StaffService extends ChangeNotifier {
 
   // Update staff member
   Future<void> updateStaffMember(UserModel staff) async {
-  try {
-    final organization = await _organizationService.getCurrentUserOrganization();
-    if (organization == null) {
-      throw 'Organization not found';
-    }
+    try {
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) {
+        throw 'Organization not found';
+      }
 
-    if (staff.organizationId != organization.id) {
-      throw 'Staff member belongs to a different organization';
-    }
+      if (staff.organizationId != organization.id) {
+        throw 'Staff member belongs to a different organization';
+      }
 
-    // Start a batch write
-    final batch = _firestore.batch();
+      // Verify current user has permission
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
 
-    // Update user document
-    batch.update(
-      _firestore.collection('users').doc(staff.uid),
-      staff.toMap()
-    );
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
 
-    // Update permissions
-    batch.update(
-      _firestore.collection('permissions').doc(staff.uid),
-      {
+      if (!userDoc.exists) throw 'User data not found';
+      final userRole = userDoc.get('role');
+
+      if (!['admin', 'client', 'manager'].contains(userRole)) {
+        throw 'Insufficient permissions to update staff members';
+      }
+
+      // Start a batch write
+      final batch = _firestore.batch();
+
+      // Update user document
+      final userRef = _firestore.collection('users').doc(staff.uid);
+      batch.update(userRef, {
+        ...staff.toMap(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Update permissions
+      final permissionRef = _firestore.collection('permissions').doc(staff.uid);
+      batch.update(permissionRef, {
         'role': staff.role,
         'permissions': _getDefaultPermissions(staff.role),
-        'updatedAt': DateTime.now(),
-      }
-    );
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-    await batch.commit();
-    notifyListeners();
-  } catch (e) {
-    debugPrint('Error updating staff member: $e');
-    rethrow;
+      await batch.commit();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating staff member: $e');
+      rethrow;
+    }
   }
-}
 
   // Change staff status
   Future<void> changeStaffStatus(String uid, String status) async {
@@ -220,6 +264,23 @@ class StaffService extends ChangeNotifier {
         throw 'Organization not found';
       }
 
+      // Verify current user has permission
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
+
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (!userDoc.exists) throw 'User data not found';
+      final userRole = userDoc.get('role');
+
+      if (!['admin', 'client', 'manager'].contains(userRole)) {
+        throw 'Insufficient permissions to change staff status';
+      }
+
+      // Get staff document
       final staffDoc = await _firestore
           .collection('users')
           .doc(uid)
@@ -229,12 +290,13 @@ class StaffService extends ChangeNotifier {
         throw 'Staff member not found in your organization';
       }
 
+      // Update staff status
       await _firestore
           .collection('users')
           .doc(uid)
           .update({
             'employmentStatus': status,
-            'updatedAt': DateTime.now(),
+            'updatedAt': FieldValue.serverTimestamp(),
           });
 
       notifyListeners();
@@ -250,6 +312,68 @@ class StaffService extends ChangeNotifier {
       await _auth.sendPasswordResetEmail(email: email);
     } catch (e) {
       debugPrint('Error resetting staff password: $e');
+      rethrow;
+    }
+  }
+
+  // Delete staff member (Additional safety checks)
+  Future<void> deleteStaffMember(String uid) async {
+    try {
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) {
+        throw 'Organization not found';
+      }
+
+      // Verify current user has permission
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
+
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (!userDoc.exists) throw 'User data not found';
+      final userRole = userDoc.get('role');
+
+      if (!['admin', 'client'].contains(userRole)) {
+        throw 'Insufficient permissions to delete staff members';
+      }
+
+      // Get staff document
+      final staffDoc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get();
+
+      if (!staffDoc.exists || staffDoc.data()?['organizationId'] != organization.id) {
+        throw 'Staff member not found in your organization';
+      }
+
+      // Start a batch write
+      final batch = _firestore.batch();
+
+      // Delete user document
+      batch.delete(_firestore.collection('users').doc(uid));
+
+      // Delete permissions document
+      batch.delete(_firestore.collection('permissions').doc(uid));
+
+      await batch.commit();
+
+      // Note: Firebase Auth user deletion requires admin SDK
+      // For client-side, we'll mark the user as inactive instead
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .update({
+            'employmentStatus': 'inactive',
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error deleting staff member: $e');
       rethrow;
     }
   }
