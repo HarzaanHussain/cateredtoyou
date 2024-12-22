@@ -1,36 +1,36 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
-import 'package:cateredtoyou/models/user.dart';
-import 'package:cateredtoyou/services/staff_service.dart';
-import 'package:cateredtoyou/widgets/custom_button.dart';
-import 'package:cateredtoyou/widgets/custom_text_field.dart';
-import 'package:cateredtoyou/utils/validators.dart';
+import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
+import 'package:provider/provider.dart'; // Importing Provider package for state management.
+import 'package:go_router/go_router.dart'; // Importing GoRouter package for navigation.
+import 'package:cateredtoyou/models/user.dart'; // Importing UserModel from the models directory.
+import 'package:cateredtoyou/services/staff_service.dart'; // Importing StaffService for staff-related operations.
+import 'package:cateredtoyou/widgets/custom_button.dart'; // Importing custom button widget.
+import 'package:cateredtoyou/widgets/custom_text_field.dart'; // Importing custom text field widget.
+import 'package:cateredtoyou/utils/validators.dart'; // Importing validators for form validation.
 
-class EditStaffScreen extends StatefulWidget {
-  final UserModel staff;
+class EditStaffScreen extends StatefulWidget { // Stateful widget for editing staff details.
+  final UserModel staff; // Staff member to be edited.
 
   const EditStaffScreen({
     super.key,
-    required this.staff,
+    required this.staff, // Required staff member parameter.
   });
 
   @override
-  State<EditStaffScreen> createState() => _EditStaffScreenState();
+  State<EditStaffScreen> createState() => _EditStaffScreenState(); // Creating state for the widget.
 }
 
 class _EditStaffScreenState extends State<EditStaffScreen> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _firstNameController;
-  late final TextEditingController _lastNameController;
-  late final TextEditingController _phoneController;
-  late String _selectedRole;
-  final List<String> _departments = [];
-  bool _isLoading = false;
-  String? _error;
-  late final StaffService _staffService;
+  final _formKey = GlobalKey<FormState>(); // Key for the form to validate.
+  late final TextEditingController _firstNameController; // Controller for first name input.
+  late final TextEditingController _lastNameController; // Controller for last name input.
+  late final TextEditingController _phoneController; // Controller for phone number input.
+  late String _selectedRole; // Selected role for the staff member.
+  final List<String> _departments = []; // List of selected departments.
+  bool _isLoading = false; // Loading state for async operations.
+  String? _error; // Error message if any operation fails.
+  late final StaffService _staffService; // Service for staff-related operations.
 
-  final List<String> _roles = [
+  final List<String> _roles = [ // List of available roles.
     'staff',
     'manager',
     'chef',
@@ -38,7 +38,7 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
     'driver'
   ];
 
-  final List<String> _availableDepartments = [
+  final List<String> _availableDepartments = [ // List of available departments.
     'Kitchen',
     'Service',
     'Delivery',
@@ -49,34 +49,34 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
   @override
   void initState() {
     super.initState();
-    _staffService = Provider.of<StaffService>(context, listen: false);
-    _firstNameController = TextEditingController(text: widget.staff.firstName);
-    _lastNameController = TextEditingController(text: widget.staff.lastName);
-    _phoneController = TextEditingController(text: widget.staff.phoneNumber);
-    _selectedRole = widget.staff.role;
+    _staffService = Provider.of<StaffService>(context, listen: false); // Initializing staff service.
+    _firstNameController = TextEditingController(text: widget.staff.firstName); // Initializing first name controller with staff's first name.
+    _lastNameController = TextEditingController(text: widget.staff.lastName); // Initializing last name controller with staff's last name.
+    _phoneController = TextEditingController(text: widget.staff.phoneNumber); // Initializing phone controller with staff's phone number.
+    _selectedRole = widget.staff.role; // Setting initial selected role.
     if (widget.staff.departments != null) {
-      _departments.addAll(widget.staff.departments!);
+      _departments.addAll(widget.staff.departments!); // Adding existing departments to the list.
     }
   }
 
   @override
   void dispose() {
-    _firstNameController.dispose();
-    _lastNameController.dispose();
-    _phoneController.dispose();
+    _firstNameController.dispose(); // Disposing first name controller.
+    _lastNameController.dispose(); // Disposing last name controller.
+    _phoneController.dispose(); // Disposing phone controller.
     super.dispose();
   }
 
-  Future<void> _handleUpdate() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _handleUpdate() async { // Function to handle staff update.
+    if (!_formKey.currentState!.validate()) return; // Validate form inputs.
 
     setState(() {
-      _isLoading = true;
-      _error = null;
+      _isLoading = true; // Set loading state to true.
+      _error = null; // Reset error message.
     });
 
     try {
-      final updatedStaff = widget.staff.copyWith(
+      final updatedStaff = widget.staff.copyWith( // Create updated staff object.
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
         phoneNumber: _phoneController.text.trim(),
@@ -84,40 +84,40 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
         departments: _departments.isNotEmpty ? _departments : null,
       );
 
-      await _staffService.updateStaffMember(updatedStaff);
+      await _staffService.updateStaffMember(updatedStaff); // Update staff member in the service.
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar( // Show success message.
         const SnackBar(content: Text('Staff member updated successfully')),
       );
-      context.go('/staff');
+      context.go('/staff'); // Navigate to staff list.
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = e.toString(); // Set error message.
       });
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isLoading = false; // Set loading state to false.
         });
       }
     }
   }
 
-  Future<void> _handleResetPassword() async {
+  Future<void> _handleResetPassword() async { // Function to handle password reset.
     setState(() {
-      _isLoading = true;
-      _error = null;
+      _isLoading = true; // Set loading state to true.
+      _error = null; // Reset error message.
     });
 
     try {
-      await _staffService.resetStaffPassword(widget.staff.email);
+      await _staffService.resetStaffPassword(widget.staff.email); // Reset staff password.
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar( // Show success message.
         const SnackBar(
           content: Text('Password reset email sent successfully'),
         ),
@@ -125,32 +125,32 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = e.toString(); // Set error message.
       });
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isLoading = false; // Set loading state to false.
         });
       }
     }
   }
 
-  Future<void> _handleStatusChange(String newStatus) async {
+  Future<void> _handleStatusChange(String newStatus) async { // Function to handle status change.
     try {
       setState(() {
-        _isLoading = true;
-        _error = null;
+        _isLoading = true; // Set loading state to true.
+        _error = null; // Reset error message.
       });
 
-      await _staffService.changeStaffStatus(
+      await _staffService.changeStaffStatus( // Change staff status.
         widget.staff.uid,
         newStatus,
       );
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar( // Show success message.
         SnackBar(
           content: Text(
             'Staff member ${newStatus == 'active' ? 'reactivated' : 'deactivated'} successfully'
@@ -158,24 +158,24 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
         ),
       );
       
-      context.go('/staff');
+      context.go('/staff'); // Navigate to staff list.
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = e.toString(); // Set error message.
       });
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isLoading = false; // Set loading state to false.
         });
       }
     }
   }
 
-  void _showStatusConfirmation() {
-    final isActive = widget.staff.employmentStatus == 'active';
-    final newStatus = isActive ? 'inactive' : 'active';
+  void _showStatusConfirmation() { // Function to show status change confirmation dialog.
+    final isActive = widget.staff.employmentStatus == 'active'; // Check if staff is active.
+    final newStatus = isActive ? 'inactive' : 'active'; // Determine new status.
 
     showDialog(
       context: context,
@@ -188,18 +188,18 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
+            onPressed: () => Navigator.pop(dialogContext), // Close dialog.
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(dialogContext);
-              _handleStatusChange(newStatus);
+              Navigator.pop(dialogContext); // Close dialog.
+              _handleStatusChange(newStatus); // Handle status change.
             },
             style: TextButton.styleFrom(
-              foregroundColor: isActive ? Colors.red : Colors.green,
+              foregroundColor: isActive ? Colors.red : Colors.green, // Set button color based on status.
             ),
-            child: Text(isActive ? 'Deactivate' : 'Reactivate'),
+            child: Text(isActive ? 'Deactivate' : 'Reactivate'), // Set button text based on status.
           ),
         ],
       ),
@@ -208,70 +208,70 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isActive = widget.staff.employmentStatus == 'active';
+    final isActive = widget.staff.employmentStatus == 'active'; // Check if staff is active.
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Edit ${widget.staff.fullName}'),
+        title: Text('Edit ${widget.staff.fullName}'), // Set app bar title.
         actions: [
           IconButton(
-            icon: const Icon(Icons.key),
-            onPressed: _isLoading ? null : _handleResetPassword,
-            tooltip: 'Reset Password',
+            icon: const Icon(Icons.key), // Icon for reset password.
+            onPressed: _isLoading ? null : _handleResetPassword, // Handle reset password.
+            tooltip: 'Reset Password', // Tooltip for the button.
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0), // Set padding for the body.
         child: Form(
-          key: _formKey,
+          key: _formKey, // Set form key.
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.stretch, // Stretch children to fill the column.
             children: [
               CustomTextField(
-                controller: _firstNameController,
-                label: 'First Name',
-                prefixIcon: Icons.person,
-                validator: Validators.validateName,
+                controller: _firstNameController, // Set controller for first name input.
+                label: 'First Name', // Set label for first name input.
+                prefixIcon: Icons.person, // Set prefix icon for first name input.
+                validator: Validators.validateName, // Set validator for first name input.
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 16), // Add vertical space.
               CustomTextField(
-                controller: _lastNameController,
-                label: 'Last Name',
-                prefixIcon: Icons.person,
-                validator: Validators.validateName,
+                controller: _lastNameController, // Set controller for last name input.
+                label: 'Last Name', // Set label for last name input.
+                prefixIcon: Icons.person, // Set prefix icon for last name input.
+                validator: Validators.validateName, // Set validator for last name input.
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 16), // Add vertical space.
               CustomTextField(
-                controller: _phoneController,
-                label: 'Phone Number',
-                prefixIcon: Icons.phone,
-                keyboardType: TextInputType.phone,
-                validator: Validators.validatePhone,
+                controller: _phoneController, // Set controller for phone number input.
+                label: 'Phone Number', // Set label for phone number input.
+                prefixIcon: Icons.phone, // Set prefix icon for phone number input.
+                keyboardType: TextInputType.phone, // Set keyboard type for phone number input.
+                validator: Validators.validatePhone, // Set validator for phone number input.
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 16), // Add vertical space.
               DropdownButtonFormField<String>(
-                value: _selectedRole,
+                value: _selectedRole, // Set selected role.
                 decoration: const InputDecoration(
-                  labelText: 'Role',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.work),
+                  labelText: 'Role', // Set label for role dropdown.
+                  border: OutlineInputBorder(), // Set border for role dropdown.
+                  prefixIcon: Icon(Icons.work), // Set prefix icon for role dropdown.
                 ),
-                items: _roles.map((String role) {
+                items: _roles.map((String role) { // Map roles to dropdown items.
                   return DropdownMenuItem<String>(
                     value: role,
-                    child: Text(role.toUpperCase()),
+                    child: Text(role.toUpperCase()), // Display role in uppercase.
                   );
                 }).toList(),
                 onChanged: (String? value) {
                   if (value != null) {
                     setState(() {
-                      _selectedRole = value;
+                      _selectedRole = value; // Update selected role.
                     });
                   }
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 16), // Add vertical space.
               const Text(
                 'Departments',
                 style: TextStyle(
@@ -282,31 +282,31 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: _availableDepartments.map((department) {
-                  final isSelected = _departments.contains(department);
+                children: _availableDepartments.map((department) { // Map departments to filter chips.
+                  final isSelected = _departments.contains(department); // Check if department is selected.
                   return FilterChip(
                     selected: isSelected,
-                    label: Text(department),
+                    label: Text(department), // Display department name.
                     onSelected: (bool selected) {
                       setState(() {
                         if (selected) {
-                          _departments.add(department);
+                          _departments.add(department); // Add department to selected list.
                         } else {
-                          _departments.remove(department);
+                          _departments.remove(department); // Remove department from selected list.
                         }
                       });
                     },
-                    selectedColor: Theme.of(context).colorScheme.primary.withAlpha((0.2 * 255).toInt()),
-                    checkmarkColor: Theme.of(context).colorScheme.primary,
+                    selectedColor: Theme.of(context).colorScheme.primary.withAlpha((0.2 * 255).toInt()), // Set selected color.
+                    checkmarkColor: Theme.of(context).colorScheme.primary, // Set checkmark color.
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 24), // Add vertical space.
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Text(
-                    _error!,
+                    _error!, // Display error message.
                     style: const TextStyle(
                       color: Colors.red,
                       fontSize: 14,
@@ -315,22 +315,22 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
                   ),
                 ),
               CustomButton(
-                label: 'Update Staff Member',
-                onPressed: _isLoading ? null : _handleUpdate,
-                isLoading: _isLoading,
+                label: 'Update Staff Member', // Set button label.
+                onPressed: _isLoading ? null : _handleUpdate, // Handle update staff member.
+                isLoading: _isLoading, // Set loading state for button.
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 16), // Add vertical space.
               OutlinedButton(
-                onPressed: _isLoading ? null : _showStatusConfirmation,
+                onPressed: _isLoading ? null : _showStatusConfirmation, // Show status confirmation dialog.
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: isActive ? Colors.red : Colors.green,
+                  foregroundColor: isActive ? Colors.red : Colors.green, // Set button color based on status.
                   side: BorderSide(
-                    color: isActive ? Colors.red : Colors.green,
+                    color: isActive ? Colors.red : Colors.green, // Set border color based on status.
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 16), // Set padding for button.
                 ),
                 child: Text(
-                  isActive ? 'Deactivate Staff Member' : 'Reactivate Staff Member'
+                  isActive ? 'Deactivate Staff Member' : 'Reactivate Staff Member' // Set button text based on status.
                 ),
               ),
             ],

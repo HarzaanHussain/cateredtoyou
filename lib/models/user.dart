@@ -1,19 +1,44 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// A model class representing a user in the system.
 class UserModel {
+  /// The unique identifier for the user.
   final String uid;
+
+  /// The email address of the user.
   final String email;
+
+  /// The first name of the user.
   final String firstName;
+
+  /// The last name of the user.
   final String lastName;
+
+  /// The phone number of the user.
   final String phoneNumber;
+
+  /// The role of the user (e.g., admin, client).
   final String role;
+
+  /// The employment status of the user (optional).
   final String? employmentStatus;
+
+  /// The departments the user belongs to (optional).
   final List<String>? departments;
+
+  /// The user who created this user record (optional).
   final String? createdBy;
+
+  /// The organization ID the user belongs to.
   final String organizationId;
+
+  /// The date and time when the user was created.
   final DateTime createdAt;
+
+  /// The date and time when the user was last updated.
   final DateTime updatedAt;
 
+  /// Constructor for creating a new [UserModel] instance.
   UserModel({
     required this.uid,
     required this.email,
@@ -29,8 +54,10 @@ class UserModel {
     required this.updatedAt,
   });
 
+  /// Returns the full name of the user by concatenating first and last names.
   String get fullName => '$firstName $lastName';
 
+  /// Converts the [UserModel] instance to a map for serialization.
   Map<String, dynamic> toMap() {
     return {
       'uid': uid,
@@ -48,6 +75,7 @@ class UserModel {
     };
   }
 
+  /// Creates a new [UserModel] instance from a map.
   factory UserModel.fromMap(Map<String, dynamic> map) {
     return UserModel(
       uid: map['uid'] ?? '',
@@ -67,6 +95,7 @@ class UserModel {
     );
   }
 
+  /// Creates a copy of the current [UserModel] instance with updated fields.
   UserModel copyWith({
     String? firstName,
     String? lastName,

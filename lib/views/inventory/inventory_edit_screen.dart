@@ -1,4 +1,3 @@
-// lib/views/inventory/inventory_edit_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';

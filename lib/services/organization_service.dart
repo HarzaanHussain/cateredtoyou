@@ -3,41 +3,51 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cateredtoyou/models/organization.dart';
 
+/// Service class for managing organizations and user-organization relationships.
 class OrganizationService extends ChangeNotifier {
+  /// Instance of FirebaseFirestore for database operations.
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  /// Instance of FirebaseAuth for authentication operations.
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Get current user's organization
+  /// Retrieves the current user's organization.
+  /// 
+  /// Returns an [Organization] object if the user is authenticated and belongs to an organization,
+  /// otherwise returns null.
   Future<Organization?> getCurrentUserOrganization() async {
     try {
-      final user = _auth.currentUser;
-      if (user == null) return null;
+      final user = _auth.currentUser; // Get the currently authenticated user.
+      if (user == null) return null; // Return null if no user is authenticated.
 
       final userDoc = await _firestore
           .collection('users')
           .doc(user.uid)
-          .get();
+          .get(); // Get the user's document from Firestore.
 
-      if (!userDoc.exists) return null;
+      if (!userDoc.exists) return null; // Return null if the user document does not exist.
 
-      final orgId = userDoc.data()?['organizationId'];
-      if (orgId == null) return null;
+      final orgId = userDoc.data()?['organizationId']; // Get the organization ID from the user document.
+      if (orgId == null) return null; // Return null if the organization ID is not found.
 
       final orgDoc = await _firestore
           .collection('organizations')
           .doc(orgId)
-          .get();
+          .get(); // Get the organization document from Firestore.
 
-      if (!orgDoc.exists) return null;
+      if (!orgDoc.exists) return null; // Return null if the organization document does not exist.
 
-      return Organization.fromMap(orgDoc.data()!, orgDoc.id);
+      return Organization.fromMap(orgDoc.data()!, orgDoc.id); // Return the organization object.
     } catch (e) {
-      debugPrint('Error getting organization: $e');
-      return null;
+      debugPrint('Error getting organization: $e'); // Print error message if an exception occurs.
+      return null; // Return null in case of an error.
     }
   }
 
-  // Create new organization
+  /// Creates a new organization.
+  /// 
+  /// Takes the organization's name, contact email, contact phone, and address as parameters.
+  /// Returns the created [Organization] object.
   Future<Organization> createOrganization({
     required String name,
     String? contactEmail,
@@ -45,12 +55,12 @@ class OrganizationService extends ChangeNotifier {
     String? address,
   }) async {
     try {
-      final user = _auth.currentUser;
-      if (user == null) throw 'User not authenticated';
+      final user = _auth.currentUser; // Get the currently authenticated user.
+      if (user == null) throw 'User not authenticated'; // Throw an error if no user is authenticated.
 
-      final orgRef = _firestore.collection('organizations').doc();
+      final orgRef = _firestore.collection('organizations').doc(); // Create a new document reference for the organization.
       
-      final now = DateTime.now();
+      final now = DateTime.now(); // Get the current date and time.
       final organization = Organization(
         id: orgRef.id,
         name: name,
@@ -60,11 +70,11 @@ class OrganizationService extends ChangeNotifier {
         contactEmail: contactEmail,
         contactPhone: contactPhone,
         address: address,
-      );
+      ); // Create a new organization object.
 
-      await orgRef.set(organization.toMap());
+      await orgRef.set(organization.toMap()); // Save the organization object to Firestore.
 
-      // Update user with organization ID
+      // Update the user document with the organization ID.
       await _firestore
           .collection('users')
           .doc(user.uid)
@@ -73,62 +83,70 @@ class OrganizationService extends ChangeNotifier {
             'updatedAt': now,
           });
 
-      notifyListeners();
-      return organization;
+      notifyListeners(); // Notify listeners about the change.
+      return organization; // Return the created organization object.
     } catch (e) {
-      debugPrint('Error creating organization: $e');
-      rethrow;
+      debugPrint('Error creating organization: $e'); // Print error message if an exception occurs.
+      rethrow; // Rethrow the exception.
     }
   }
 
-  // Update organization
+  /// Updates an existing organization.
+  /// 
+  /// Takes an [Organization] object as a parameter and updates the corresponding document in Firestore.
   Future<void> updateOrganization(Organization organization) async {
     try {
       await _firestore
           .collection('organizations')
           .doc(organization.id)
-          .update(organization.toMap());
+          .update(organization.toMap()); // Update the organization document in Firestore.
 
-      notifyListeners();
+      notifyListeners(); // Notify listeners about the change.
     } catch (e) {
-      debugPrint('Error updating organization: $e');
-      rethrow;
+      debugPrint('Error updating organization: $e'); // Print error message if an exception occurs.
+      rethrow; // Rethrow the exception.
     }
   }
 
-  // Get organization members count
+  /// Retrieves the count of members in an organization.
+  /// 
+  /// Takes the organization ID as a parameter.
+  /// Returns the count of members in the organization.
   Future<int> getOrganizationMembersCount(String organizationId) async {
     try {
       final snapshot = await _firestore
           .collection('users')
           .where('organizationId', isEqualTo: organizationId)
           .count()
-          .get();
+          .get(); // Get the count of users belonging to the organization.
 
-      return snapshot.count ?? 0;
+      return snapshot.count ?? 0; // Return the count of members, or 0 if the count is null.
     } catch (e) {
-      debugPrint('Error getting members count: $e');
-      return 0;
+      debugPrint('Error getting members count: $e'); // Print error message if an exception occurs.
+      return 0; // Return 0 in case of an error.
     }
   }
 
-  // Check if user has organization access
+  /// Checks if the current user has access to a specific organization.
+  /// 
+  /// Takes the organization ID as a parameter.
+  /// Returns true if the user has access, otherwise returns false.
   Future<bool> hasOrganizationAccess(String organizationId) async {
     try {
-      final user = _auth.currentUser;
-      if (user == null) return false;
+      final user = _auth.currentUser; // Get the currently authenticated user.
+      if (user == null) return false; // Return false if no user is authenticated.
 
       final userDoc = await _firestore
           .collection('users')
           .doc(user.uid)
-          .get();
+          .get(); // Get the user's document from Firestore.
 
-      if (!userDoc.exists) return false;
+      if (!userDoc.exists) return false; // Return false if the user document does not exist.
 
-      return userDoc.data()?['organizationId'] == organizationId;
+      return userDoc.data()?['organizationId'] == organizationId; // Return true if the user belongs to the organization.
     } catch (e) {
-      debugPrint('Error checking organization access: $e');
-      return false;
+      debugPrint('Error checking organization access: $e'); // Print error message if an exception occurs.
+      return false; // Return false in case of an error.
     }
   }
 }
