@@ -1,213 +1,185 @@
-# CateredToYou - Catering Management System
+# CateredToYou - Staff and Inventory Management System
 
-## Overview
-CateredToYou is a comprehensive Flutter-based catering management application integrated with Firebase. It provides a robust solution for managing catering operations, including staff management, inventory control, event planning, and task automation.
+A Flutter application for managing staff, inventory, and catering operations with role-based access control and real-time data synchronization.
+
+## Project Overview
+
+CateredToYou is a comprehensive management system that allows catering businesses to:
+- Manage staff members with different roles and permissions
+- Track inventory items and stock levels
+- Handle role-based access control
+- Manage organizations and multi-tenant data isolation
+
+### Core Features
+
+- **Authentication & Authorization**
+  - User registration and login
+  - Role-based access control (Admin, Client, Manager, Chef, Server, Driver)
+  - Organization-based data isolation
+
+- **Staff Management**
+  - Add/Edit staff members
+  - Assign roles and permissions
+  - Manage employment status
+  - Password reset functionality
+
+- **Inventory Management**
+  - Track inventory items
+  - Monitor stock levels
+  - Handle reorder points
+  - Record inventory transactions
 
 ## Project Structure
-```
+
+ 
 lib/
-├── models/                  # Data models
-│   ├── user.dart           # User model
-│   ├── auth_model.dart     # Authentication state management
+├── models/                 # Data Models
+│   ├── user.dart          # User data model with roles and permissions
+│   ├── auth_model.dart    # Authentication state management
+│   ├── inventory_item_model.dart  # Inventory item model
 │   └── organization.dart   # Organization model
 │
-├── routes/                 # Navigation
-│   └── app_router.dart     # Centralized routing with GoRouter
-│
-├── services/              # Business logic & Firebase interactions
-│   ├── auth_service.dart   # Authentication service
-│   ├── firebase_service.dart # Firebase configuration
-│   ├── staff_service.dart   # Staff management
+├── services/              # Business Logic Layer
+│   ├── auth_service.dart       # Authentication operations
+│   ├── firebase_service.dart   # Firebase initialization and config
+│   ├── inventory_service.dart  # Inventory management
 │   ├── organization_service.dart # Organization management
-│   └── role_permissions.dart # Permission management
+│   ├── role_permissions.dart   # Permission management
+│   └── staff_service.dart      # Staff management
 │
-├── utils/                 # Utilities
-│   ├── constants.dart      # App constants
-│   └── validators.dart     # Form validation
-│
-├── views/                 # UI screens
-│   ├── auth/              # Authentication screens
-│   │   ├── login_screen.dart
-│   │   └── register_screen.dart
-│   ├── staff/            # Staff management
-│   │   ├── staff_list_screen.dart
-│   │   ├── add_staff_screen.dart
-│   │   └── edit_staff_screen.dart
+├── views/                 # UI Screens
+│   ├── auth/
+│   │   ├── login_screen.dart    # User login
+│   │   └── register_screen.dart # User registration
+│   ├── inventory/
+│   │   ├── inventory_list_screen.dart  # Inventory listing
+│   │   └── inventory_edit_screen.dart  # Add/Edit inventory
+│   ├── staff/
+│   │   ├── staff_list_screen.dart     # Staff listing
+│   │   ├── add_staff_screen.dart      # Add new staff
+│   │   └── edit_staff_screen.dart     # Edit staff details
 │   └── home/
-│       └── home_screen.dart
+│       └── home_screen.dart           # Main dashboard
 │
-└── widgets/              # Reusable components
-    ├── custom_button.dart
-    └── custom_text_field.dart
-```
+├── widgets/              # Reusable Components
+│   ├── bottom_nav_bar.dart   # Bottom navigation
+│   ├── custom_button.dart    # Styled buttons
+│   ├── custom_text_field.dart # Form inputs
+│   └── permission_widget.dart # Permission-based rendering
+│
+└── utils/               # Utilities
+    └── validators.dart  # Form validation rules
 
-## Current Features
+ 
 
-### Authentication System
-- Email/password authentication
+## Technical Architecture
+
+### Authentication Flow
+1. Users can register as clients or staff members
+2. Authentication state is managed using Firebase Auth
+3. User roles and permissions are stored in Firestore
+4. Organization-based data isolation is enforced
+
+### Data Model
+1. **Users Collection**
+   - uid: string
+   - email: string
+   - firstName: string
+   - lastName: string
+   - role: string
+   - organizationId: string
+   - employmentStatus: string
+   - createdAt: timestamp
+   - updatedAt: timestamp
+
+2. **Permissions Collection**
+   - uid: string (matches user)
+   - role: string
+   - permissions: array
+   - organizationId: string
+
+3. **Inventory Collection**
+   - id: string
+   - name: string
+   - category: enum
+   - quantity: number
+   - reorderPoint: number
+   - organizationId: string
+
+### Security Rules
+The application implements comprehensive security rules for data access:
+- Organization-based isolation
 - Role-based access control
-- Organization-based data isolation
-- Session management
-- Secure password handling
+- Validation of inventory operations
+- Protected staff management
 
-### Staff Management
-- Staff creation and editing
-- Role assignment (Admin, Manager, Chef, Server, Driver)
-- Department management
-- Status control (Active/Inactive)
-- Staff search and filtering
-- Permission-based access control
+## Setup and Configuration
 
-### Organization Management
-- Multi-organization support
-- Organization-based data isolation
-- Organization settings management
-- User-organization relationship handling
+1. **Prerequisites**
+   - Flutter SDK
+   - Firebase project
+   - Firebase CLI
 
-## Upcoming Features
+2. **Firebase Setup**
+      
+   # Initialize Firebase
+   flutterfire configure
+    
 
-### 1. Inventory Management (In Development)
-- Inventory tracking
-- Stock level monitoring
-- Automatic reorder alerts
-- Usage tracking
-- Inventory categories
-  - Food items
-  - Beverages
-  - Equipment
-  - Supplies
-- Reports and analytics
+3. **Environment Configuration**
+   - Create firebase_options.dart with your Firebase credentials
+   - Set up security rules in Firebase Console
 
-### 2. Event Management (Planned)
-- Event creation and planning
-- Client management
-- Venue management
-- Menu planning
-- Staff assignment
-- Event timeline creation
-- Resource allocation
-- Budget tracking
-- Client communication tools
-- Event status tracking
-- Automated task generation
+4. **Run the Application**
+      
+   flutter pub get
+   flutter run
+    
 
-### 3. Task Management (Planned)
-- Automated task generation from events
-- Task assignment
-- Priority management
-- Status tracking
-- Department-based task routing
-- Deadline management
-- Task dependencies
-- Progress tracking
-- Notification system
+## Role-Based Permissions
 
-## Technical Details
+1. **Admin**
+   - Full system access
+   - Manage all staff and inventory
+   - View all reports
 
-### Firebase Integration
-- Cloud Firestore for data storage
-- Firebase Authentication for user management
-- Security rules for data protection
-- Real-time data synchronization
+2. **Client**
+   - Manage staff members
+   - View inventory
+   - Access reports
 
-### State Management
-- Provider for state management
-- ChangeNotifier for service states
-- StreamBuilder for real-time updates
+3. **Manager**
+   - Manage assigned staff
+   - Handle inventory
+   - View reports
 
-### Navigation
-- GoRouter for routing
-- Deep linking support
-- Route protection
-- Navigation state management
+4. **Staff** (Chef, Server, Driver)
+   - View assigned tasks
+   - Update inventory (role-specific)
+   - View relevant information
 
-### Security
-```javascript
-// Security Rules Structure
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Organization-based access
-    match /organizations/{orgId} {
-      allow read: if isAuthenticated();
-      allow write: if hasManagementRole();
-    }
+## Future Enhancements
 
-    // User management
-    match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if hasManagementPermissions();
-    }
+1. **Planned Features**
+   - Event management system
+   - Task assignment and tracking
+   - Automated inventory alerts
+   - Advanced reporting
 
-    // Additional collections...
-  }
-}
-```
-
-## Getting Started
-
-### Prerequisites
-- Flutter SDK (Latest stable version)
-- Firebase CLI
-- Node.js & npm
-- Git
-
-### Installation
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/cateredtoyou.git
-```
-
-2. Install dependencies:
-```bash
-flutter pub get
-```
-
-3. Configure Firebase:
-```bash
-flutterfire configure
-```
-
-4. Run the app:
-```bash
-flutter run
-```
-
-### Environment Setup
-Create a `.env` file with:
-```
-FIREBASE_API_KEY=your_api_key
-FIREBASE_PROJECT_ID=your_project_id
-FIREBASE_APP_ID=your_app_id
-```
-
-## Development Guidelines
-
-### Code Style
-- Follow Flutter's style guide
-- Use camelCase for variables and methods
-- Use PascalCase for classes
-- Document public APIs
-- Write unit tests for business logic
-
-### State Management
-- Use Provider for simple state
-- Implement proper error handling
-- Follow reactive programming patterns
-- Maintain immutable state
-
-### UI/UX Guidelines
-- Material Design 3
-- Responsive layouts
-- Error feedback
-- Loading states
-- Accessibility support
+2. **Technical Improvements**
+   - Implement caching for offline support
+   - Add real-time notifications
+   - Enhanced security measures
+   - Performance optimization
 
 ## Contributing
+
 1. Fork the repository
 2. Create a feature branch
-3. Commit changes
+3. Commit your changes
 4. Push to the branch
-5. Open a pull request
+5. Create a Pull Request
 
 ## License
-This project is licensed under the MIT License.
+
+This project is proprietary and confidential. All rights reserved.
