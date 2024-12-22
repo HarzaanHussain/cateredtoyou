@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cateredtoyou/models/user.dart';
 import 'package:cateredtoyou/services/organization_service.dart';
 
+
 class StaffService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -11,6 +12,10 @@ class StaffService extends ChangeNotifier {
 
   StaffService(this._organizationService);
 
+  // Get staff members for current organization
+  // Cache for organization ID to prevent multiple fetches
+  String? _cachedOrgId;
+  
   // Get staff members for current organization
   Stream<List<UserModel>> getStaffMembers() async* {
     try {
@@ -20,18 +25,31 @@ class StaffService extends ChangeNotifier {
         return;
       }
 
-      // Get the user's organization ID
-      final userDoc = await _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
+      // Use cached organization ID if available
+      String? organizationId = _cachedOrgId;
       
-      if (!userDoc.exists) {
+      if (organizationId == null) {
+        // Get the user's organization ID
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+        
+        if (!userDoc.exists) {
+          yield [];
+          return;
+        }
+
+        organizationId = userDoc.data()?['organizationId'];
+        _cachedOrgId = organizationId; // Cache the organization ID
+      }
+
+      if (organizationId == null) {
+        debugPrint('No organization ID found');
         yield [];
         return;
       }
 
-      final organizationId = userDoc.data()?['organizationId'];
       debugPrint('Getting staff for organization: $organizationId');
 
       // Listen to users collection filtered by organizationId
@@ -39,11 +57,20 @@ class StaffService extends ChangeNotifier {
           .collection('users')
           .where('organizationId', isEqualTo: organizationId)
           .snapshots()
+          .handleError((error) {
+            debugPrint('Error in staff stream: $error');
+            return [];
+          })
           .map((snapshot) {
-            return snapshot.docs
-                .map((doc) => UserModel.fromMap(doc.data()))
-                .where((user) => user.role != 'client') // Exclude clients
-                .toList();
+            try {
+              return snapshot.docs
+                  .map((doc) => UserModel.fromMap(doc.data()))
+                  .where((user) => user.role != 'client') // Exclude clients
+                  .toList();
+            } catch (e) {
+              debugPrint('Error mapping staff data: $e');
+              return [];
+            }
           });
 
     } catch (e) {
@@ -52,7 +79,13 @@ class StaffService extends ChangeNotifier {
     }
   }
 
-  Future<bool> createStaffMember({
+  // Clear cached organization ID when needed
+  void clearCache() {
+    _cachedOrgId = null;
+    notifyListeners();
+  }
+
+   Future<bool> createStaffMember({
     required String email,
     required String password,
     required String firstName,
@@ -62,10 +95,10 @@ class StaffService extends ChangeNotifier {
   }) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) throw 'Not authenticated';
-    
+
     try {
       debugPrint('Starting staff creation process...');
-      
+
       // 1. Check organization access
       final userDoc = await _firestore
           .collection('users')
@@ -137,7 +170,7 @@ class StaffService extends ChangeNotifier {
       if (user != null && user.uid != currentUser.uid) {
         await user.delete();
       }
-      
+
       if (e.code == 'email-already-in-use') {
         throw 'An account with this email already exists';
       }

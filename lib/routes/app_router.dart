@@ -1,4 +1,7 @@
+import 'package:cateredtoyou/models/inventory_item_model.dart';
 import 'package:cateredtoyou/models/user.dart';
+import 'package:cateredtoyou/views/inventory/inventory_edit_screen.dart';
+import 'package:cateredtoyou/views/inventory/inventory_list_screen.dart';
 import 'package:cateredtoyou/views/staff/add_staff_screen.dart';
 import 'package:cateredtoyou/views/staff/edit_staff_screen.dart';
 import 'package:cateredtoyou/views/staff/staff_list_screen.dart';
@@ -68,7 +71,7 @@ class AppRouter {
           return null; // No redirection if authenticated
         },
       ),
-       GoRoute(
+      GoRoute(
         path: '/staff',
         builder: (context, state) => const StaffListScreen(),
       ),
@@ -81,6 +84,21 @@ class AppRouter {
         builder: (context, state) {
           final staff = state.extra as UserModel;
           return EditStaffScreen(staff: staff);
+        },
+      ),
+      GoRoute(
+        path: '/inventory',
+        builder: (context, state) => const InventoryListScreen(),
+      ),
+      GoRoute(
+        path: '/add-inventory',
+        builder: (context, state) => const InventoryEditScreen(),
+      ),
+      GoRoute(
+        path: '/edit-inventory',
+        builder: (context, state) {
+          final item = state.extra as InventoryItem;
+          return InventoryEditScreen(item: item);
         },
       ),
     ],

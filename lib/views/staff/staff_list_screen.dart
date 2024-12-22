@@ -25,12 +25,12 @@ class _StaffListScreenState extends State<StaffListScreen> {
 
   List<UserModel> _filterStaff(List<UserModel> staffList) {
     if (_searchQuery.isEmpty) return staffList;
-    
+
     return staffList.where((staff) {
       final searchLower = _searchQuery.toLowerCase();
       return staff.fullName.toLowerCase().contains(searchLower) ||
-             staff.email.toLowerCase().contains(searchLower) ||
-             staff.role.toLowerCase().contains(searchLower);
+          staff.email.toLowerCase().contains(searchLower) ||
+          staff.role.toLowerCase().contains(searchLower);
     }).toList();
   }
 
@@ -38,6 +38,10 @@ class _StaffListScreenState extends State<StaffListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.push('/home'),
+        ),
         title: const Text('Staff Management'),
         actions: [
           IconButton(
@@ -159,13 +163,12 @@ class StaffListItem extends StatelessWidget {
           staff.uid,
           isActive ? 'inactive' : 'active',
         );
-        
+
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                '${staff.fullName} has been ${isActive ? 'deactivated' : 'reactivated'}'
-              ),
+                  '${staff.fullName} has been ${isActive ? 'deactivated' : 'reactivated'}'),
             ),
           );
         }

@@ -90,6 +90,7 @@ Future<void> _handleAddStaff() async {
           duration: Duration(seconds: 2),
         ),
       );
+      context.go('/staff');
 
       // Use replaceTo to prevent going back
       if (mounted) {
