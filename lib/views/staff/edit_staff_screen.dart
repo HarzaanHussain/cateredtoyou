@@ -114,6 +114,7 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
 
     try {
       await _staffService.resetStaffPassword(widget.staff.email); // Reset staff password.
+      (widget.staff.email);
 
       if (!mounted) return;
 

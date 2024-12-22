@@ -1,138 +1,133 @@
-// lib/views/inventory/inventory_list_screen.dart
+import 'package:flutter/material.dart'; // Importing Flutter material package for UI components
+import 'package:provider/provider.dart'; // Importing provider package for state management
+import 'package:go_router/go_router.dart'; // Importing go_router package for navigation
+import 'package:cateredtoyou/models/inventory_item_model.dart'; // Importing inventory item model
+import 'package:cateredtoyou/services/inventory_service.dart'; // Importing inventory service
+import 'package:cateredtoyou/widgets/custom_button.dart'; // Importing custom button widget
 
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
-import 'package:cateredtoyou/models/inventory_item_model.dart';
-import 'package:cateredtoyou/services/inventory_service.dart';
-import 'package:cateredtoyou/widgets/custom_button.dart';
-
-class InventoryListScreen extends StatefulWidget {
-  const InventoryListScreen({super.key});
+class InventoryListScreen extends StatefulWidget { // Defining a stateful widget for inventory list screen
+  const InventoryListScreen({super.key}); // Constructor with optional key
 
   @override
-  State<InventoryListScreen> createState() => _InventoryListScreenState();
+  State<InventoryListScreen> createState() => _InventoryListScreenState(); // Creating state for the widget
 }
 
-class _InventoryListScreenState extends State<InventoryListScreen> {
-  String _searchQuery = '';
-  InventoryCategory? _filterCategory;
-  bool _showLowStockOnly = false;
-  final _searchController = TextEditingController();
+class _InventoryListScreenState extends State<InventoryListScreen> { // State class for InventoryListScreen
+  String _searchQuery = ''; // Variable to store search query
+  InventoryCategory? _filterCategory; // Variable to store selected filter category
+  bool _showLowStockOnly = false; // Variable to show only low stock items
+  final _searchController = TextEditingController(); // Controller for search input field
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
+  void dispose() { // Dispose method to clean up resources
+    _searchController.dispose(); // Disposing search controller
+    super.dispose(); // Calling super dispose
   }
 
-  List<InventoryItem> _filterInventory(List<InventoryItem> items) {
-    return items.where((item) {
-      if (_showLowStockOnly && !item.needsReorder) return false;
-      
-      if (_filterCategory != null && item.category != _filterCategory) {
+  List<InventoryItem> _filterInventory(List<InventoryItem> items) { // Method to filter inventory items
+    return items.where((item) { // Filtering items based on conditions
+      if (_showLowStockOnly && !item.needsReorder) return false; // Check if low stock filter is applied
+      if (_filterCategory != null && item.category != _filterCategory) { // Check if category filter is applied
         return false;
       }
-
-      if (_searchQuery.isEmpty) return true;
-
-      final query = _searchQuery.toLowerCase();
-      return item.name.toLowerCase().contains(query);
-    }).toList();
+      if (_searchQuery.isEmpty) return true; // Check if search query is empty
+      final query = _searchQuery.toLowerCase(); // Convert search query to lowercase
+      return item.name.toLowerCase().contains(query); // Check if item name contains search query
+    }).toList(); // Return filtered list
   }
 
-  void _showQuantityAdjustDialog(InventoryItem item) {
-    final formKey = GlobalKey<FormState>();
-    final quantityController = TextEditingController(
-      text: item.quantity.toString()
+  void _showQuantityAdjustDialog(InventoryItem item) { // Method to show quantity adjust dialog
+    final formKey = GlobalKey<FormState>(); // Form key for validation
+    final quantityController = TextEditingController( // Controller for quantity input field
+      text: item.quantity.toString() // Setting initial value to current quantity
     );
-    final notesController = TextEditingController();
+    final notesController = TextEditingController(); // Controller for notes input field
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Adjust ${item.name} Quantity'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+    showDialog( // Show dialog
+      context: context, // Context of the dialog
+      builder: (context) => AlertDialog( // Building alert dialog
+        title: Text('Adjust ${item.name} Quantity'), // Dialog title
+        content: Form( // Form widget for validation
+          key: formKey, // Setting form key
+          child: Column( // Column to arrange input fields vertically
+            mainAxisSize: MainAxisSize.min, // Minimize the main axis size
             children: [
-              TextFormField(
-                controller: quantityController,
-                decoration: const InputDecoration(
-                  labelText: 'New Quantity',
-                  border: OutlineInputBorder(),
+              TextFormField( // Input field for quantity
+                controller: quantityController, // Setting controller
+                decoration: const InputDecoration( // Input decoration
+                  labelText: 'New Quantity', // Label text
+                  border: OutlineInputBorder(), // Border style
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a quantity';
+                keyboardType: const TextInputType.numberWithOptions(decimal: true), // Keyboard type for numbers
+                validator: (value) { // Validator for input field
+                  if (value == null || value.isEmpty) { // Check if value is empty
+                    return 'Please enter a quantity'; // Return error message
                   }
-                  final number = double.tryParse(value);
-                  if (number == null) {
-                    return 'Please enter a valid number';
+                  final number = double.tryParse(value); // Try parsing value to double
+                  if (number == null) { // Check if parsing failed
+                    return 'Please enter a valid number'; // Return error message
                   }
-                  if (number < 0) {
-                    return 'Quantity cannot be negative';
+                  if (number < 0) { // Check if number is negative
+                    return 'Quantity cannot be negative'; // Return error message
                   }
-                  return null;
+                  return null; // Return null if no error
                 },
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (Optional)',
-                  border: OutlineInputBorder(),
+              const SizedBox(height: 16), // SizedBox for spacing
+              TextFormField( // Input field for notes
+                controller: notesController, // Setting controller
+                decoration: const InputDecoration( // Input decoration
+                  labelText: 'Notes (Optional)', // Label text
+                  border: OutlineInputBorder(), // Border style
                 ),
-                maxLines: 2,
+                maxLines: 2, // Maximum lines for input field
               ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+        actions: [ // Actions for dialog
+          TextButton( // Cancel button
+            onPressed: () => Navigator.pop(context), // Close dialog on press
+            child: const Text('Cancel'), // Button text
           ),
-          TextButton(
-            onPressed: () async {
-              if (formKey.currentState?.validate() ?? false) {
-                final newQuantity = double.parse(quantityController.text);
-                final notes = notesController.text.trim();
-                
-                final inventoryService = context.read<InventoryService>();
-                final navigator = Navigator.of(context);
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
+          TextButton( // Update button
+            onPressed: () async { // Async function on press
+              if (formKey.currentState?.validate() ?? false) { // Validate form
+                final newQuantity = double.parse(quantityController.text); // Parse new quantity
+                final notes = notesController.text.trim(); // Trim notes
+
+                final inventoryService = context.read<InventoryService>(); // Get inventory service
+                final navigator = Navigator.of(context); // Get navigator
+                final scaffoldMessenger = ScaffoldMessenger.of(context); // Get scaffold messenger
 
                 try {
-                  await inventoryService.adjustQuantity(
-                    item.id,
-                    newQuantity,
-                    notes: notes.isNotEmpty ? notes : null,
+                  await inventoryService.adjustQuantity( // Adjust quantity in inventory service
+                    item.id, // Item ID
+                    newQuantity, // New quantity
+                    notes: notes.isNotEmpty ? notes : null, // Notes if not empty
                   );
 
-                  if (mounted) {
-                    navigator.pop();
-                    scaffoldMessenger.showSnackBar(
+                  if (mounted) { // Check if widget is mounted
+                    navigator.pop(); // Close dialog
+                    scaffoldMessenger.showSnackBar( // Show success message
                       const SnackBar(
-                        content: Text('Quantity updated successfully'),
+                        content: Text('Quantity updated successfully'), // Message text
                       ),
                     );
                   }
-                } catch (e) {
-                  if (mounted) {
-                    scaffoldMessenger.showSnackBar(
+                } catch (e) { // Catch any errors
+                  if (mounted) { // Check if widget is mounted
+                    scaffoldMessenger.showSnackBar( // Show error message
                       SnackBar(
-                        content: Text('Error: $e'),
-                        backgroundColor: Colors.red,
+                        content: Text('Error: $e'), // Error message text
+                        backgroundColor: Colors.red, // Background color
                       ),
                     );
                   }
                 }
               }
             },
-            child: const Text('Update'),
+            child: const Text('Update'), // Button text
           ),
         ],
       ),
@@ -140,73 +135,73 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Inventory Management'),
+  Widget build(BuildContext context) { // Build method for widget
+    return Scaffold( // Scaffold widget for basic material design layout
+      appBar: AppBar( // App bar for the screen
+        title: const Text('Inventory Management'), // Title of the app bar
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => context.push('/add-inventory'),
+          IconButton( // Button to add new inventory item
+            icon: const Icon(Icons.add), // Icon for the button
+            onPressed: () => context.push('/add-inventory'), // Navigate to add inventory screen on press
           ),
         ],
       ),
-      body: Column(
+      body: Column( // Column to arrange widgets vertically
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
+          Padding( // Padding for search and filter section
+            padding: const EdgeInsets.all(16.0), // Padding value
+            child: Column( // Column to arrange widgets vertically
               children: [
-                TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search inventory...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                TextField( // Search input field
+                  controller: _searchController, // Setting controller
+                  decoration: InputDecoration( // Input decoration
+                    hintText: 'Search inventory...', // Hint text
+                    prefixIcon: const Icon(Icons.search), // Prefix icon
+                    border: OutlineInputBorder( // Border style
+                      borderRadius: BorderRadius.circular(10), // Border radius
                     ),
-                    suffixIcon: _searchQuery.isNotEmpty
+                    suffixIcon: _searchQuery.isNotEmpty // Suffix icon conditionally
                         ? IconButton(
-                            icon: const Icon(Icons.clear),
+                            icon: const Icon(Icons.clear), // Clear icon
                             onPressed: () {
-                              setState(() {
-                                _searchQuery = '';
-                                _searchController.clear();
+                              setState(() { // Update state on press
+                                _searchQuery = ''; // Clear search query
+                                _searchController.clear(); // Clear input field
                               });
                             },
                           )
                         : null,
                   ),
-                  onChanged: (value) {
+                  onChanged: (value) { // Update search query on input change
                     setState(() {
-                      _searchQuery = value;
+                      _searchQuery = value; // Set search query
                     });
                   },
                 ),
-                const SizedBox(height: 8),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
+                const SizedBox(height: 8), // SizedBox for spacing
+                SingleChildScrollView( // Scrollable row for filter chips
+                  scrollDirection: Axis.horizontal, // Horizontal scroll direction
+                  child: Row( // Row to arrange filter chips horizontally
                     children: [
-                      FilterChip(
-                        selected: _showLowStockOnly,
-                        label: const Text('Low Stock'),
-                        onSelected: (selected) {
+                      FilterChip( // Filter chip for low stock
+                        selected: _showLowStockOnly, // Selected state
+                        label: const Text('Low Stock'), // Label text
+                        onSelected: (selected) { // Update state on selection
                           setState(() {
-                            _showLowStockOnly = selected;
+                            _showLowStockOnly = selected; // Set low stock filter
                           });
                         },
                       ),
-                      const SizedBox(width: 8),
-                      ...InventoryCategory.values.map((category) {
+                      const SizedBox(width: 8), // SizedBox for spacing
+                      ...InventoryCategory.values.map((category) { // Map categories to filter chips
                         return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            selected: _filterCategory == category,
-                            label: Text(category.toString().split('.').last),
-                            onSelected: (selected) {
+                          padding: const EdgeInsets.only(right: 8), // Padding for each chip
+                          child: FilterChip( // Filter chip for category
+                            selected: _filterCategory == category, // Selected state
+                            label: Text(category.toString().split('.').last), // Label text
+                            onSelected: (selected) { // Update state on selection
                               setState(() {
-                                _filterCategory = selected ? category : null;
+                                _filterCategory = selected ? category : null; // Set category filter
                               });
                             },
                           ),
@@ -218,58 +213,58 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
               ],
             ),
           ),
-          Expanded(
-            child: StreamBuilder<List<InventoryItem>>(
-              stream: context.read<InventoryService>().getInventoryItems(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
+          Expanded( // Expanded widget to fill available space
+            child: StreamBuilder<List<InventoryItem>>( // Stream builder for inventory items
+              stream: context.read<InventoryService>().getInventoryItems(), // Stream of inventory items
+              builder: (context, snapshot) { // Builder for stream
+                if (snapshot.hasError) { // Check for errors
                   return Center(
-                    child: Text('Error: ${snapshot.error}'),
+                    child: Text('Error: ${snapshot.error}'), // Display error message
                   );
                 }
 
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                if (snapshot.connectionState == ConnectionState.waiting) { // Check for loading state
                   return const Center(
-                    child: CircularProgressIndicator(),
+                    child: CircularProgressIndicator(), // Display loading indicator
                   );
                 }
 
-                final items = snapshot.data ?? [];
-                final filteredItems = _filterInventory(items);
+                final items = snapshot.data ?? []; // Get inventory items
+                final filteredItems = _filterInventory(items); // Filter inventory items
 
-                if (items.isEmpty) {
+                if (items.isEmpty) { // Check if no items
                   return Center(
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center, // Center align
                       children: [
                         const Text(
-                          'No inventory items found',
-                          style: TextStyle(fontSize: 18),
+                          'No inventory items found', // No items message
+                          style: TextStyle(fontSize: 18), // Text style
                         ),
-                        const SizedBox(height: 16),
-                        CustomButton(
-                          label: 'Add Item',
-                          onPressed: () => context.push('/add-inventory'),
+                        const SizedBox(height: 16), // SizedBox for spacing
+                        CustomButton( // Button to add new item
+                          label: 'Add Item', // Button label
+                          onPressed: () => context.push('/add-inventory'), // Navigate to add inventory screen on press
                         ),
                       ],
                     ),
                   );
                 }
 
-                if (filteredItems.isEmpty) {
+                if (filteredItems.isEmpty) { // Check if no filtered items
                   return const Center(
-                    child: Text('No items match your search'),
+                    child: Text('No items match your search'), // No match message
                   );
                 }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filteredItems.length,
-                  itemBuilder: (context, index) {
-                    final item = filteredItems[index];
-                    return InventoryListItem(
-                      item: item,
-                      onAdjustQuantity: () => _showQuantityAdjustDialog(item),
+                return ListView.builder( // List view builder for inventory items
+                  padding: const EdgeInsets.all(16), // Padding for list view
+                  itemCount: filteredItems.length, // Number of items
+                  itemBuilder: (context, index) { // Builder for each item
+                    final item = filteredItems[index]; // Get item
+                    return InventoryListItem( // Inventory list item widget
+                      item: item, // Pass item
+                      onAdjustQuantity: () => _showQuantityAdjustDialog(item), // Show quantity adjust dialog on press
                     );
                   },
                 );
@@ -282,141 +277,141 @@ class _InventoryListScreenState extends State<InventoryListScreen> {
   }
 }
 
-class InventoryListItem extends StatelessWidget {
-  final InventoryItem item;
-  final VoidCallback onAdjustQuantity;
+class InventoryListItem extends StatelessWidget { // Stateless widget for inventory list item
+  final InventoryItem item; // Inventory item
+  final VoidCallback onAdjustQuantity; // Callback for adjusting quantity
 
   const InventoryListItem({
     super.key,
-    required this.item,
-    required this.onAdjustQuantity,
+    required this.item, // Required item
+    required this.onAdjustQuantity, // Required callback
   });
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final needsReorder = item.needsReorder;
+  Widget build(BuildContext context) { // Build method for widget
+    final theme = Theme.of(context); // Get theme
+    final needsReorder = item.needsReorder; // Check if item needs reorder
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        onTap: () => context.push('/edit-inventory', extra: item),
-        title: Row(
+    return Card( // Card widget for item
+      margin: const EdgeInsets.only(bottom: 16), // Margin for card
+      child: ListTile( // List tile for item
+        contentPadding: const EdgeInsets.all(16), // Padding for list tile
+        onTap: () => context.push('/edit-inventory', extra: item), // Navigate to edit inventory screen on tap
+        title: Row( // Row for title
           children: [
             Expanded(
               child: Text(
-                item.name,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+                item.name, // Item name
+                style: theme.textTheme.titleMedium?.copyWith( // Text style
+                  fontWeight: FontWeight.bold, // Bold font weight
                 ),
               ),
             ),
-            if (needsReorder)
+            if (needsReorder) // Check if needs reorder
               Container(
-                padding: const EdgeInsets.symmetric(
+                padding: const EdgeInsets.symmetric( // Padding for container
                   horizontal: 8,
                   vertical: 4,
                 ),
-                decoration: BoxDecoration(
-                  color: Colors.red.withAlpha((0.1 * 255).toInt()),
-                  borderRadius: BorderRadius.circular(4),
+                decoration: BoxDecoration( // Decoration for container
+                  color: Colors.red.withAlpha((0.1 * 255).toInt()), // Background color
+                  borderRadius: BorderRadius.circular(4), // Border radius
                 ),
                 child: Text(
-                  'Low Stock',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
+                  'Low Stock', // Low stock text
+                  style: theme.textTheme.bodySmall?.copyWith( // Text style
+                    color: Colors.red, // Text color
+                    fontWeight: FontWeight.bold, // Bold font weight
                   ),
                 ),
               ),
           ],
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        subtitle: Column( // Column for subtitle
+          crossAxisAlignment: CrossAxisAlignment.start, // Start alignment
           children: [
-            const SizedBox(height: 8),
+            const SizedBox(height: 8), // SizedBox for spacing
             Text(
-              'Category: ${item.category.toString().split('.').last}',
-              style: theme.textTheme.bodyMedium,
+              'Category: ${item.category.toString().split('.').last}', // Category text
+              style: theme.textTheme.bodyMedium, // Text style
             ),
-            const SizedBox(height: 4),
-            Row(
+            const SizedBox(height: 4), // SizedBox for spacing
+            Row( // Row for quantity and reorder point
               children: [
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start, // Start alignment
                     children: [
                       Text(
-                        'Quantity: ${item.quantity} ${item.unit.toString().split('.').last}',
-                        style: theme.textTheme.bodyMedium,
+                        'Quantity: ${item.quantity} ${item.unit.toString().split('.').last}', // Quantity text
+                        style: theme.textTheme.bodyMedium, // Text style
                       ),
                       Text(
-                        'Reorder Point: ${item.reorderPoint}',
-                        style: theme.textTheme.bodyMedium,
+                        'Reorder Point: ${item.reorderPoint}', // Reorder point text
+                        style: theme.textTheme.bodyMedium, // Text style
                       ),
                     ],
                   ),
                 ),
-                TextButton.icon(
-                  onPressed: onAdjustQuantity,
-                  icon: const Icon(Icons.edit),
-                  label: const Text('Adjust'),
+                TextButton.icon( // Button to adjust quantity
+                  onPressed: onAdjustQuantity, // Callback on press
+                  icon: const Icon(Icons.edit), // Edit icon
+                  label: const Text('Adjust'), // Button label
                 ),
               ],
             ),
           ],
         ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
+        trailing: PopupMenuButton<String>( // Popup menu for more actions
+          onSelected: (value) { // Handle menu selection
             switch (value) {
               case 'edit':
-                context.push('/edit-inventory', extra: item);
+                context.push('/edit-inventory', extra: item); // Navigate to edit inventory screen
                 break;
               case 'delete':
-                showDialog(
+                showDialog( // Show delete confirmation dialog
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('Delete Item'),
+                    title: const Text('Delete Item'), // Dialog title
                     content: Text(
-                      'Are you sure you want to delete ${item.name}?'
+                      'Are you sure you want to delete ${item.name}?' // Confirmation message
                     ),
                     actions: [
                       TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel'),
+                        onPressed: () => Navigator.pop(context), // Close dialog on press
+                        child: const Text('Cancel'), // Cancel button text
                       ),
                       TextButton(
-                        onPressed: () async {
+                        onPressed: () async { // Async function on press
                           try {
                             final inventoryService = 
-                                context.read<InventoryService>();
-                            await inventoryService.deleteInventoryItem(item.id);
+                                context.read<InventoryService>(); // Get inventory service
+                            await inventoryService.deleteInventoryItem(item.id); // Delete inventory item
 
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
+                            if (context.mounted) { // Check if widget is mounted
+                              Navigator.pop(context); // Close dialog
+                              ScaffoldMessenger.of(context).showSnackBar( // Show success message
                                 const SnackBar(
-                                  content: Text('Item deleted successfully'),
+                                  content: Text('Item deleted successfully'), // Message text
                                 ),
                               );
                             }
-                          } catch (e) {
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
+                          } catch (e) { // Catch any errors
+                            if (context.mounted) { // Check if widget is mounted
+                              Navigator.pop(context); // Close dialog
+                              ScaffoldMessenger.of(context).showSnackBar( // Show error message
                                 SnackBar(
-                                  content: Text('Error: $e'),
-                                  backgroundColor: Colors.red,
+                                  content: Text('Error: $e'), // Error message text
+                                  backgroundColor: Colors.red, // Background color
                                 ),
                               );
                             }
                           }
                         },
                         style: TextButton.styleFrom(
-                          foregroundColor: Colors.red,
+                          foregroundColor: Colors.red, // Button text color
                         ),
-                        child: const Text('Delete'),
+                        child: const Text('Delete'), // Delete button text
                       ),
                     ],
                   ),
@@ -424,15 +419,15 @@ class InventoryListItem extends StatelessWidget {
                 break;
             }
           },
-          itemBuilder: (context) => [
+          itemBuilder: (context) => [ // Menu items
             const PopupMenuItem(
-              value: 'edit',
-              child: Text('Edit'),
+              value: 'edit', // Edit action
+              child: Text('Edit'), // Edit text
             ),
             const PopupMenuItem(
-              textStyle: TextStyle(color: Colors.red),
-              value: 'delete',
-              child: Text('Delete'),
+              textStyle: TextStyle(color: Colors.red), // Delete action text style
+              value: 'delete', // Delete action
+              child: Text('Delete'), // Delete text
             ),
           ],
         ),

@@ -1,91 +1,68 @@
-import 'package:flutter/foundation.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cateredtoyou/models/user.dart';
-import 'package:cateredtoyou/services/organization_service.dart';
-
+import 'package:flutter/foundation.dart'; // Importing foundation package for ChangeNotifier
+import 'package:cloud_firestore/cloud_firestore.dart'; // Importing Firestore package for database operations
+import 'package:firebase_auth/firebase_auth.dart'; // Importing Firebase Auth package for authentication
+import 'package:cateredtoyou/models/user.dart'; // Importing UserModel for user data
+import 'package:cateredtoyou/services/organization_service.dart'; // Importing OrganizationService for organization-related operations
 
 /// Service class for managing staff-related operations
 class StaffService extends ChangeNotifier {
-  /// Instance of FirebaseFirestore for database operations
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance; // Firestore instance for database operations
+  final FirebaseAuth _auth = FirebaseAuth.instance; // Firebase Auth instance for authentication
+  final OrganizationService _organizationService; // OrganizationService instance for organization-related operations
+  final FirebaseAuth _staffAuth = FirebaseAuth.instance; // Separate Firebase Auth instance for staff authentication
 
-  /// Instance of FirebaseAuth for authentication operations
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  /// Instance of OrganizationService for organization-related operations
-  final OrganizationService _organizationService;
-
-  /// Constructor to initialize OrganizationService
-  StaffService(this._organizationService);
-
-  /// Cached organization ID to prevent multiple fetches
-  String? _cachedOrgId;
+  StaffService(this._organizationService); // Constructor to initialize OrganizationService
 
   /// Stream to get staff members for the current organization
   Stream<List<UserModel>> getStaffMembers() async* {
     try {
       final currentUser = _auth.currentUser; // Get the current authenticated user
       if (currentUser == null) {
-        yield []; // Yield an empty list if no user is authenticated
+        yield []; // If no user is authenticated, yield an empty list
         return;
       }
 
-      String? organizationId = _cachedOrgId; // Use cached organization ID if available
-
-      if (organizationId == null) {
-        final userDoc = await _firestore
-            .collection('users')
-            .doc(currentUser.uid)
-            .get(); // Get the user's document from Firestore
-
-        if (!userDoc.exists) {
-          yield []; // Yield an empty list if user document does not exist
-          return;
-        }
-
-        organizationId = userDoc.data()?['organizationId']; // Get organization ID from user document
-        _cachedOrgId = organizationId; // Cache the organization ID
-      }
-
-      if (organizationId == null) {
-        debugPrint('No organization ID found'); // Log if no organization ID is found
-        yield []; // Yield an empty list if no organization ID is found
-        return;
-      }
-
-      debugPrint('Getting staff for organization: $organizationId'); // Log the organization ID
-
-      yield* _firestore
+      final userDoc = await _firestore
           .collection('users')
-          .where('organizationId', isEqualTo: organizationId)
-          .snapshots()
-          .handleError((error) {
-            debugPrint('Error in staff stream: $error'); // Log any errors in the stream
-            return [];
-          })
-          .map((snapshot) {
-            try {
-              return snapshot.docs
-                  .map((doc) => UserModel.fromMap(doc.data()))
-                  .where((user) => user.role != 'client') // Exclude clients from the list
-                  .toList();
-            } catch (e) {
-              debugPrint('Error mapping staff data: $e'); // Log any errors in mapping data
-              return [];
-            }
-          });
+          .doc(currentUser.uid)
+          .get(); // Get the current user's document from Firestore
 
+      if (!userDoc.exists) {
+        yield []; // If user document does not exist, yield an empty list
+        return;
+      }
+
+      final organizationId = userDoc.data()?['organizationId']; // Get the organization ID from user document
+      final userRole = userDoc.data()?['role']; // Get the user role from user document
+
+      if (!['client', 'admin', 'manager'].contains(userRole)) {
+        yield []; // If user role is not client, admin, or manager, yield an empty list
+        return;
+      }
+
+      // Query staff members using only organizationId filter
+      final query = _firestore
+          .collection('users')
+          .where('organizationId', isEqualTo: organizationId); // Query users with the same organization ID
+
+      yield* query.snapshots().map((snapshot) {
+        try {
+          return snapshot.docs
+              .map((doc) => UserModel.fromMap(doc.data())) // Map Firestore documents to UserModel
+              .where((user) => 
+                  // Filter in application code instead of database
+                  user.employmentStatus == 'active' &&
+                  !['client', 'admin'].contains(user.role)) // Filter active staff members excluding clients and admins
+              .toList();
+        } catch (e) {
+          debugPrint('Error mapping staff data: $e'); // Print error if mapping fails
+          return [];
+        }
+      });
     } catch (e) {
-      debugPrint('Error in getStaffMembers: $e'); // Log any errors in the method
-      yield []; // Yield an empty list if an error occurs
+      debugPrint('Error in getStaffMembers: $e'); // Print error if any exception occurs
+      yield [];
     }
-  }
-
-  /// Clear cached organization ID when needed
-  void clearCache() {
-    _cachedOrgId = null; // Clear the cached organization ID
-    notifyListeners(); // Notify listeners of the change
   }
 
   /// Create a new staff member
@@ -97,88 +74,142 @@ class StaffService extends ChangeNotifier {
     required String phoneNumber,
     required String role,
   }) async {
-    final currentUser = _auth.currentUser; // Get the current authenticated user
-    if (currentUser == null) throw 'Not authenticated'; // Throw an error if no user is authenticated
+    if (!['manager', 'chef', 'server', 'driver', 'staff'].contains(role)) {
+      throw 'Invalid role specified'; // Throw error if role is invalid
+    }
+
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) throw 'Not authenticated'; // Throw error if no user is authenticated
 
     try {
-      debugPrint('Starting staff creation process...'); // Log the start of the staff creation process
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) {
+        throw 'Organization not found'; // Throw error if organization is not found
+      }
 
       final userDoc = await _firestore
           .collection('users')
           .doc(currentUser.uid)
-          .get(); // Get the current user's document from Firestore
+          .get();
 
-      if (!userDoc.exists) throw 'User data not found'; // Throw an error if user document does not exist
-      final organizationId = userDoc.get('organizationId'); // Get organization ID from user document
-      final userRole = userDoc.get('role'); // Get user role from user document
+      if (!userDoc.exists) throw 'User data not found'; // Throw error if user document is not found
+      final userRole = userDoc.get('role');
 
       if (!['admin', 'client', 'manager'].contains(userRole)) {
-        throw 'Insufficient permissions to create staff members'; // Throw an error if user does not have permission
+        throw 'Insufficient permissions to create staff members'; // Throw error if user does not have permission
       }
 
-      debugPrint('Creating Firebase Auth user...'); // Log the creation of Firebase Auth user
-      final UserCredential authResult = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      // Use the separate auth instance to create the new user
+      final UserCredential newStaffCredential = await _staffAuth.createUserWithEmailAndPassword(
         email: email,
         password: password,
-      ); // Create a new Firebase Auth user
+      );
 
-      if (authResult.user == null) {
-        throw 'Failed to create authentication account'; // Throw an error if user creation fails
+      if (newStaffCredential.user == null) {
+        throw 'Failed to create authentication account'; // Throw error if user creation fails
       }
 
-      final uid = authResult.user!.uid; // Get the UID of the created user
-      debugPrint('Created user with UID: $uid'); // Log the UID of the created user
+      final uid = newStaffCredential.user!.uid;
+      debugPrint('Created user with UID: $uid'); // Print the UID of the newly created user
 
-      await _firestore.runTransaction((transaction) async {
-        final now = DateTime.now(); // Get the current date and time
+      try {
+        await _firestore.runTransaction((transaction) async {
+          final now = DateTime.now();
 
-        final userRef = _firestore.collection('users').doc(uid); // Reference to the new user document
-        transaction.set(userRef, {
-          'uid': uid,
-          'email': email,
-          'firstName': firstName,
-          'lastName': lastName,
-          'phoneNumber': phoneNumber,
-          'role': role,
-          'employmentStatus': 'active',
-          'organizationId': organizationId,
-          'createdBy': currentUser.uid,
-          'createdAt': now,
-          'updatedAt': now,
-        }); // Set the new user document data
+          final userRef = _firestore.collection('users').doc(uid);
+          transaction.set(userRef, {
+            'uid': uid,
+            'email': email,
+            'firstName': firstName,
+            'lastName': lastName,
+            'phoneNumber': phoneNumber,
+            'role': role,
+            'employmentStatus': 'active',
+            'organizationId': organization.id,
+            'createdBy': currentUser.uid,
+            'createdAt': now,
+            'updatedAt': now,
+          }); // Set user data in Firestore
 
-        final permissionRef = _firestore.collection('permissions').doc(uid); // Reference to the new permissions document
-        transaction.set(permissionRef, {
-          'role': role,
-          'permissions': _getDefaultPermissions(role),
-          'organizationId': organizationId,
-          'createdAt': now,
-          'updatedAt': now,
-        }); // Set the new permissions document data
-      });
+          final permissionRef = _firestore.collection('permissions').doc(uid);
+          transaction.set(permissionRef, {
+            'role': role,
+            'permissions': _getDefaultPermissions(role),
+            'organizationId': organization.id,
+            'createdAt': now,
+            'updatedAt': now,
+          }); // Set permissions data in Firestore
+        });
 
-      debugPrint('Staff member created successfully'); // Log the successful creation of staff member
-      notifyListeners(); // Notify listeners of the change
-      return true;
+        // Sign out from the staff auth instance
+        await _staffAuth.signOut();
 
+        notifyListeners(); // Notify listeners about the change
+        return true;
+      } catch (e) {
+        // If Firestore operations fail, clean up the auth account
+        await newStaffCredential.user?.delete();
+        rethrow; // Rethrow the exception
+      }
     } on FirebaseAuthException catch (e) {
-      debugPrint('Firebase Auth Error: ${e.code}'); // Log any Firebase Auth errors
-      final user = _auth.currentUser;
-      if (user != null && user.uid != currentUser.uid) {
-        await user.delete(); // Delete the user if authentication was created but Firestore failed
+      debugPrint('Firebase Auth Error: ${e.code}'); // Print Firebase Auth error code
+      if (e.code == 'email-already-in-use') {
+        throw 'An account with this email already exists'; // Throw error if email is already in use
+      }
+      throw 'Failed to create staff account: ${e.message}'; // Throw error if user creation fails
+    } catch (e) {
+      debugPrint('Error creating staff member: $e'); // Print error if any exception occurs
+      rethrow; // Rethrow the exception
+    }
+  }
+
+  /// Update a staff member's information
+  Future<void> updateStaffMember(UserModel staff) async {
+    try {
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) {
+        throw 'Organization not found'; // Throw error if organization is not found
       }
 
-      if (e.code == 'email-already-in-use') {
-        throw 'An account with this email already exists'; // Throw an error if email is already in use
+      if (staff.organizationId != organization.id) {
+        throw 'Staff member belongs to a different organization'; // Throw error if staff belongs to a different organization
       }
-      throw 'Failed to create staff account: ${e.message}'; // Throw a generic error for other cases
+
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated'; // Throw error if no user is authenticated
+
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (!userDoc.exists) throw 'User data not found'; // Throw error if user document is not found
+      final userRole = userDoc.get('role');
+
+      if (!['admin', 'client', 'manager'].contains(userRole)) {
+        throw 'Insufficient permissions to update staff members'; // Throw error if user does not have permission
+      }
+
+      final batch = _firestore.batch();
+
+      final userRef = _firestore.collection('users').doc(staff.uid);
+      batch.update(userRef, {
+        ...staff.toMap(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }); // Update user data in Firestore
+
+      final permissionRef = _firestore.collection('permissions').doc(staff.uid);
+      batch.update(permissionRef, {
+        'role': staff.role,
+        'permissions': _getDefaultPermissions(staff.role),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }); // Update permissions data in Firestore
+
+      await batch.commit(); // Commit the batch update
+      notifyListeners(); // Notify listeners about the change
     } catch (e) {
-      debugPrint('Error creating staff member: $e'); // Log any other errors
-      final user = _auth.currentUser;
-      if (user != null && user.uid != currentUser.uid) {
-        await user.delete(); // Delete the user if authentication was created but Firestore failed
-      }
-      rethrow; // Rethrow the error
+      debugPrint('Error updating staff member: $e'); // Print error if any exception occurs
+      rethrow; // Rethrow the exception
     }
   }
 
@@ -194,7 +225,7 @@ class StaffService extends ChangeNotifier {
           'view_inventory',
           'manage_tasks',
           'view_tasks',
-        ]; // Permissions for manager role
+        ]; // Return default permissions for manager
       case 'chef':
         return [
           'view_events',
@@ -202,116 +233,66 @@ class StaffService extends ChangeNotifier {
           'manage_inventory',
           'view_tasks',
           'manage_kitchen_tasks',
-        ]; // Permissions for chef role
+        ]; // Return default permissions for chef
       case 'server':
         return [
           'view_events',
           'view_tasks',
           'update_service_tasks',
           'view_inventory',
-        ]; // Permissions for server role
+        ]; // Return default permissions for server
       case 'driver':
         return [
           'view_events',
           'view_tasks',
           'update_delivery_tasks',
           'view_inventory',
-        ]; // Permissions for driver role
+        ]; // Return default permissions for driver
       case 'staff':
         return [
           'view_events',
           'view_tasks',
           'view_inventory',
           'update_assigned_tasks',
-        ]; // Permissions for staff role
+        ]; // Return default permissions for staff
       default:
         return [
           'view_events',
           'view_tasks',
-        ]; // Default permissions
-    }
-  }
-
-  /// Update a staff member's information
-  Future<void> updateStaffMember(UserModel staff) async {
-    try {
-      final organization = await _organizationService.getCurrentUserOrganization(); // Get the current user's organization
-      if (organization == null) {
-        throw 'Organization not found'; // Throw an error if organization is not found
-      }
-
-      if (staff.organizationId != organization.id) {
-        throw 'Staff member belongs to a different organization'; // Throw an error if staff belongs to a different organization
-      }
-
-      final currentUser = _auth.currentUser; // Get the current authenticated user
-      if (currentUser == null) throw 'Not authenticated'; // Throw an error if no user is authenticated
-
-      final userDoc = await _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .get(); // Get the current user's document from Firestore
-
-      if (!userDoc.exists) throw 'User data not found'; // Throw an error if user document does not exist
-      final userRole = userDoc.get('role'); // Get user role from user document
-
-      if (!['admin', 'client', 'manager'].contains(userRole)) {
-        throw 'Insufficient permissions to update staff members'; // Throw an error if user does not have permission
-      }
-
-      final batch = _firestore.batch(); // Start a batch write
-
-      final userRef = _firestore.collection('users').doc(staff.uid); // Reference to the staff user document
-      batch.update(userRef, {
-        ...staff.toMap(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }); // Update the staff user document
-
-      final permissionRef = _firestore.collection('permissions').doc(staff.uid); // Reference to the staff permissions document
-      batch.update(permissionRef, {
-        'role': staff.role,
-        'permissions': _getDefaultPermissions(staff.role),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }); // Update the staff permissions document
-
-      await batch.commit(); // Commit the batch write
-      notifyListeners(); // Notify listeners of the change
-    } catch (e) {
-      debugPrint('Error updating staff member: $e'); // Log any errors
-      rethrow; // Rethrow the error
+        ]; // Return default permissions for unknown role
     }
   }
 
   /// Change a staff member's employment status
   Future<void> changeStaffStatus(String uid, String status) async {
     try {
-      final organization = await _organizationService.getCurrentUserOrganization(); // Get the current user's organization
+      final organization = await _organizationService.getCurrentUserOrganization();
       if (organization == null) {
-        throw 'Organization not found'; // Throw an error if organization is not found
+        throw 'Organization not found'; // Throw error if organization is not found
       }
 
-      final currentUser = _auth.currentUser; // Get the current authenticated user
-      if (currentUser == null) throw 'Not authenticated'; // Throw an error if no user is authenticated
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated'; // Throw error if no user is authenticated
 
       final userDoc = await _firestore
           .collection('users')
           .doc(currentUser.uid)
-          .get(); // Get the current user's document from Firestore
+          .get();
 
-      if (!userDoc.exists) throw 'User data not found'; // Throw an error if user document does not exist
-      final userRole = userDoc.get('role'); // Get user role from user document
+      if (!userDoc.exists) throw 'User data not found'; // Throw error if user document is not found
+      final userRole = userDoc.get('role');
 
       if (!['admin', 'client', 'manager'].contains(userRole)) {
-        throw 'Insufficient permissions to change staff status'; // Throw an error if user does not have permission
+        throw 'Insufficient permissions to change staff status'; // Throw error if user does not have permission
       }
 
       final staffDoc = await _firestore
           .collection('users')
           .doc(uid)
-          .get(); // Get the staff user's document from Firestore
+          .get();
 
       if (!staffDoc.exists || staffDoc.data()?['organizationId'] != organization.id) {
-        throw 'Staff member not found in your organization'; // Throw an error if staff is not found in the organization
+        throw 'Staff member not found in your organization'; // Throw error if staff is not found in the organization
       }
 
       await _firestore
@@ -320,77 +301,59 @@ class StaffService extends ChangeNotifier {
           .update({
             'employmentStatus': status,
             'updatedAt': FieldValue.serverTimestamp(),
-          }); // Update the staff user's employment status
+          }); // Update staff employment status in Firestore
 
-      notifyListeners(); // Notify listeners of the change
+      notifyListeners(); // Notify listeners about the change
     } catch (e) {
-      debugPrint('Error changing staff status: $e'); // Log any errors
-      rethrow; // Rethrow the error
+      debugPrint('Error changing staff status: $e'); // Print error if any exception occurs
+      rethrow; // Rethrow the exception
     }
   }
 
-  /// Reset a staff member's password
+  /// Reset password for a staff member
   Future<void> resetStaffPassword(String email) async {
     try {
-      await _auth.sendPasswordResetEmail(email: email); // Send a password reset email
-    } catch (e) {
-      debugPrint('Error resetting staff password: $e'); // Log any errors
-      rethrow; // Rethrow the error
-    }
-  }
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated'; // Throw error if no user is authenticated
 
-  /// Delete a staff member
-  Future<void> deleteStaffMember(String uid) async {
-    try {
-      final organization = await _organizationService.getCurrentUserOrganization(); // Get the current user's organization
-      if (organization == null) {
-        throw 'Organization not found'; // Throw an error if organization is not found
-      }
-
-      final currentUser = _auth.currentUser; // Get the current authenticated user
-      if (currentUser == null) throw 'Not authenticated'; // Throw an error if no user is authenticated
-
+      // Verify the user has permission to reset passwords
       final userDoc = await _firestore
           .collection('users')
           .doc(currentUser.uid)
-          .get(); // Get the current user's document from Firestore
+          .get();
 
-      if (!userDoc.exists) throw 'User data not found'; // Throw an error if user document does not exist
-      final userRole = userDoc.get('role'); // Get user role from user document
+      if (!userDoc.exists) throw 'User data not found'; // Throw error if user document is not found
+      final userRole = userDoc.get('role');
+      final organizationId = userDoc.get('organizationId');
 
-      if (!['admin', 'client'].contains(userRole)) {
-        throw 'Insufficient permissions to delete staff members'; // Throw an error if user does not have permission
+      if (!['admin', 'client', 'manager'].contains(userRole)) {
+        throw 'Insufficient permissions to reset staff password'; // Throw error if user does not have permission
       }
 
-      final staffDoc = await _firestore
+      // First query by email only - this is more efficient
+      final staffQuery = await _firestore
           .collection('users')
-          .doc(uid)
-          .get(); // Get the staff user's document from Firestore
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
 
-      if (!staffDoc.exists || staffDoc.data()?['organizationId'] != organization.id) {
-        throw 'Staff member not found in your organization'; // Throw an error if staff is not found in the organization
+      if (staffQuery.docs.isEmpty) {
+        throw 'Staff member not found'; // Throw error if staff is not found
       }
 
-      final batch = _firestore.batch(); // Start a batch write
+      final staffDoc = staffQuery.docs.first;
+      final staffData = staffDoc.data();
 
-      batch.delete(_firestore.collection('users').doc(uid)); // Delete the staff user document
+      // Then verify organization
+      if (staffData['organizationId'] != organizationId) {
+        throw 'Staff member not found in your organization'; // Throw error if staff is not found in the organization
+      }
 
-      batch.delete(_firestore.collection('permissions').doc(uid)); // Delete the staff permissions document
-
-      await batch.commit(); // Commit the batch write
-
-      await _firestore
-          .collection('users')
-          .doc(uid)
-          .update({
-            'employmentStatus': 'inactive',
-            'updatedAt': FieldValue.serverTimestamp(),
-          }); // Mark the user as inactive instead of deleting from Firebase Auth
-
-      notifyListeners(); // Notify listeners of the change
+      // Send password reset email
+      await _auth.sendPasswordResetEmail(email: email); // Send password reset email
     } catch (e) {
-      debugPrint('Error deleting staff member: $e'); // Log any errors
-      rethrow; // Rethrow the error
+      debugPrint('Error resetting staff password: $e'); // Print error if any exception occurs
+      rethrow; // Rethrow the exception
     }
   }
 }
