@@ -89,18 +89,22 @@ lib/
 
 2. **Clone & Install**
       
-   git clone https://github.com/HarzaanHussain/cateredtoyou.git
-   cd cateredtoyou
-   flutter pub get
+   -git clone https://github.com/HarzaanHussain/cateredtoyou.git
+   
+   -cd cateredtoyou
+   
+   -flutter pub get
+
+   -flutter run
     
 
-3. **Firebase Setup**
+4. **Firebase Setup**
    - Create a new Firebase project
    - Enable Authentication, Firestore, and Storage
    - Add your `firebase_options.dart`
    - Set up security rules from the provided rules file
 
-4. **Configuration**
+5. **Configuration**
    - Update `lib/services/firebase_service.dart` with your settings
    - Configure environment variables if needed
    - Set up authentication providers
