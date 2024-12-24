@@ -72,6 +72,18 @@ class RolePermissions extends ChangeNotifier {
       description: 'View assigned tasks',
       category: 'Task Management',
     ),
+     'manage_menu': Permission(
+      id: 'manage_menu',
+      name: 'Manage Menu Items',
+      description: 'Create, edit, and delete menu items',
+      category: 'Menu Management',
+    ),
+    'view_menu': Permission(
+      id: 'view_menu',
+      name: 'View Menu Items',
+      description: 'View menu items and recipes',
+      category: 'Menu Management',
+    ),
   };
 
   // Default role permissions
@@ -85,7 +97,9 @@ class RolePermissions extends ChangeNotifier {
       'view_inventory',
       'manage_tasks',
       'view_tasks',
-    ],
+       'manage_menu',
+      'view_menu',
+    ],    
     'client': [
       'manage_staff',
       'view_staff',
@@ -94,6 +108,8 @@ class RolePermissions extends ChangeNotifier {
       'view_inventory',
       'manage_tasks',
       'view_tasks',
+       'manage_menu',
+      'view_menu',
     ],
     'manager': [
       'view_staff',
@@ -103,21 +119,35 @@ class RolePermissions extends ChangeNotifier {
       'view_inventory',
       'manage_tasks',
       'view_tasks',
+       'manage_menu',
+      'view_menu',
     ],
+    'staff': [
+    'view_events',
+    'manage_inventory',
+    'view_inventory',
+    'view_tasks',
+    'view_menu',
+    
+  ],
     'chef': [
       'view_events',
       'manage_inventory',
       'view_inventory',
       'view_tasks',
+      'manage_menu',
+      'view_menu',
     ],
     'server': [
       'view_events',
       'view_inventory',
       'view_tasks',
+      'view_menu',
     ],
     'driver': [
       'view_events',
       'view_tasks',
+      'view_menu',
     ],
   };
 

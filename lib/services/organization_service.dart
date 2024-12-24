@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cateredtoyou/models/organization.dart';
+import 'package:cateredtoyou/models/organization_model.dart';
 
 /// Service class for managing organizations and user-organization relationships.
 class OrganizationService extends ChangeNotifier {

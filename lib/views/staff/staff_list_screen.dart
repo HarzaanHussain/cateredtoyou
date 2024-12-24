@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
 import 'package:provider/provider.dart'; // Importing Provider package for state management.
 import 'package:go_router/go_router.dart'; // Importing GoRouter package for navigation.
-import 'package:cateredtoyou/models/user.dart'; // Importing UserModel class from models.
+import 'package:cateredtoyou/models/user_model.dart'; // Importing UserModel class from models.
 import 'package:cateredtoyou/services/staff_service.dart'; // Importing StaffService class for staff-related operations.
 
 /// A screen that displays a list of staff members and allows searching, adding, and editing staff.

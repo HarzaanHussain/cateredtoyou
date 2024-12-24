@@ -17,7 +17,7 @@ class FirebaseService {
       await FirebaseAuth.instance.setSettings(
         appVerificationDisabledForTesting: false, // Disable app verification for testing
       );
-      
+        
       // Optional: Configure Firestore settings
       FirebaseFirestore.instance.settings = const Settings(
         persistenceEnabled: true, // Enable offline data persistence

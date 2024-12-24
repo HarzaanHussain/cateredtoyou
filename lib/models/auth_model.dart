@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // Importing Firestore fo
 import 'package:flutter/foundation.dart'; // Importing foundation for ChangeNotifier
 import 'package:firebase_auth/firebase_auth.dart'; // Importing Firebase Auth for authentication
 import 'package:cateredtoyou/services/auth_service.dart'; // Importing custom AuthService
-import 'user.dart'; // Importing UserModel
+import 'package:cateredtoyou/models/user_model.dart'; // Importing UserModel for user data
 
 class AuthModel extends ChangeNotifier { // AuthModel class extending ChangeNotifier for state management
   final AuthService _authService = AuthService(); // Instance of AuthService for authentication operations

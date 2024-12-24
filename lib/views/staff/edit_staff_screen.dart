@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
 import 'package:provider/provider.dart'; // Importing Provider package for state management.
 import 'package:go_router/go_router.dart'; // Importing GoRouter package for navigation.
-import 'package:cateredtoyou/models/user.dart'; // Importing UserModel from the models directory.
+import 'package:cateredtoyou/models/user_model.dart'; // Importing UserModel from the models directory.
 import 'package:cateredtoyou/services/staff_service.dart'; // Importing StaffService for staff-related operations.
 import 'package:cateredtoyou/widgets/custom_button.dart'; // Importing custom button widget.
 import 'package:cateredtoyou/widgets/custom_text_field.dart'; // Importing custom text field widget.
@@ -29,7 +29,7 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
   bool _isLoading = false; // Loading state for async operations.
   String? _error; // Error message if any operation fails.
   late final StaffService _staffService; // Service for staff-related operations.
-
+  
   final List<String> _roles = [ // List of available roles.
     'staff',
     'manager',

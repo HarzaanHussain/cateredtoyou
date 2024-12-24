@@ -1,185 +1,203 @@
-# CateredToYou - Staff and Inventory Management System
+# CateredToYou
 
-A Flutter application for managing staff, inventory, and catering operations with role-based access control and real-time data synchronization.
+A comprehensive Flutter-based catering management system with real-time event planning, inventory tracking, and staff management capabilities.
 
-## Project Overview
+## Features
 
-CateredToYou is a comprehensive management system that allows catering businesses to:
-- Manage staff members with different roles and permissions
-- Track inventory items and stock levels
-- Handle role-based access control
-- Manage organizations and multi-tenant data isolation
+### Event Management
+- Create and manage catering events
+- Track event details, menus, and supplies
+- Handle customer information
+- Monitor event status and progress
 
-### Core Features
+### Inventory System
+- Real-time inventory tracking
+- Low stock alerts
+- Transaction history
+- Multi-unit support
+- Reorder point management
 
-- **Authentication & Authorization**
-  - User registration and login
-  - Role-based access control (Admin, Client, Manager, Chef, Server, Driver)
-  - Organization-based data isolation
+### Staff Management
+- Role-based access control
+- Staff scheduling
+- Performance tracking
+- Permission management
 
-- **Staff Management**
-  - Add/Edit staff members
-  - Assign roles and permissions
-  - Manage employment status
-  - Password reset functionality
-
-- **Inventory Management**
-  - Track inventory items
-  - Monitor stock levels
-  - Handle reorder points
-  - Record inventory transactions
+### Customer Management
+- Customer profiles
+- Event history
+- Contact information
+- Preferences tracking
 
 ## Project Structure
 
- 
+ plaintext
 lib/
-├── models/                 # Data Models
-│   ├── user.dart          # User data model with roles and permissions
-│   ├── auth_model.dart    # Authentication state management
-│   ├── inventory_item_model.dart  # Inventory item model
-│   └── organization.dart   # Organization model
-│
-├── services/              # Business Logic Layer
-│   ├── auth_service.dart       # Authentication operations
-│   ├── firebase_service.dart   # Firebase initialization and config
-│   ├── inventory_service.dart  # Inventory management
+├── models/                     # Data Models & Business Logic
+│   ├── auth_model.dart        # Authentication state management
+│   ├── customer_model.dart    # Customer data structure
+│   ├── event_model.dart       # Event management model
+│   ├── inventory_model.dart   # Inventory tracking model
+│   ├── menu_item_model.dart   # Menu items and pricing
+│   ├── organization_model.dart      # Organization management
+│   └── user_model.dart             # User profile and permissions
+
+├── services/                  # Business Logic & Firebase Integration
+│   ├── auth_service.dart     # Authentication operations
+│   ├── customer_service.dart # Customer management
+│   ├── event_service.dart    # Event operations
+│   ├── firebase_service.dart # Firebase configuration
+│   ├── inventory_service.dart # Inventory management
+│   ├── menu_service.dart     # Menu operations
 │   ├── organization_service.dart # Organization management
-│   ├── role_permissions.dart   # Permission management
-│   └── staff_service.dart      # Staff management
-│
-├── views/                 # UI Screens
-│   ├── auth/
-│   │   ├── login_screen.dart    # User login
-│   │   └── register_screen.dart # User registration
-│   ├── inventory/
-│   │   ├── inventory_list_screen.dart  # Inventory listing
-│   │   └── inventory_edit_screen.dart  # Add/Edit inventory
-│   ├── staff/
-│   │   ├── staff_list_screen.dart     # Staff listing
-│   │   ├── add_staff_screen.dart      # Add new staff
-│   │   └── edit_staff_screen.dart     # Edit staff details
-│   └── home/
-│       └── home_screen.dart           # Main dashboard
-│
-├── widgets/              # Reusable Components
-│   ├── bottom_nav_bar.dart   # Bottom navigation
-│   ├── custom_button.dart    # Styled buttons
-│   ├── custom_text_field.dart # Form inputs
-│   └── permission_widget.dart # Permission-based rendering
-│
-└── utils/               # Utilities
-    └── validators.dart  # Form validation rules
+│   ├── role_permissions.dart # Access control
+│   └── staff_service.dart    # Staff management
 
- 
+├── views/                    # UI Screens
+│   ├── auth/                # Authentication screens
+│   ├── events/             # Event management UI
+│   ├── inventory/          # Inventory management
+│   ├── menu_item/          # Menu management
+│   └── staff/              # Staff management
 
-## Technical Architecture
+└── widgets/                # Reusable Components
+    ├── custom_button.dart  
+    ├── custom_text_field.dart
+    └── various UI components
+    
 
-### Authentication Flow
-1. Users can register as clients or staff members
-2. Authentication state is managed using Firebase Auth
-3. User roles and permissions are stored in Firestore
-4. Organization-based data isolation is enforced
-
-### Data Model
-1. **Users Collection**
-   - uid: string
-   - email: string
-   - firstName: string
-   - lastName: string
-   - role: string
-   - organizationId: string
-   - employmentStatus: string
-   - createdAt: timestamp
-   - updatedAt: timestamp
-
-2. **Permissions Collection**
-   - uid: string (matches user)
-   - role: string
-   - permissions: array
-   - organizationId: string
-
-3. **Inventory Collection**
-   - id: string
-   - name: string
-   - category: enum
-   - quantity: number
-   - reorderPoint: number
-   - organizationId: string
-
-### Security Rules
-The application implements comprehensive security rules for data access:
-- Organization-based isolation
-- Role-based access control
-- Validation of inventory operations
-- Protected staff management
-
-## Setup and Configuration
+## Setup Instructions
 
 1. **Prerequisites**
-   - Flutter SDK
-   - Firebase project
-   - Firebase CLI
-
-2. **Firebase Setup**
       
-   # Initialize Firebase
-   flutterfire configure
+   flutter --version  # Ensure Flutter 3.5.3 or higher
     
 
-3. **Environment Configuration**
-   - Create firebase_options.dart with your Firebase credentials
-   - Set up security rules in Firebase Console
-
-4. **Run the Application**
+2. **Clone & Install**
       
+   git clone https://github.com/yourusername/cateredtoyou.git
+   cd cateredtoyou
    flutter pub get
-   flutter run
     
 
-## Role-Based Permissions
+3. **Firebase Setup**
+   - Create a new Firebase project
+   - Enable Authentication, Firestore, and Storage
+   - Add your `firebase_options.dart`
+   - Set up security rules from the provided rules file
 
-1. **Admin**
-   - Full system access
-   - Manage all staff and inventory
-   - View all reports
+4. **Configuration**
+   - Update `lib/services/firebase_service.dart` with your settings
+   - Configure environment variables if needed
+   - Set up authentication providers
 
-2. **Client**
-   - Manage staff members
-   - View inventory
-   - Access reports
+## Security & Permissions
 
-3. **Manager**
-   - Manage assigned staff
-   - Handle inventory
-   - View reports
+### Role-Based Access
+- **Admin**: Full system access
+- **Client**: Organization management
+- **Manager**: Event and staff management
+- **Chef**: Kitchen and inventory
+- **Server**: Event execution
+- **Driver**: Delivery management
 
-4. **Staff** (Chef, Server, Driver)
-   - View assigned tasks
-   - Update inventory (role-specific)
-   - View relevant information
+### Data Isolation
+- Organization-level data separation
+- Role-based data access
+- Secure customer information
+- Audit logging
 
-## Future Enhancements
+## Firebase Collections
 
-1. **Planned Features**
-   - Event management system
-   - Task assignment and tracking
-   - Automated inventory alerts
-   - Advanced reporting
+### Firestore Structure
+ plaintext
+/users
+  ├── uid
+  │   ├── profile info
+  │   └── permissions
+/events
+  ├── eventId
+  │   ├── details
+  │   ├── menu
+  │   └── supplies
+/inventory
+  ├── itemId
+  │   ├── details
+  │   └── transactions
+/customers
+  └── customerId
+      └── details
+ 
 
-2. **Technical Improvements**
-   - Implement caching for offline support
-   - Add real-time notifications
-   - Enhanced security measures
-   - Performance optimization
+## Development Guidelines
 
-## Contributing
+### Code Style
+- Follow Flutter/Dart style guide
+- Use meaningful variable names
+- Comment complex logic
+- Keep methods focused and small
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+### State Management
+- Provider for app-wide state
+- Local state for UI components
+- Proper error handling
+- Loading state management
+
+### Testing
+   
+flutter test        # Run unit tests
+flutter drive       # Run integration tests
+ 
+
+## Production Deployment
+
+1. **Build Release**
+      
+   flutter build apk --release  # Android
+   flutter build ios --release  # iOS
+    
+
+2. **Firebase Deployment**
+      
+   firebase deploy --only firestore:rules  # Deploy security rules
+   firebase deploy --only functions        # Deploy cloud functions
+    
+
+## Error Handling
+
+The application implements comprehensive error handling:
+- Network error recovery
+- Data validation
+- User feedback
+- Error logging
+
+## Performance Considerations
+
+- Lazy loading for lists
+- Image optimization
+- Caching strategies
+- Batch operations for Firestore
+
+## Maintenance & Updates
+
+1. Regular tasks:
+   - Dependency updates
+   - Security rule reviews
+   - Performance monitoring
+   - User feedback integration
+
+2. Backup procedures:
+   - Regular Firestore exports
+   - Configuration backups
+   - Version control
+
+## Support & Contributing
+
+1. Report issues via GitHub
+2. Follow contribution guidelines
+3. Code review process
+4. Testing requirements
 
 ## License
 
-This project is proprietary and confidential. All rights reserved.
+Copyright (c) 2024 [Your Company Name]. All rights reserved.

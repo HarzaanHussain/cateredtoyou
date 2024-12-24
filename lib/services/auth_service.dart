@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Authentication package
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Cloud Firestore package
 import 'package:flutter/foundation.dart'; // Import Flutter foundation package for debugging
-import 'package:cateredtoyou/models/user.dart'; // Import UserModel class
+import 'package:cateredtoyou/models/user_model.dart'; // Import UserModel class
 
 class AuthResult {
   final bool success; // Indicates if the operation was successful
@@ -94,11 +94,14 @@ class AuthService {
             'view_inventory', // Permission to view inventory
             'manage_tasks', // Permission to manage tasks
             'view_tasks', // Permission to view tasks
+            'manage_menu', // Permission to manage menu
+            'view_menu', // Permission to view menu
           ],
           'organizationId': orgId, // Organization ID
           'createdAt': now, // Creation time
           'updatedAt': now, // Update time
         });
+        
 
         debugPrint('Registration completed successfully'); // Debug print for successful registration
         return AuthResult(

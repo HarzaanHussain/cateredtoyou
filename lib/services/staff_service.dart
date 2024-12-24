@@ -1,15 +1,16 @@
 import 'package:flutter/foundation.dart'; // Importing foundation package for ChangeNotifier
 import 'package:cloud_firestore/cloud_firestore.dart'; // Importing Firestore package for database operations
 import 'package:firebase_auth/firebase_auth.dart'; // Importing Firebase Auth package for authentication
-import 'package:cateredtoyou/models/user.dart'; // Importing UserModel for user data
+import 'package:cateredtoyou/models/user_model.dart'; // Importing UserModel for user data
 import 'package:cateredtoyou/services/organization_service.dart'; // Importing OrganizationService for organization-related operations
-
+import 'package:cateredtoyou/services/role_permissions.dart'; // Importing RolePermissions for role-based permissions
 /// Service class for managing staff-related operations
 class StaffService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance; // Firestore instance for database operations
   final FirebaseAuth _auth = FirebaseAuth.instance; // Firebase Auth instance for authentication
   final OrganizationService _organizationService; // OrganizationService instance for organization-related operations
   final FirebaseAuth _staffAuth = FirebaseAuth.instance; // Separate Firebase Auth instance for staff authentication
+ final RolePermissions _rolePermissions = RolePermissions(); // RolePermissions instance for managing permissions
 
   StaffService(this._organizationService); // Constructor to initialize OrganizationService
 
@@ -131,15 +132,10 @@ class StaffService extends ChangeNotifier {
             'updatedAt': now,
           }); // Set user data in Firestore
 
-          final permissionRef = _firestore.collection('permissions').doc(uid);
-          transaction.set(permissionRef, {
-            'role': role,
-            'permissions': _getDefaultPermissions(role),
-            'organizationId': organization.id,
-            'createdAt': now,
-            'updatedAt': now,
-          }); // Set permissions data in Firestore
+         // Use RolePermissions to create permissions
+          await _rolePermissions.createUserPermissions(uid, role);
         });
+        
 
         // Sign out from the staff auth instance
         await _staffAuth.signOut();
@@ -198,12 +194,9 @@ class StaffService extends ChangeNotifier {
         'updatedAt': FieldValue.serverTimestamp(),
       }); // Update user data in Firestore
 
-      final permissionRef = _firestore.collection('permissions').doc(staff.uid);
-      batch.update(permissionRef, {
-        'role': staff.role,
-        'permissions': _getDefaultPermissions(staff.role),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }); // Update permissions data in Firestore
+      // Use RolePermissions to update permissions
+      await _rolePermissions.updateUserPermissions(staff.uid, staff.role);
+
 
       await batch.commit(); // Commit the batch update
       notifyListeners(); // Notify listeners about the change
@@ -213,55 +206,7 @@ class StaffService extends ChangeNotifier {
     }
   }
 
-  /// Get default permissions based on role
-  List<String> _getDefaultPermissions(String role) {
-    switch (role) {
-      case 'manager':
-        return [
-          'view_staff',
-          'manage_events',
-          'view_events',
-          'manage_inventory',
-          'view_inventory',
-          'manage_tasks',
-          'view_tasks',
-        ]; // Return default permissions for manager
-      case 'chef':
-        return [
-          'view_events',
-          'view_inventory',
-          'manage_inventory',
-          'view_tasks',
-          'manage_kitchen_tasks',
-        ]; // Return default permissions for chef
-      case 'server':
-        return [
-          'view_events',
-          'view_tasks',
-          'update_service_tasks',
-          'view_inventory',
-        ]; // Return default permissions for server
-      case 'driver':
-        return [
-          'view_events',
-          'view_tasks',
-          'update_delivery_tasks',
-          'view_inventory',
-        ]; // Return default permissions for driver
-      case 'staff':
-        return [
-          'view_events',
-          'view_tasks',
-          'view_inventory',
-          'update_assigned_tasks',
-        ]; // Return default permissions for staff
-      default:
-        return [
-          'view_events',
-          'view_tasks',
-        ]; // Return default permissions for unknown role
-    }
-  }
+ 
 
   /// Change a staff member's employment status
   Future<void> changeStaffStatus(String uid, String status) async {
