@@ -75,7 +75,7 @@ lib/
 
 2. **Clone & Install**
       
-   git clone https://github.com/yourusername/cateredtoyou.git
+   git clone https://github.com/HarzaanHussain/cateredtoyou.git
    cd cateredtoyou
    flutter pub get
     
