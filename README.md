@@ -31,39 +31,53 @@ A comprehensive Flutter-based catering management system with real-time event pl
 
 ## Project Structure
 
- plaintext
 lib/
-├── models/                     # Data Models & Business Logic
-│   ├── auth_model.dart        # Authentication state management
-│   ├── customer_model.dart    # Customer data structure
-│   ├── event_model.dart       # Event management model
-│   ├── inventory_model.dart   # Inventory tracking model
-│   ├── menu_item_model.dart   # Menu items and pricing
-│   ├── organization_model.dart      # Organization management
-│   └── user_model.dart             # User profile and permissions
-
-├── services/                  # Business Logic & Firebase Integration
-│   ├── auth_service.dart     # Authentication operations
-│   ├── customer_service.dart # Customer management
-│   ├── event_service.dart    # Event operations
-│   ├── firebase_service.dart # Firebase configuration
-│   ├── inventory_service.dart # Inventory management
-│   ├── menu_service.dart     # Menu operations
+├── models/                     # Data Models & Business Logic (POJOs/DTOs)
+│   ├── auth_model.dart         # Authentication state management
+│   ├── customer_model.dart     # Customer data structure
+│   ├── event_model.dart        # Event management model
+│   ├── inventory_model.dart    # Inventory tracking model
+│   ├── menu_item_model.dart    # Menu items and pricing
+│   ├── organization_model.dart # Organization management
+│   └── user_model.dart         # User profile and permissions
+│
+├── services/                   # Business Logic & Firebase Integration (Use Cases/Interactors)
+│   ├── auth_service.dart       # Authentication operations
+│   ├── customer_service.dart   # Customer management
+│   ├── event_service.dart      # Event operations
+│   ├── firebase_service.dart   # Firebase configuration and initialization
+│   ├── inventory_service.dart  # Inventory management
+│   ├── menu_service.dart       # Menu operations
 │   ├── organization_service.dart # Organization management
-│   ├── role_permissions.dart # Access control
-│   └── staff_service.dart    # Staff management
-
-├── views/                    # UI Screens
-│   ├── auth/                # Authentication screens
-│   ├── events/             # Event management UI
-│   ├── inventory/          # Inventory management
-│   ├── menu_item/          # Menu management
-│   └── staff/              # Staff management
-
-└── widgets/                # Reusable Components
-    ├── custom_button.dart  
-    ├── custom_text_field.dart
-    └── various UI components
+│   ├── role_permissions.dart   # Access control and authorization logic
+│   └── staff_service.dart      # Staff management
+│
+├── views/                      # UI Screens (Presentation Layer)
+│   ├── auth/                   # Authentication screens
+│   │   ├── login_screen.dart
+│   │   ├── register_screen.dart
+│   │   └── ...
+│   ├── events/                 # Event management UI
+│   │   ├── event_list_screen.dart
+│   │   ├── event_details_screen.dart
+│   │   └── ...
+│   ├── inventory/             # Inventory management
+│   │   ├── inventory_list_screen.dart
+│   │   ├── add_item_screen.dart
+│   │   └── ...
+│   ├── menu_item/             # Menu management
+│   │   ├── menu_list_screen.dart
+│   │   ├── edit_menu_item_screen.dart
+│   │   └── ...
+│   └── staff/                  # Staff management
+│       ├── staff_list_screen.dart
+│       ├── add_staff_screen.dart
+│       └── ...
+│
+└── widgets/                    # Reusable UI Components
+├── custom_button.dart
+├── custom_text_field.dart
+└── ...                     # Various other UI components
     
 
 ## Setup Instructions
