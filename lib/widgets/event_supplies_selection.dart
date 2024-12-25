@@ -1,67 +1,73 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:cateredtoyou/models/inventory_item_model.dart';
-import 'package:cateredtoyou/models/event_model.dart';
-import 'package:cateredtoyou/services/inventory_service.dart';
+import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
+import 'package:provider/provider.dart'; // Importing Provider package for state management.
+import 'package:cateredtoyou/models/inventory_item_model.dart'; // Importing InventoryItem model.
+import 'package:cateredtoyou/models/event_model.dart'; // Importing Event model.
+import 'package:cateredtoyou/services/inventory_service.dart'; // Importing InventoryService for fetching inventory items.
+/// This file contains the EventSuppliesSelection widget which allows users to select supplies for an event.
+/// It uses Flutter's StatefulWidget to manage the state of the selected supplies and Provider for state management.
 
+/// A StatefulWidget that allows users to select supplies for an event.
 class EventSuppliesSelection extends StatefulWidget {
-  final List<EventSupply> selectedSupplies;
-  final Function(List<EventSupply>) onSuppliesChanged;
+  final List<EventSupply> selectedSupplies; // List of currently selected supplies.
+  final Function(List<EventSupply>) onSuppliesChanged; // Callback function to notify when the selected supplies change.
 
+  /// Constructor for EventSuppliesSelection.
   const EventSuppliesSelection({
-    super.key,
-    required this.selectedSupplies,
-    required this.onSuppliesChanged,
+    super.key, // Key for the widget.
+    required this.selectedSupplies, // Required list of selected supplies.
+    required this.onSuppliesChanged, // Required callback function.
   });
 
   @override
-  State<EventSuppliesSelection> createState() => _EventSuppliesSelectionState();
+  State<EventSuppliesSelection> createState() => _EventSuppliesSelectionState(); // Creates the mutable state for this widget.
 }
 
+/// State class for EventSuppliesSelection.
 class _EventSuppliesSelectionState extends State<EventSuppliesSelection> {
+  /// Shows a dialog to add a supply item with a specified quantity.
   void _showSupplyDialog(InventoryItem item) {
-    final quantityController = TextEditingController(text: '1');
+    final quantityController = TextEditingController(text: '1'); // Controller for the quantity input field.
 
     showDialog(
-      context: context,
+      context: context, // Context of the current widget.
       builder: (context) => AlertDialog(
-        title: Text('Add ${item.name}'),
+        title: Text('Add ${item.name}'), // Title of the dialog.
         content: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min, // Minimize the size of the column.
           children: [
             TextFormField(
-              controller: quantityController,
+              controller: quantityController, // Controller for the quantity input field.
               decoration: InputDecoration(
-                labelText: 'Quantity (${item.unit.toString().split('.').last})',
-                border: const OutlineInputBorder(),
+                labelText: 'Quantity (${item.unit.toString().split('.').last})', // Label for the quantity input field.
+                border: const OutlineInputBorder(), // Border style for the input field.
               ),
-              keyboardType: TextInputType.number,
+              keyboardType: TextInputType.number, // Keyboard type for numeric input.
             ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context), // Closes the dialog.
+            child: const Text('Cancel'), // Cancel button text.
           ),
           TextButton(
             onPressed: () {
-              final quantity = double.tryParse(quantityController.text) ?? 0;
+              final quantity = double.tryParse(quantityController.text) ?? 0; // Parses the quantity input.
               if (quantity > 0) {
                 final eventSupply = EventSupply(
-                  inventoryId: item.id,
-                  name: item.name,
-                  quantity: quantity,
-                  unit: item.unit.toString().split('.').last,
+                  inventoryId: item.id, // ID of the inventory item.
+                  name: item.name, // Name of the inventory item.
+                  quantity: quantity, // Quantity of the supply.
+                  unit: item.unit.toString().split('.').last, // Unit of the supply.
                 );
 
-                final updatedSupplies = List<EventSupply>.from(widget.selectedSupplies);
-                updatedSupplies.add(eventSupply);
-                widget.onSuppliesChanged(updatedSupplies);
-                Navigator.pop(context);
+                final updatedSupplies = List<EventSupply>.from(widget.selectedSupplies); // Creates a copy of the selected supplies list.
+                updatedSupplies.add(eventSupply); // Adds the new supply to the list.
+                widget.onSuppliesChanged(updatedSupplies); // Calls the callback function with the updated list.
+                Navigator.pop(context); // Closes the dialog.
               }
             },
-            child: const Text('Add'),
+            child: const Text('Add'), // Add button text.
           ),
         ],
       ),
@@ -71,26 +77,26 @@ class _EventSuppliesSelectionState extends State<EventSuppliesSelection> {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
       children: [
         Text(
-          'Supplies & Equipment',
-          style: Theme.of(context).textTheme.titleLarge,
+          'Supplies & Equipment', // Title text.
+          style: Theme.of(context).textTheme.titleLarge, // Style for the title text.
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 8), // Adds vertical spacing.
         StreamBuilder<List<InventoryItem>>(
-          stream: context.read<InventoryService>().getInventoryItems(),
+          stream: context.read<InventoryService>().getInventoryItems(), // Stream of inventory items from the InventoryService.
           builder: (context, snapshot) {
             if (snapshot.hasError) {
-              return const Text('Error loading inventory items');
+              return const Text('Error loading inventory items'); // Error message if the stream has an error.
             }
 
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const CircularProgressIndicator();
+              return const CircularProgressIndicator(); // Loading indicator while waiting for the stream.
             }
 
-            final inventoryItems = snapshot.data ?? [];
-            
+            final inventoryItems = snapshot.data ?? []; // List of inventory items from the stream.
+
             return Column(
               children: [
                 // Selected supplies
@@ -99,50 +105,50 @@ class _EventSuppliesSelectionState extends State<EventSuppliesSelection> {
                     child: Column(
                       children: widget.selectedSupplies.map((supply) {
                         return ListTile(
-                          title: Text(supply.name),
-                          subtitle: Text('${supply.quantity} ${supply.unit}'),
+                          title: Text(supply.name), // Name of the selected supply.
+                          subtitle: Text('${supply.quantity} ${supply.unit}'), // Quantity and unit of the selected supply.
                           trailing: IconButton(
-                            icon: const Icon(Icons.delete),
+                            icon: const Icon(Icons.delete), // Delete icon.
                             onPressed: () {
                               final updatedSupplies = List<EventSupply>.from(widget.selectedSupplies)
-                                ..removeWhere((s) => s.inventoryId == supply.inventoryId);
-                              widget.onSuppliesChanged(updatedSupplies);
+                                ..removeWhere((s) => s.inventoryId == supply.inventoryId); // Removes the supply from the list.
+                              widget.onSuppliesChanged(updatedSupplies); // Calls the callback function with the updated list.
                             },
                           ),
                         );
                       }).toList(),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 16), // Adds vertical spacing.
                 ],
 
                 // Available inventory items by category
                 ...InventoryCategory.values.map((category) {
                   final categoryItems = inventoryItems
                       .where((item) => item.category == category)
-                      .toList();
-                  if (categoryItems.isEmpty) return const SizedBox();
+                      .toList(); // Filters inventory items by category.
+                  if (categoryItems.isEmpty) return const SizedBox(); // Returns an empty widget if no items in the category.
 
                   return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
                     children: [
                       Text(
-                        category.toString().split('.').last,
-                        style: Theme.of(context).textTheme.titleMedium,
+                        category.toString().split('.').last, // Category name.
+                        style: Theme.of(context).textTheme.titleMedium, // Style for the category name.
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 8), // Adds vertical spacing.
                       Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                        spacing: 8, // Horizontal spacing between chips.
+                        runSpacing: 8, // Vertical spacing between chips.
                         children: categoryItems.map((item) {
                           return ActionChip(
-                            avatar: const Icon(Icons.add),
-                            label: Text(item.name),
-                            onPressed: () => _showSupplyDialog(item),
+                            avatar: const Icon(Icons.add), // Add icon.
+                            label: Text(item.name), // Name of the inventory item.
+                            onPressed: () => _showSupplyDialog(item), // Shows the supply dialog when the chip is pressed.
                           );
                         }).toList(),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 16), // Adds vertical spacing.
                     ],
                   );
                 }),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+///TODO Needs better implemtation 
 class BottomNavBar extends StatelessWidget {
   final int selectedIndex;
   final Function(int) onItemTapped;

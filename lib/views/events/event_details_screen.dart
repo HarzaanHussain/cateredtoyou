@@ -1,53 +1,53 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cateredtoyou/models/event_model.dart';
-import 'package:cateredtoyou/models/customer_model.dart';
-import 'package:cateredtoyou/services/event_service.dart';
+import 'package:flutter/material.dart'; // Importing Flutter material package for UI components
+import 'package:provider/provider.dart'; // Importing provider package for state management
+import 'package:go_router/go_router.dart'; // Importing go_router package for navigation
+import 'package:intl/intl.dart'; // Importing intl package for date formatting
+import 'package:cloud_firestore/cloud_firestore.dart'; // Importing cloud_firestore package for Firestore database
+import 'package:cateredtoyou/models/event_model.dart'; // Importing event model
+import 'package:cateredtoyou/models/customer_model.dart'; // Importing customer model
+import 'package:cateredtoyou/services/event_service.dart'; // Importing event service for event-related operations
 
 class EventDetailsScreen extends StatelessWidget {
-  final Event event;
+  final Event event; // Event object to display details for
 
   const EventDetailsScreen({
     super.key,
-    required this.event,
+    required this.event, // Constructor requiring an event object
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dateFormat = DateFormat('MMM d, y');
-    final timeFormat = DateFormat('h:mm a');
+    final theme = Theme.of(context); // Getting the current theme
+    final dateFormat = DateFormat('MMM d, y'); // Date format for displaying dates
+    final timeFormat = DateFormat('h:mm a'); // Time format for displaying times
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Event Details'),
+        title: const Text('Event Details'), // AppBar title
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () => context.push('/edit-event', extra: event),
+            icon: const Icon(Icons.edit), // Edit icon button
+            onPressed: () => context.push('/edit-event', extra: event), // Navigate to edit event screen
           ),
           PopupMenuButton<String>(
             onSelected: (value) async {
               switch (value) {
                 case 'status':
-                  _showStatusChangeDialog(context);
+                  _showStatusChangeDialog(context); // Show status change dialog
                   break;
                 case 'delete':
-                  _showDeleteConfirmation(context);
+                  _showDeleteConfirmation(context); // Show delete confirmation dialog
                   break;
               }
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: 'status',
-                child: Text('Change Status'),
+                child: Text('Change Status'), // Popup menu item for changing status
               ),
               const PopupMenuItem(
                 value: 'delete',
-                textStyle: TextStyle(color: Colors.red),
+                textStyle: TextStyle(color: Colors.red), // Popup menu item for deleting event
                 child: Text('Delete Event'),
               ),
             ],
@@ -61,14 +61,14 @@ class EventDetailsScreen extends StatelessWidget {
             // Header Section with Status
             Container(
               padding: const EdgeInsets.all(16),
-              color: theme.colorScheme.primary.withAlpha((0.1 * 255).toInt()),
+              color: theme.colorScheme.primary.withAlpha((0.1 * 255).toInt()), // Light background color based on theme
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     event.name,
                     style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.bold, // Event name with bold font
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -80,11 +80,11 @@ class EventDetailsScreen extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: _getStatusColor(event.status).withAlpha((0.1 * 255).toInt()),
+                          color: _getStatusColor(event.status).withAlpha((0.1 * 255).toInt()), // Status color background
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          event.status.toString().split('.').last.toUpperCase(),
+                          event.status.toString().split('.').last.toUpperCase(), // Displaying event status
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: _getStatusColor(event.status),
                             fontWeight: FontWeight.bold,
@@ -113,19 +113,19 @@ class EventDetailsScreen extends StatelessWidget {
                             children: [
                               Icon(
                                 Icons.description_outlined,
-                                color: theme.colorScheme.primary,
+                                color: theme.colorScheme.primary, // Icon for description
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 'Description',
                                 style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.bold, // Title for description section
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text(event.description),
+                          Text(event.description), // Displaying event description
                         ],
                       ),
                     ),
@@ -137,13 +137,13 @@ class EventDetailsScreen extends StatelessWidget {
                     future: FirebaseFirestore.instance
                         .collection('customers')
                         .doc(event.customerId)
-                        .get(),
+                        .get(), // Fetching customer data from Firestore
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
                         return const Card(
                           child: Padding(
                             padding: EdgeInsets.all(16),
-                            child: Text('Error loading customer information'),
+                            child: Text('Error loading customer information'), // Error message
                           ),
                         );
                       }
@@ -152,7 +152,7 @@ class EventDetailsScreen extends StatelessWidget {
                         return const Card(
                           child: Padding(
                             padding: EdgeInsets.all(16),
-                            child: Center(child: CircularProgressIndicator()),
+                            child: Center(child: CircularProgressIndicator()), // Loading indicator
                           ),
                         );
                       }
@@ -163,13 +163,13 @@ class EventDetailsScreen extends StatelessWidget {
                         return const Card(
                           child: Padding(
                             padding: EdgeInsets.all(16),
-                            child: Text('Customer not found'),
+                            child: Text('Customer not found'), // Customer not found message
                           ),
                         );
                       }
 
                       final customer =
-                          CustomerModel.fromMap(customerData, event.customerId);
+                          CustomerModel.fromMap(customerData, event.customerId); // Creating customer model from data
 
                       return Card(
                         child: Padding(
@@ -181,14 +181,14 @@ class EventDetailsScreen extends StatelessWidget {
                                 children: [
                                   Icon(
                                     Icons.person_outline,
-                                    color: theme.colorScheme.primary,
+                                    color: theme.colorScheme.primary, // Icon for customer information
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
                                     'Customer Information',
                                     style:
                                         theme.textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
+                                      fontWeight: FontWeight.bold, // Title for customer information section
                                     ),
                                   ),
                                 ],
@@ -197,19 +197,19 @@ class EventDetailsScreen extends StatelessWidget {
                               _InfoRow(
                                 icon: Icons.person,
                                 label: 'Name',
-                                value: customer.fullName,
+                                value: customer.fullName, // Displaying customer name
                               ),
                               const SizedBox(height: 8),
                               _InfoRow(
                                 icon: Icons.email_outlined,
                                 label: 'Email',
-                                value: customer.email,
+                                value: customer.email, // Displaying customer email
                               ),
                               const SizedBox(height: 8),
                               _InfoRow(
                                 icon: Icons.phone_outlined,
                                 label: 'Phone',
-                                value: customer.phoneNumber,
+                                value: customer.phoneNumber, // Displaying customer phone number
                               ),
                             ],
                           ),
@@ -230,13 +230,13 @@ class EventDetailsScreen extends StatelessWidget {
                             children: [
                               Icon(
                                 Icons.calendar_today,
-                                color: theme.colorScheme.primary,
+                                color: theme.colorScheme.primary, // Icon for date and time
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 'Date & Time',
                                 style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.bold, // Title for date and time section
                                 ),
                               ),
                             ],
@@ -248,14 +248,14 @@ class EventDetailsScreen extends StatelessWidget {
                                 child: _InfoRow(
                                   icon: Icons.calendar_today,
                                   label: 'Start Date',
-                                  value: dateFormat.format(event.startDate),
+                                  value: dateFormat.format(event.startDate), // Displaying event start date
                                 ),
                               ),
                               Expanded(
                                 child: _InfoRow(
                                   icon: Icons.calendar_today,
                                   label: 'End Date',
-                                  value: dateFormat.format(event.endDate),
+                                  value: dateFormat.format(event.endDate), // Displaying event end date
                                 ),
                               ),
                             ],
@@ -267,14 +267,14 @@ class EventDetailsScreen extends StatelessWidget {
                                 child: _InfoRow(
                                   icon: Icons.access_time,
                                   label: 'Start Time',
-                                  value: timeFormat.format(event.startTime),
+                                  value: timeFormat.format(event.startTime), // Displaying event start time
                                 ),
                               ),
                               Expanded(
                                 child: _InfoRow(
                                   icon: Icons.access_time,
                                   label: 'End Time',
-                                  value: timeFormat.format(event.endTime),
+                                  value: timeFormat.format(event.endTime), // Displaying event end time
                                 ),
                               ),
                             ],
@@ -296,60 +296,56 @@ class EventDetailsScreen extends StatelessWidget {
                             children: [
                               Icon(
                                 Icons.location_on_outlined,
-                                color: theme.colorScheme.primary,
+                                color: theme.colorScheme.primary, // Icon for venue and attendance
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 'Venue & Attendance',
                                 style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.bold, // Title for venue and attendance section
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 16),
                           
+                          // Displays the location of the event
                           _InfoRow(
                             icon: Icons.location_on,
                             label: 'Location',
                             value: event.location,
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 8), // Adds vertical spacing between rows
                           Row(
                             children: [
                               Expanded(
                                 child: _InfoRow(
                                   icon: Icons.people_outline,
                                   label: 'Guest Count',
-                                  value: event.guestCount.toString(),
+                                  value: event.guestCount.toString(), // Displays the guest count
                                 ),
                               ),
                               Expanded(
                                 child: _InfoRow(
                                   icon: Icons.person_outline,
                                   label: 'Min. Staff',
-                                  value: event.minStaff.toString(),
+                                  value: event.minStaff.toString(), // Displays the minimum staff required
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                          const SizedBox(height: 16), // Adds vertical spacing between sections
 
-                  //staff 
-                  if (event.assignedStaff.isNotEmpty)
+                          // Displays assigned staff if there are any
+                          if (event.assignedStaff.isNotEmpty)
                             Card(
                               child: Padding(
-                                padding: const EdgeInsets.all(16),
+                                padding: const EdgeInsets.all(16), // Adds padding inside the card
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Row(
                                           children: [
@@ -357,11 +353,10 @@ class EventDetailsScreen extends StatelessWidget {
                                               Icons.people_outline,
                                               color: theme.colorScheme.primary,
                                             ),
-                                            const SizedBox(width: 8),
+                                            const SizedBox(width: 8), // Adds horizontal spacing
                                             Text(
                                               'Assigned Staff',
-                                              style: theme.textTheme.titleMedium
-                                                  ?.copyWith(
+                                              style: theme.textTheme.titleMedium?.copyWith(
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
@@ -369,42 +364,33 @@ class EventDetailsScreen extends StatelessWidget {
                                         ),
                                         Text(
                                           '${event.assignedStaff.length}/${event.minStaff} Required',
-                                          style: theme.textTheme.titleSmall
-                                              ?.copyWith(
-                                            color: event.assignedStaff.length <
-                                                    event.minStaff
+                                          style: theme.textTheme.titleSmall?.copyWith(
+                                            color: event.assignedStaff.length < event.minStaff
                                                 ? theme.colorScheme.error
                                                 : theme.colorScheme.primary,
                                           ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 16),
-                                    ...event.assignedStaff.map((staff) =>
-                                        Column(
+                                    const SizedBox(height: 16), // Adds vertical spacing
+                                    ...event.assignedStaff.map((staff) => Column(
                                           children: [
                                             ListTile(
-                                              leading: const Icon(
-                                                  Icons.person_outline),
-                                              title: Text(staff.name),
+                                              leading: const Icon(Icons.person_outline),
+                                              title: Text(staff.name), // Displays the staff name
                                               subtitle: Text(
-                                                staff.role.toUpperCase(),
-                                                style: theme.textTheme.bodySmall
-                                                    ?.copyWith(
-                                                  color:
-                                                      theme.colorScheme.primary,
+                                                staff.role.toUpperCase(), // Displays the staff role
+                                                style: theme.textTheme.bodySmall?.copyWith(
+                                                  color: theme.colorScheme.primary,
                                                 ),
                                               ),
                                               trailing: Text(
-                                                DateFormat('MMM d, y')
-                                                    .format(staff.assignedAt),
-                                                style:
-                                                    theme.textTheme.bodySmall,
+                                                DateFormat('MMM d, y').format(staff.assignedAt),
+                                                style: theme.textTheme.bodySmall,
                                               ),
                                             ),
-                                            if (staff !=
-                                                event.assignedStaff.last)
-                                              const Divider(),
+                                            if (staff != event.assignedStaff.last)
+                                              const Divider(), // Adds a divider between staff members
                                           ],
                                         )),
                                   ],
@@ -412,134 +398,137 @@ class EventDetailsScreen extends StatelessWidget {
                               ),
                             ),
 
-                  // Menu Items Card
-                  if (event.menuItems.isNotEmpty)
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
+                          // Displays menu items if there are any
+                          if (event.menuItems.isNotEmpty)
+                            Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16), // Adds padding inside the card
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(
-                                      Icons.restaurant_menu,
-                                      color: theme.colorScheme.primary,
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.restaurant_menu,
+                                              color: theme.colorScheme.primary,
+                                            ),
+                                            const SizedBox(width: 8), // Adds horizontal spacing
+                                            Text(
+                                              'Menu Items',
+                                              style: theme.textTheme.titleMedium?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        Text(
+                                          'Total: \$${event.totalPrice.toStringAsFixed(2)}',
+                                          style: theme.textTheme.titleMedium?.copyWith(
+                                            color: theme.colorScheme.primary,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Menu Items',
-                                      style:
-                                          theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                                    const SizedBox(height: 16), // Adds vertical spacing
+                                    ...event.menuItems.map((item) => Column(
+                                          children: [
+                                            ListTile(
+                                              contentPadding: EdgeInsets.zero,
+                                              title: Text(item.name), // Displays the menu item name
+                                              subtitle: item.specialInstructions?.isNotEmpty == true
+                                                  ? Text(item.specialInstructions!)
+                                                  : null, // Displays special instructions if any
+                                              trailing: Text(
+                                                '${item.quantity}x \$${item.price.toStringAsFixed(2)}',
+                                                style: theme.textTheme.titleSmall,
+                                              ),
+                                            ),
+                                            if (event.menuItems.last != item)
+                                              const Divider(), // Adds a divider between menu items
+                                          ],
+                                        )),
                                   ],
                                 ),
-                                Text(
-                                  'Total: \$${event.totalPrice.toStringAsFixed(2)}',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    color: theme.colorScheme.primary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                            const SizedBox(height: 16),
-                            ...event.menuItems.map((item) => Column(
-                                  children: [
-                                    ListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      title: Text(item.name),
-                                      subtitle: item.specialInstructions
-                                                  ?.isNotEmpty ==
-                                              true
-                                          ? Text(item.specialInstructions!)
-                                          : null,
-                                      trailing: Text(
-                                        '${item.quantity}x \$${item.price.toStringAsFixed(2)}',
-                                        style: theme.textTheme.titleSmall,
-                                      ),
-                                    ),
-                                    if (event.menuItems.last != item)
-                                      const Divider(),
-                                  ],
-                                )),
-                          ],
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 16),
+                          const SizedBox(height: 16), // Adds vertical spacing between sections
 
-                  // Supplies Card
-                  if (event.supplies.isNotEmpty)
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.inventory_2_outlined,
-                                  color: theme.colorScheme.primary,
+                          // Displays supplies if there are any
+                          if (event.supplies.isNotEmpty)
+                            Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16), // Adds padding inside the card
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.inventory_2_outlined,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                        const SizedBox(width: 8), // Adds horizontal spacing
+                                        Text(
+                                          'Supplies & Equipment',
+                                          style: theme.textTheme.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16), // Adds vertical spacing
+                                    ...event.supplies.map((supply) => Column(
+                                          children: [
+                                            ListTile(
+                                              contentPadding: EdgeInsets.zero,
+                                              title: Text(supply.name), // Displays the supply name
+                                              trailing: Text(
+                                                '${supply.quantity} ${supply.unit}',
+                                                style: theme.textTheme.titleSmall,
+                                              ),
+                                            ),
+                                            if (event.supplies.last != supply)
+                                              const Divider(), // Adds a divider between supplies
+                                          ],
+                                        )),
+                                  ],
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Supplies & Equipment',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                            const SizedBox(height: 16),
-                            ...event.supplies.map((supply) => Column(
-                                  children: [
-                                    ListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      title: Text(supply.name),
-                                      trailing: Text(
-                                        '${supply.quantity} ${supply.unit}',
-                                        style: theme.textTheme.titleSmall,
-                                      ),
-                                    ),
-                                    if (event.supplies.last != supply)
-                                      const Divider(),
-                                  ],
-                                )),
-                          ],
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 16),
+                          const SizedBox(height: 16), // Adds vertical spacing between sections
 
-                  // Notes Card
-                  if (event.notes.isNotEmpty)
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.note_outlined,
-                                  color: theme.colorScheme.primary,
+                          // Displays additional notes if there are any
+                          if (event.notes.isNotEmpty)
+                            Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16), // Adds padding inside the card
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.note_outlined,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                        const SizedBox(width: 8), // Adds horizontal spacing
+                                        Text(
+                                          'Additional Notes',
+                                          style: theme.textTheme.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8), // Adds vertical spacing
+                                    Text(event.notes), // Displays the additional notes
+                                  ],
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Additional Notes',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                             const SizedBox(height: 8),
                             Text(event.notes),
