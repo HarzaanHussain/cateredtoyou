@@ -61,7 +61,7 @@ class EventDetailsScreen extends StatelessWidget {
             // Header Section with Status
             Container(
               padding: const EdgeInsets.all(16),
-              color: theme.colorScheme.primary.withOpacity(0.1),
+              color: theme.colorScheme.primary.withAlpha((0.1 * 255).toInt()),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -80,7 +80,7 @@ class EventDetailsScreen extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: _getStatusColor(event.status).withOpacity(0.1),
+                          color: _getStatusColor(event.status).withAlpha((0.1 * 255).toInt()),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -308,7 +308,39 @@ class EventDetailsScreen extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 16),
-                          if (event.assignedStaff.isNotEmpty)
+                          
+                          _InfoRow(
+                            icon: Icons.location_on,
+                            label: 'Location',
+                            value: event.location,
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _InfoRow(
+                                  icon: Icons.people_outline,
+                                  label: 'Guest Count',
+                                  value: event.guestCount.toString(),
+                                ),
+                              ),
+                              Expanded(
+                                child: _InfoRow(
+                                  icon: Icons.person_outline,
+                                  label: 'Min. Staff',
+                                  value: event.minStaff.toString(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  //staff 
+                  if (event.assignedStaff.isNotEmpty)
                             Card(
                               child: Padding(
                                 padding: const EdgeInsets.all(16),
@@ -379,35 +411,6 @@ class EventDetailsScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
-                          _InfoRow(
-                            icon: Icons.location_on,
-                            label: 'Location',
-                            value: event.location,
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _InfoRow(
-                                  icon: Icons.people_outline,
-                                  label: 'Guest Count',
-                                  value: event.guestCount.toString(),
-                                ),
-                              ),
-                              Expanded(
-                                child: _InfoRow(
-                                  icon: Icons.person_outline,
-                                  label: 'Min. Staff',
-                                  value: event.minStaff.toString(),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
 
                   // Menu Items Card
                   if (event.menuItems.isNotEmpty)

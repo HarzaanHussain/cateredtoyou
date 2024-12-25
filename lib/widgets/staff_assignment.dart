@@ -1,12 +1,12 @@
-// Create new file: lib/widgets/staff_assignment_widget.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cateredtoyou/models/event_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cateredtoyou/models/user_model.dart';
+import 'package:cateredtoyou/models/event_model.dart';
 
 class StaffAssignmentWidget extends StatefulWidget {
-  final List<AssignedStaff> assignedStaff;
   final int minStaff;
+  final List<AssignedStaff> assignedStaff;
   final Function(List<AssignedStaff>) onStaffAssigned;
 
   const StaffAssignmentWidget({
@@ -22,60 +22,122 @@ class StaffAssignmentWidget extends StatefulWidget {
 
 class _StaffAssignmentWidgetState extends State<StaffAssignmentWidget> {
   late List<AssignedStaff> _assignedStaff;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  bool _hasPermission = false;
 
   @override
   void initState() {
     super.initState();
     _assignedStaff = List.from(widget.assignedStaff);
+    _checkPermissions();
   }
 
-  void _showStaffSelectionDialog() {
+  Future<void> _checkPermissions() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      // Check user role
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final userRole = userDoc.data()?['role'] as String?;
+      
+      // Check permissions
+      final permDoc = await _firestore.collection('permissions').doc(user.uid).get();
+      final permissions = List<String>.from(permDoc.data()?['permissions'] ?? []);
+
+      setState(() {
+        _hasPermission = ['admin', 'client', 'manager'].contains(userRole) ||
+            permissions.contains('manage_staff');
+      });
+    } catch (e) {
+      debugPrint('Error checking permissions: $e');
+    }
+  }
+
+  Future<String?> _getCurrentOrgId() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+
+    final doc = await _firestore.collection('users').doc(user.uid).get();
+    return doc.data()?['organizationId'] as String?;
+  }
+
+  Future<void> _showStaffSelectionDialog() async {
+    if (!_hasPermission) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You do not have permission to assign staff')),
+      );
+      return;
+    }
+
+    final orgId = await _getCurrentOrgId();
+    if (orgId == null) return;
+
+    if (!mounted) return;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Assign Staff'),
         content: SizedBox(
           width: double.maxFinite,
+          height: 400,
           child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
+            stream: _firestore
                 .collection('users')
-                .where('role', whereIn: ['staff','server', 'chef', 'driver'])
+                .where('organizationId', isEqualTo: orgId)
+                .where('role', whereIn: ['staff', 'server', 'chef', 'driver'])
+                .where('employmentStatus', isEqualTo: 'active')
                 .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
-                return const Text('Error loading staff');
+                return Text('Error: ${snapshot.error}');
               }
 
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              final staff = snapshot.data?.docs
-                  .map((doc) => UserModel.fromMap(doc.data() as Map<String, dynamic>))
-                  .where((user) => !_assignedStaff.any((assigned) => assigned.userId == user.uid))
+              final availableStaff = snapshot.data?.docs
+                  .map((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    data['uid'] = doc.id; // Ensure uid is set from document ID
+                    return UserModel.fromMap(data);
+                  })
+                  .where((staff) => !_assignedStaff
+                      .any((assigned) => assigned.userId == staff.uid))
                   .toList() ??
                   [];
 
+              if (availableStaff.isEmpty) {
+                return const Center(child: Text('No available staff'));
+              }
+
               return ListView.builder(
-                shrinkWrap: true,
-                itemCount: staff.length,
+                itemCount: availableStaff.length,
                 itemBuilder: (context, index) {
-                  final member = staff[index];
+                  final staff = availableStaff[index];
                   return ListTile(
-                    title: Text(member.fullName),
-                    subtitle: Text(member.role.toUpperCase()),
-                    onTap: () {
-                      setState(() {
-                        _assignedStaff.add(AssignedStaff(
-                          userId: member.uid,
-                          name: member.fullName,
-                          role: member.role,
+                    title: Text(staff.fullName),
+                    subtitle: Text(staff.role.toUpperCase()),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.add_circle_outline),
+                      onPressed: () {
+                        final newStaffMember = AssignedStaff(
+                          userId: staff.uid,
+                          name: staff.fullName,
+                          role: staff.role,
                           assignedAt: DateTime.now(),
-                        ));
-                      });
-                      widget.onStaffAssigned(_assignedStaff);
-                      Navigator.pop(context);
-                    },
+                        );
+                        
+                        setState(() {
+                          _assignedStaff = [..._assignedStaff, newStaffMember];
+                        });
+                        widget.onStaffAssigned(_assignedStaff);
+                        Navigator.pop(context);
+                      },
+                    ),
                   );
                 },
               );
@@ -100,13 +162,10 @@ class _StaffAssignmentWidgetState extends State<StaffAssignmentWidget> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Assigned Staff',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            const Text('Assigned Staff'),
             Text(
               '${_assignedStaff.length}/${widget.minStaff} Required',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: TextStyle(
                 color: _assignedStaff.length < widget.minStaff
                     ? Theme.of(context).colorScheme.error
                     : Theme.of(context).colorScheme.primary,
@@ -115,16 +174,7 @@ class _StaffAssignmentWidgetState extends State<StaffAssignmentWidget> {
           ],
         ),
         const SizedBox(height: 16),
-        if (_assignedStaff.isEmpty)
-          Center(
-            child: Text(
-              'No staff assigned yet',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
-          )
-        else
+        if (_assignedStaff.isNotEmpty)
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -138,12 +188,12 @@ class _StaffAssignmentWidgetState extends State<StaffAssignmentWidget> {
                   trailing: IconButton(
                     icon: const Icon(Icons.remove_circle_outline),
                     color: Theme.of(context).colorScheme.error,
-                    onPressed: () {
+                    onPressed: _hasPermission ? () {
                       setState(() {
-                        _assignedStaff.removeAt(index);
+                        _assignedStaff = List.from(_assignedStaff)..removeAt(index);
                       });
                       widget.onStaffAssigned(_assignedStaff);
-                    },
+                    } : null,
                   ),
                 ),
               );
@@ -153,9 +203,9 @@ class _StaffAssignmentWidgetState extends State<StaffAssignmentWidget> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
+            onPressed: _hasPermission ? _showStaffSelectionDialog : null,
             icon: const Icon(Icons.person_add),
             label: const Text('Assign Staff'),
-            onPressed: _showStaffSelectionDialog,
           ),
         ),
       ],

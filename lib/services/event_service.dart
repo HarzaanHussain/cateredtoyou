@@ -12,8 +12,7 @@ class EventService extends ChangeNotifier {
 
   EventService(this._organizationService);
 
-  // Get events stream
-   Stream<List<Event>> getEvents() async* {
+  Stream<List<Event>> getEvents() async* {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) {
@@ -21,19 +20,16 @@ class EventService extends ChangeNotifier {
         return;
       }
 
-      // Get organization info
       final organization = await _organizationService.getCurrentUserOrganization();
       if (organization == null) {
         yield [];
         return;
       }
 
-      // Create query
       final query = _firestore
           .collection('events')
           .where('organizationId', isEqualTo: organization.id);
 
-      // Stream events
       yield* query.snapshots().map((snapshot) {
         try {
           final events = snapshot.docs
@@ -52,9 +48,6 @@ class EventService extends ChangeNotifier {
     }
   }
 
-  
-
-  // Verify inventory availability
   Future<void> _verifyInventoryAvailability(List<EventSupply> supplies) async {
     for (final supply in supplies) {
       final doc = await _firestore
@@ -73,8 +66,46 @@ class EventService extends ChangeNotifier {
     }
   }
 
-  // Create event
- Future<Event> createEvent({
+   // Replace the _verifyStaffAssignment function with this:
+Future<void> _verifyStaffAssignment(String organizationId, List<AssignedStaff> staff) async {
+  // If staff list is empty, no need to verify
+  if (staff.isEmpty) return;
+  
+  // Check if current user is a client
+  final currentUser = _auth.currentUser;
+  if (currentUser == null) throw 'Not authenticated';
+  
+  final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+  final userRole = userDoc.data()?['role'];
+  
+  if (userRole != 'client') {
+    throw 'Only client users can assign staff';
+  }
+
+  // Verify each staff member
+  for (final member in staff) {
+    final staffDoc = await _firestore.collection('users').doc(member.userId).get();
+    
+    if (!staffDoc.exists) {
+      throw 'Staff member ${member.name} not found';
+    }
+    
+    if (staffDoc.data()?['organizationId'] != organizationId) {
+      throw 'Staff member ${member.name} belongs to a different organization';
+    }
+    
+    if (staffDoc.data()?['employmentStatus'] != 'active') {
+      throw 'Staff member ${member.name} is not active';
+    }
+    
+    final rolePermission = staffDoc.data()?['role'];
+    if (!['staff', 'server', 'chef', 'driver'].contains(rolePermission)) {
+      throw 'Invalid staff role for ${member.name}';
+    }
+  }
+}
+
+  Future<Event> createEvent({
     required String name,
     required String description,
     required DateTime startDate,
@@ -88,54 +119,64 @@ class EventService extends ChangeNotifier {
     required DateTime endTime,
     List<EventMenuItem> menuItems = const [],
     List<EventSupply> supplies = const [],
-    List<AssignedStaff> assignedStaff = const [], 
+    List<AssignedStaff> assignedStaff = const [],
     Map<String, dynamic>? metadata,
   }) async {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) {
-      throw 'Not authenticated';
-    }
-
-    // Validate user permissions
-    final userRef = _firestore.collection('users').doc(currentUser.uid);
-    final userDoc = await userRef.get();
-    
-    if (!userDoc.exists) {
-      throw 'User not found';
-    }
-
-    final userRole = userDoc.data()?['role'];
-    final hasPermission = ['admin', 'client', 'manager'].contains(userRole);
-    
-    if (!hasPermission) {
-      throw 'Insufficient permissions to create events';
-    }
-
-    // Get organization
-    final organization = await _organizationService.getCurrentUserOrganization();
-    if (organization == null) {
-      throw 'Organization not found';
-    }
-
-    // Validate dates
-    if (endDate.isBefore(startDate)) {
-      throw 'End date must be after start date';
-    }
-
-    if (startTime.isAfter(endTime)) {
-      throw 'End time must be after start time';
-    }
-
-    // Calculate total price
-    final totalPrice = menuItems.fold<double>(
-      0,
-      (total, item) => total + (item.price * item.quantity),
-    );
-
     try {
-      // Use transaction for atomicity
-      final event = await _firestore.runTransaction<Event>((transaction) async {
-        // Verify customer exists and belongs to organization
+      debugPrint('Starting event creation');
+      
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        throw 'Not authenticated';
+      }
+
+      final userRef = _firestore.collection('users').doc(currentUser.uid);
+      final userDoc = await userRef.get();
+      
+      if (!userDoc.exists) {
+        throw 'User not found';
+      }
+
+      final userRole = userDoc.data()?['role'];
+      if (!['admin', 'client', 'manager'].contains(userRole)) {
+        throw 'Insufficient permissions to create events';
+      }
+
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) {
+        throw 'Organization not found';
+      }
+
+      if (endDate.isBefore(startDate)) {
+        throw 'End date must be after start date';
+      }
+
+      if (startTime.isAfter(endTime)) {
+        throw 'End time must be after start time';
+      }
+
+      // Format staff data with proper types
+      if (assignedStaff.isNotEmpty) {
+        await _verifyStaffAssignment(organization.id, assignedStaff);
+        debugPrint('Staff assignments verified successfully');
+      }
+
+      final staffData = assignedStaff.map((staff) => {
+        'userId': staff.userId,
+        'name': staff.name,
+        'role': staff.role,
+        'assignedAt': Timestamp.fromDate(staff.assignedAt),
+      }).toList();
+
+      debugPrint('Staff data prepared: $staffData');
+
+      final totalPrice = menuItems.fold<double>(
+        0,
+        (total, item) => total + (item.price * item.quantity),
+      ); 
+
+      return await _firestore.runTransaction<Event>((transaction) async {
+        // Verify customer belongs to organization
         final customerRef = _firestore.collection('customers').doc(customerId);
         final customerDoc = await transaction.get(customerRef);
         
@@ -145,34 +186,70 @@ class EventService extends ChangeNotifier {
         }
 
         // Verify inventory availability
+        await _verifyInventoryAvailability(supplies);
+        debugPrint('Inventory availability verified');
+
+        final docRef = _firestore.collection('events').doc();
+        final now = DateTime.now();
+        
+        // Create event data with proper Timestamps
+        final docData = {
+          'name': name.trim(),
+          'description': description.trim(),
+          'startDate': Timestamp.fromDate(startDate),
+          'endDate': Timestamp.fromDate(endDate),
+          'location': location.trim(),
+          'customerId': customerId,
+          'organizationId': organization.id,
+          'guestCount': guestCount,
+          'minStaff': minStaff,
+          'notes': notes.trim(),
+          'status': EventStatus.draft.toString().split('.').last,
+          'startTime': Timestamp.fromDate(startTime),
+          'endTime': Timestamp.fromDate(endTime),
+          'createdBy': currentUser.uid,
+          'createdAt': Timestamp.fromDate(now),
+          'updatedAt': Timestamp.fromDate(now),
+          'menuItems': menuItems.map((item) => item.toMap()).toList(),
+          'supplies': supplies.map((supply) => supply.toMap()).toList(),
+          'assignedStaff': staffData,
+          'totalPrice': totalPrice,
+          'metadata': metadata,
+        };
+
+        transaction.set(docRef, docData);
+        debugPrint('Event document created');
+
+        // Update inventory
         for (final supply in supplies) {
           final inventoryRef = _firestore
               .collection('inventory')
               .doc(supply.inventoryId);
-          
-          final inventoryDoc = await transaction.get(inventoryRef);
-          
-          if (!inventoryDoc.exists) {
-            throw 'Supply item ${supply.name} not found';
-          }
+              
+          transaction.update(inventoryRef, {
+            'quantity': FieldValue.increment(-supply.quantity),
+            'updatedAt': Timestamp.fromDate(now),
+            'lastModifiedBy': currentUser.uid,
+          });
 
-          final item = InventoryItem.fromMap(inventoryDoc.data()!, inventoryDoc.id);
-          
-          if (item.quantity < supply.quantity) {
-            throw '''Insufficient quantity available for ${supply.name}. 
-                    Available: ${item.quantity} ${item.unit}''';
-          }
-
-          if (item.organizationId != organization.id) {
-            throw 'Invalid inventory item selected';
-          }
+          final transactionRef = _firestore
+              .collection('inventory_transactions')
+              .doc();
+              
+          transaction.set(transactionRef, {
+            'itemId': supply.inventoryId,
+            'eventId': docRef.id,
+            'type': 'reservation',
+            'quantity': supply.quantity,
+            'timestamp': Timestamp.fromDate(now),
+            'userId': currentUser.uid,
+            'organizationId': organization.id,
+          });
         }
 
-        // Create event document
-        final docRef = _firestore.collection('events').doc();
-        final now = DateTime.now();
-        
-        final event = Event(
+        debugPrint('Event creation completed successfully');
+
+        return Event(
           id: docRef.id,
           name: name.trim(),
           description: description.trim(),
@@ -192,60 +269,29 @@ class EventService extends ChangeNotifier {
           updatedAt: now,
           menuItems: menuItems,
           supplies: supplies,
-          assignedStaff: assignedStaff, 
+          assignedStaff: assignedStaff,
           totalPrice: totalPrice,
           metadata: metadata,
         );
-
-        // Set event document
-        transaction.set(docRef, event.toMap());
-
-        // Update inventory quantities
-        for (final supply in supplies) {
-          final inventoryRef = _firestore
-              .collection('inventory')
-              .doc(supply.inventoryId);
-              
-          transaction.update(inventoryRef, {
-            'quantity': FieldValue.increment(-supply.quantity),
-            'updatedAt': now,
-            'lastModifiedBy': currentUser.uid,
-          });
-
-          // Create inventory transaction record
-          final transactionRef = _firestore
-              .collection('inventory_transactions')
-              .doc();
-              
-          transaction.set(transactionRef, {
-            'itemId': supply.inventoryId,
-            'eventId': docRef.id,
-            'type': 'reservation',
-            'quantity': supply.quantity,
-            'timestamp': now,
-            'userId': currentUser.uid,
-            'organizationId': organization.id,
-          });
-        }
-
-        return event;
       });
-
-      notifyListeners();
-      return event;
     } catch (e) {
       debugPrint('Error creating event: $e');
+      debugPrint('Stack trace: ${StackTrace.current}');
       rethrow;
+    } finally {
+      notifyListeners();
     }
   }
 
 
-  // Update event
-  Future<void> updateEvent(Event updatedEvent) async {
+ Future<void> updateEvent(Event updatedEvent) async {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) throw 'Not authenticated';
 
+      debugPrint('Starting event update for ID: ${updatedEvent.id}');
+
+      // Get the organization info up front
       final organization = await _organizationService.getCurrentUserOrganization();
       if (organization == null) {
         throw 'Organization not found';
@@ -255,91 +301,104 @@ class EventService extends ChangeNotifier {
         throw 'Event belongs to a different organization';
       }
 
-      // Get current event to compare supplies
-      final eventDoc = await _firestore
-          .collection('events')
-          .doc(updatedEvent.id)
-          .get();
-
+      // First get the original event
+      final eventDoc = await _firestore.collection('events').doc(updatedEvent.id).get();
       if (!eventDoc.exists) throw 'Event not found';
-      final currentEvent = Event.fromMap(eventDoc.data()!, eventDoc.id);
+      final originalEvent = Event.fromMap(eventDoc.data()!, eventDoc.id);
 
-      // Calculate supplies to return and new supplies to allocate
-      final suppliesToReturn = currentEvent.supplies.where(
-        (original) => !updatedEvent.supplies.any((updated) => 
-          updated.inventoryId == original.inventoryId && 
-          updated.quantity == original.quantity
-        )
-      ).toList();
-
-      final suppliesToAllocate = updatedEvent.supplies.where(
-        (updated) => !currentEvent.supplies.any((original) => 
-          original.inventoryId == updated.inventoryId &&
-          original.quantity == updated.quantity
-        )
-      ).toList();
-
-      // Verify availability for new supplies
-      if (suppliesToAllocate.isNotEmpty) {
-        await _verifyInventoryAvailability(suppliesToAllocate);
+      // Verify staff assignments
+      if (updatedEvent.assignedStaff.isNotEmpty) {
+        await _verifyStaffAssignment(organization.id, updatedEvent.assignedStaff);
       }
 
-      // Use transaction for atomic updates
-      await _firestore.runTransaction((transaction) async {
-        final eventRef = _firestore.collection('events').doc(updatedEvent.id);
-        
-        // Update event
-        transaction.update(eventRef, updatedEvent.toMap());
+      // Format staff data for update
+      final staffData = updatedEvent.assignedStaff.map((staff) => {
+        'userId': staff.userId,
+        'name': staff.name,
+        'role': staff.role,
+        'assignedAt': Timestamp.fromDate(staff.assignedAt),
+      }).toList();
 
-        final now = DateTime.now();
+      debugPrint('Staff data being updated: $staffData');
 
-        // Return old supplies
-        for (final supply in suppliesToReturn) {
-          final inventoryRef = _firestore.collection('inventory').doc(supply.inventoryId);
-          transaction.update(inventoryRef, {
-            'quantity': FieldValue.increment(supply.quantity),
-            'updatedAt': now,
-            'lastModifiedBy': currentUser.uid,
-          });
-        }
+      // Prepare update data
+      final Map<String, dynamic> updateData = {
+        'name': updatedEvent.name.trim(),
+        'description': updatedEvent.description.trim(),
+        'startDate': Timestamp.fromDate(updatedEvent.startDate),
+        'endDate': Timestamp.fromDate(updatedEvent.endDate),
+        'location': updatedEvent.location.trim(),
+        'customerId': updatedEvent.customerId,
+        'organizationId': organization.id,
+        'guestCount': updatedEvent.guestCount,
+        'minStaff': updatedEvent.minStaff,
+        'notes': updatedEvent.notes.trim(),
+        'status': updatedEvent.status.toString().split('.').last,
+        'startTime': Timestamp.fromDate(updatedEvent.startTime),
+        'endTime': Timestamp.fromDate(updatedEvent.endTime),
+        'menuItems': updatedEvent.menuItems.map((item) => item.toMap()).toList(),
+        'supplies': updatedEvent.supplies.map((supply) => supply.toMap()).toList(),
+        'assignedStaff': staffData,
+        'totalPrice': updatedEvent.totalPrice,
+        'metadata': updatedEvent.metadata,
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      };
 
-        // Allocate new supplies
-        for (final supply in suppliesToAllocate) {
-          final inventoryRef = _firestore.collection('inventory').doc(supply.inventoryId);
-          transaction.update(inventoryRef, {
-            'quantity': FieldValue.increment(-supply.quantity),
-            'updatedAt': now,
-            'lastModifiedBy': currentUser.uid,
-          });
-        }
-      });
+      // Handle inventory update if supplies changed
+      if (!listEquals(originalEvent.supplies, updatedEvent.supplies)) {
+        await _firestore.runTransaction((transaction) async {
+          // Update event
+          transaction.update(
+            _firestore.collection('events').doc(updatedEvent.id),
+            updateData
+          );
 
-       final removedStaff = currentEvent.assignedStaff
-          .where((staff) => !updatedEvent.assignedStaff
-              .any((updated) => updated.userId == staff.userId))
-          .toList();
+          // Handle returned supplies
+          for (final supply in originalEvent.supplies) {
+            if (!updatedEvent.supplies.contains(supply)) {
+              final inventoryRef = _firestore.collection('inventory').doc(supply.inventoryId);
+              transaction.update(inventoryRef, {
+                'quantity': FieldValue.increment(supply.quantity),
+                'updatedAt': DateTime.now(),
+                'lastModifiedBy': currentUser.uid,
+              });
+            }
+          }
 
-      final addedStaff = updatedEvent.assignedStaff
-          .where((staff) => !currentEvent.assignedStaff
-              .any((current) => current.userId == staff.userId))
-          .toList();
+          // Handle new supplies
+          for (final supply in updatedEvent.supplies) {
+            if (!originalEvent.supplies.contains(supply)) {
+              final inventoryRef = _firestore.collection('inventory').doc(supply.inventoryId);
+              transaction.update(inventoryRef, {
+                'quantity': FieldValue.increment(-supply.quantity),
+                'updatedAt': DateTime.now(),
+                'lastModifiedBy': currentUser.uid,
+              });
+            }
+          }
+        });
+      } else {
+        // If supplies didn't change, just update the event
+        await _firestore
+            .collection('events')
+            .doc(updatedEvent.id)
+            .update(updateData);
+      }
 
-      
-
+      debugPrint('Event update completed successfully');
       notifyListeners();
     } catch (e) {
       debugPrint('Error updating event: $e');
+      debugPrint('Stack trace: ${StackTrace.current}');
       rethrow;
     }
   }
 
-  // Change event status
   Future<void> changeEventStatus(String eventId, EventStatus newStatus) async {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) throw 'Not authenticated';
 
-      // Complete or cancel event
       if (newStatus == EventStatus.completed || newStatus == EventStatus.cancelled) {
         await _firestore.runTransaction((transaction) async {
           final eventDoc = await transaction.get(
@@ -349,16 +408,13 @@ class EventService extends ChangeNotifier {
           if (!eventDoc.exists) throw 'Event not found';
           final event = Event.fromMap(eventDoc.data()!, eventDoc.id);
 
-          // Update event status
           transaction.update(eventDoc.reference, {
             'status': newStatus.toString().split('.').last,
             'updatedAt': FieldValue.serverTimestamp(),
           });
-          
 
           final now = DateTime.now();
 
-          // Return supplies to inventory
           for (final supply in event.supplies) {
             final inventoryRef = _firestore.collection('inventory').doc(supply.inventoryId);
             transaction.update(inventoryRef, {
@@ -369,7 +425,6 @@ class EventService extends ChangeNotifier {
           }
         });
       } else {
-        // Simple status update
         await _firestore
             .collection('events')
             .doc(eventId)
@@ -386,7 +441,6 @@ class EventService extends ChangeNotifier {
     }
   }
 
-  // Delete event
   Future<void> deleteEvent(String eventId) async {
     try {
       final currentUser = _auth.currentUser;
@@ -400,12 +454,10 @@ class EventService extends ChangeNotifier {
         if (!eventDoc.exists) throw 'Event not found';
         final event = Event.fromMap(eventDoc.data()!, eventDoc.id);
 
-        // Delete event
         transaction.delete(eventDoc.reference);
 
         final now = DateTime.now();
 
-        // Return supplies to inventory
         for (final supply in event.supplies) {
           final inventoryRef = _firestore.collection('inventory').doc(supply.inventoryId);
           transaction.update(inventoryRef, {
@@ -422,5 +474,4 @@ class EventService extends ChangeNotifier {
       rethrow;
     }
   }
-  
 }

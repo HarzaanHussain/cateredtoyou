@@ -230,6 +230,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
           endTime: endDateTime,
           menuItems: _selectedMenuItems,
           supplies: _selectedSupplies,
+          assignedStaff: _assignedStaff,
         );
       } else {
         final updatedEvent = widget.event!.copyWith(
@@ -246,6 +247,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
           endTime: endDateTime,
           menuItems: _selectedMenuItems,
           supplies: _selectedSupplies,
+          assignedStaff: _assignedStaff,
           totalPrice: _totalPrice,
         );
 
@@ -436,23 +438,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: StaffAssignmentWidget(
-                            assignedStaff:
-                                _assignedStaff, // Make sure this is declared in state
-                            minStaff:
-                                int.tryParse(_minStaffController.text) ?? 0,
-                            onStaffAssigned: (newStaff) {
-                              setState(() {
-                                _assignedStaff = newStaff;
-                              });
-                            },
-                          ),
-                        ),
-                      ),
+                      
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -556,6 +542,23 @@ class _EventEditScreenState extends State<EventEditScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: StaffAssignmentWidget(
+                            assignedStaff: _assignedStaff,
+                            minStaff:
+                                int.tryParse(_minStaffController.text) ?? 0,
+                            onStaffAssigned: (List<AssignedStaff> newStaff) {
+                              setState(() {
+                                _assignedStaff =
+                                    newStaff; // No need for cast since types match
+                              });
+                            },
+                          ),
+                        ),
+                      ),
               const SizedBox(height: 16),
               Card(
                 child: Padding(

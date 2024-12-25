@@ -77,6 +77,38 @@ class EventSupply {
     );
   }
 }
+class AssignedStaff {
+  final String userId;
+  final String name;
+  final String role;
+  final DateTime assignedAt;
+
+  const AssignedStaff({
+    required this.userId,
+    required this.name,
+    required this.role,
+    required this.assignedAt,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'userId': userId,
+      'name': name,
+      'role': role,
+      'assignedAt': Timestamp.fromDate(assignedAt),
+    };
+  }
+
+  factory AssignedStaff.fromMap(Map<String, dynamic> map) {
+    return AssignedStaff(
+      userId: map['userId'] ?? '',
+      name: map['name'] ?? '',
+      role: map['role'] ?? '',
+      assignedAt: (map['assignedAt'] as Timestamp).toDate(),
+    );
+  }
+}
+
 
 class Event {
   final String id;
@@ -237,37 +269,6 @@ class Event {
       totalPrice: totalPrice ?? this.totalPrice,
       assignedStaff: assignedStaff ?? this.assignedStaff,
       metadata: metadata ?? this.metadata,
-    );
-  }
-}
-class AssignedStaff {
-  final String userId;
-  final String name;
-  final String role;
-  final DateTime assignedAt;
-
-  const AssignedStaff({
-    required this.userId,
-    required this.name,
-    required this.role,
-    required this.assignedAt,
-  });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'userId': userId,
-      'name': name,
-      'role': role,
-      'assignedAt': Timestamp.fromDate(assignedAt),
-    };
-  }
-
-  factory AssignedStaff.fromMap(Map<String, dynamic> map) {
-    return AssignedStaff(
-      userId: map['userId'] ?? '',
-      name: map['name'] ?? '',
-      role: map['role'] ?? '',
-      assignedAt: (map['assignedAt'] as Timestamp).toDate(),
     );
   }
 }

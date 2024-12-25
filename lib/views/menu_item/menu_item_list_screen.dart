@@ -214,7 +214,7 @@ class MenuItemCard extends StatelessWidget {
                 vertical: 4,
               ),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.1),
+                color: theme.colorScheme.primary.withAlpha((0.1 * 255).toInt()),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(

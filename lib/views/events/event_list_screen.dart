@@ -246,7 +246,6 @@ class EventListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isUpcoming = event.startDate.isAfter(DateTime.now());
     final dateFormat = DateFormat('MMM d, y');
     final timeFormat = DateFormat('h:mm a');
 
@@ -270,7 +269,7 @@ class EventListItem extends StatelessWidget {
                 vertical: 4,
               ),
               decoration: BoxDecoration(
-                color: _getStatusColor(event.status).withOpacity(0.1),
+                color: _getStatusColor(event.status).withAlpha((0.1 * 255).toInt()),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
