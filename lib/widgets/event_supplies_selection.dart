@@ -123,11 +123,14 @@ class _EventSuppliesSelectionState extends State<EventSuppliesSelection> {
                 ],
 
                 // Available inventory items by category
-                ...InventoryCategory.values.map((category) {
-                  final categoryItems = inventoryItems
-                      .where((item) => item.category == category)
-                      .toList(); // Filters inventory items by category.
-                  if (categoryItems.isEmpty) return const SizedBox(); // Returns an empty widget if no items in the category.
+                ...InventoryCategory.values.where((category) =>  // Filters out food and beverage categories.
+                  category != InventoryCategory.food && 
+                  category != InventoryCategory.beverage
+                ).map((category) { // Maps the remaining categories to widgets.
+                  final categoryItems = inventoryItems // Filters inventory items by category.
+                      .where((item) => item.category == category) 
+                      .toList();
+                  if (categoryItems.isEmpty) return const SizedBox();// Returns an empty widget if no items in the category.
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
@@ -141,11 +144,14 @@ class _EventSuppliesSelectionState extends State<EventSuppliesSelection> {
                         spacing: 8, // Horizontal spacing between chips.
                         runSpacing: 8, // Vertical spacing between chips.
                         children: categoryItems.map((item) {
-                          return ActionChip(
-                            avatar: const Icon(Icons.add), // Add icon.
-                            label: Text(item.name), // Name of the inventory item.
-                            onPressed: () => _showSupplyDialog(item), // Shows the supply dialog when the chip is pressed.
-                          );
+                            return Tooltip(
+                            message: 'Available: ${item.quantity} ${item.unit.toString().split('.').last}',
+                            child: ActionChip(
+                              avatar: const Icon(Icons.add),
+                              label: Text('${item.name} (${item.quantity})'),
+                              onPressed: () => _showSupplyDialog(item),
+                            ),
+                            );
                         }).toList(),
                       ),
                       const SizedBox(height: 16), // Adds vertical spacing.
