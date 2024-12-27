@@ -7,32 +7,34 @@ import 'package:provider/provider.dart';
 import 'package:cateredtoyou/models/task_model.dart';
 import 'package:cateredtoyou/services/task_service.dart';
 
+/// The `TaskListScreen` class represents a screen that displays a list of tasks.
+/// It uses a `DefaultTabController` to manage four tabs: My Tasks, Department, All Tasks, and Completed.
 class TaskListScreen extends StatelessWidget {
   const TaskListScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 4, // Specifies the number of tabs.
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Tasks'),
+          title: const Text('Tasks'), // Title of the AppBar.
           bottom: const TabBar(
-            isScrollable: true,
+            isScrollable: true, // Allows the tabs to be scrollable.
             tabs: [
-              Tab(text: 'My Tasks'),
-              Tab(text: 'Department'),
-              Tab(text: 'All Tasks'),
-              Tab(text: 'Completed'),
+              Tab(text: 'My Tasks'), // Tab for "My Tasks".
+              Tab(text: 'Department'), // Tab for "Department".
+              Tab(text: 'All Tasks'), // Tab for "All Tasks".
+              Tab(text: 'Completed'), // Tab for "Completed".
             ],
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.add),
+              icon: const Icon(Icons.add), // Icon for adding a new task.
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const ManageTasksScreen(),
+                  builder: (context) => const ManageTasksScreen(), // Navigates to the ManageTasksScreen.
                 ),
               ),
             ),
@@ -40,10 +42,10 @@ class TaskListScreen extends StatelessWidget {
         ),
         body: const TabBarView(
           children: [
-            _TaskList(listType: TaskListType.assigned),
-            _TaskList(listType: TaskListType.department),
-            _TaskList(listType: TaskListType.all),
-            _TaskList(listType: TaskListType.completed),
+            _TaskList(listType: TaskListType.assigned), // Displays assigned tasks.
+            _TaskList(listType: TaskListType.department), // Displays department tasks.
+            _TaskList(listType: TaskListType.all), // Displays all tasks.
+            _TaskList(listType: TaskListType.completed), // Displays completed tasks.
           ],
         ),
       ),
@@ -51,10 +53,12 @@ class TaskListScreen extends StatelessWidget {
   }
 }
 
+/// Enum representing different types of task lists.
 enum TaskListType { assigned, department, all, completed }
 
+/// The `_TaskList` class represents a list of tasks based on the specified `listType`.
 class _TaskList extends StatefulWidget {
-  final TaskListType listType;
+  final TaskListType listType; // The type of task list to display.
 
   const _TaskList({required this.listType});
 
@@ -63,13 +67,13 @@ class _TaskList extends StatefulWidget {
 }
 
 class _TaskListState extends State<_TaskList> {
-  TaskPriority? _selectedPriority;
-  String? _searchQuery;
-  final TextEditingController _searchController = TextEditingController();
+  TaskPriority? _selectedPriority; // The selected priority filter.
+  String? _searchQuery; // The search query for filtering tasks.
+  final TextEditingController _searchController = TextEditingController(); // Controller for the search input.
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _searchController.dispose(); // Disposes the search controller when the widget is removed.
     super.dispose();
   }
 
@@ -77,21 +81,21 @@ class _TaskListState extends State<_TaskList> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildFilterBar(),
+        _buildFilterBar(), // Builds the filter bar.
         Expanded(
           child: Consumer<TaskService>(
             builder: (context, taskService, child) {
               return StreamBuilder<List<Task>>(
-                stream: _getFilteredTaskStream(taskService),
+                stream: _getFilteredTaskStream(taskService), // Gets the filtered task stream.
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return Center(
-                      child: Text('Error: ${snapshot.error}'),
+                      child: Text('Error: ${snapshot.error}'), // Displays an error message if there's an error.
                     );
                   }
 
                   if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const Center(child: CircularProgressIndicator()); // Displays a loading indicator if data is not available.
                   }
 
                   final tasks = snapshot.data!;
@@ -117,10 +121,10 @@ class _TaskListState extends State<_TaskList> {
                             onPressed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const ManageTasksScreen(),
+                                builder: (context) => const ManageTasksScreen(), // Navigates to the ManageTasksScreen.
                               ),
                             ),
-                            child: const Text('Create Task'),
+                            child: const Text('Create Task'), // Button to create a new task.
                           ),
                         ],
                       ),
@@ -133,12 +137,12 @@ class _TaskListState extends State<_TaskList> {
                     },
                     child: ListView.builder(
                       padding: const EdgeInsets.all(8),
-                      itemCount: tasks.length,
+                      itemCount: tasks.length, // Number of tasks to display.
                       itemBuilder: (context, index) {
                         final task = tasks[index];
                         return Dismissible(
-                          key: Key(task.id),
-                          direction: DismissDirection.endToStart,
+                          key: Key(task.id), // Unique key for each task.
+                          direction: DismissDirection.endToStart, // Swipe direction for dismissing.
                           confirmDismiss: (direction) async {
                             if (task.status == TaskStatus.completed) {
                               return await showDialog(
@@ -151,11 +155,11 @@ class _TaskListState extends State<_TaskList> {
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(context, false),
-                                      child: const Text('CANCEL'),
+                                      child: const Text('CANCEL'), // Cancel button.
                                     ),
                                     TextButton(
                                       onPressed: () => Navigator.pop(context, true),
-                                      child: const Text('DELETE'),
+                                      child: const Text('DELETE'), // Delete button.
                                     ),
                                   ],
                                 ),
@@ -164,7 +168,7 @@ class _TaskListState extends State<_TaskList> {
                             return false;
                           },
                           background: Container(
-                            color: Colors.red,
+                            color: Colors.red, // Background color for the dismissible widget.
                             alignment: Alignment.centerRight,
                             padding: const EdgeInsets.only(right: 16),
                             child: const Icon(
@@ -172,7 +176,7 @@ class _TaskListState extends State<_TaskList> {
                               color: Colors.white,
                             ),
                           ),
-                          child: TaskCard(task: task),
+                          child: TaskCard(task: task), // Displays the task card.
                         );
                       },
                     ),
@@ -186,6 +190,7 @@ class _TaskListState extends State<_TaskList> {
     );
   }
 
+  /// Builds the filter bar with search and priority filters.
   Widget _buildFilterBar() {
     return Container(
       padding: const EdgeInsets.all(8),
@@ -204,15 +209,15 @@ class _TaskListState extends State<_TaskList> {
           TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'Search tasks...',
-              prefixIcon: const Icon(Icons.search),
+              hintText: 'Search tasks...', // Hint text for the search input.
+              prefixIcon: const Icon(Icons.search), // Search icon.
               suffixIcon: _searchQuery != null
                   ? IconButton(
-                      icon: const Icon(Icons.clear),
+                      icon: const Icon(Icons.clear), // Clear icon.
                       onPressed: () {
                         _searchController.clear();
                         setState(() {
-                          _searchQuery = null;
+                          _searchQuery = null; // Clears the search query.
                         });
                       },
                     )
@@ -230,11 +235,11 @@ class _TaskListState extends State<_TaskList> {
             child: Row(
               children: [
                 FilterChip(
-                  label: const Text('All Priorities'),
-                  selected: _selectedPriority == null,
+                  label: const Text('All Priorities'), // Label for the "All Priorities" filter.
+                  selected: _selectedPriority == null, // Checks if no priority is selected.
                   onSelected: (selected) {
                     setState(() {
-                      _selectedPriority = null;
+                      _selectedPriority = null; // Sets the selected priority to null.
                     });
                   },
                 ),
@@ -243,15 +248,15 @@ class _TaskListState extends State<_TaskList> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: FilterChip(
-                      label: Text(priority.toString().split('.').last),
-                      selected: _selectedPriority == priority,
+                      label: Text(priority.toString().split('.').last), // Label for each priority.
+                      selected: _selectedPriority == priority, // Checks if the priority is selected.
                       onSelected: (selected) {
                         setState(() {
-                          _selectedPriority = selected ? priority : null;
+                          _selectedPriority = selected ? priority : null; // Sets the selected priority.
                         });
                       },
-                      backgroundColor: _getPriorityColor(priority).withOpacity(0.1),
-                      selectedColor: _getPriorityColor(priority).withOpacity(0.2),
+                      backgroundColor: _getPriorityColor(priority).withOpacity(0.1), // Background color for the chip.
+                      selectedColor: _getPriorityColor(priority).withOpacity(0.2), // Selected color for the chip.
                       labelStyle: TextStyle(
                         color: _selectedPriority == priority
                             ? _getPriorityColor(priority)
@@ -268,37 +273,38 @@ class _TaskListState extends State<_TaskList> {
     );
   }
 
+  /// Returns a stream of tasks filtered by the selected priority and search query.
   Stream<List<Task>> _getFilteredTaskStream(TaskService taskService) {
     Stream<List<Task>> baseStream;
     
     switch (widget.listType) {
       case TaskListType.assigned:
         baseStream = taskService.getAssignedTasks(
-          FirebaseAuth.instance.currentUser!.uid,
+          FirebaseAuth.instance.currentUser!.uid, // Gets tasks assigned to the current user.
         );
         break;
       case TaskListType.department:
         baseStream = taskService.getTasksByDepartment(
-          'currentDepartmentId', // Replace with actual department ID
+          'currentDepartmentId', // Replace with actual department ID.
         );
         break;
       case TaskListType.completed:
-        baseStream = taskService.getTasks(status: TaskStatus.completed);
+        baseStream = taskService.getTasks(status: TaskStatus.completed); // Gets completed tasks.
         break;
       case TaskListType.all:
       default:
-        baseStream = taskService.getTasks();
+        baseStream = taskService.getTasks(); // Gets all tasks.
         break;
     }
 
     return baseStream.map((tasks) {
       return tasks.where((task) {
-        // Apply priority filter if selected
+        // Apply priority filter if selected.
         if (_selectedPriority != null && task.priority != _selectedPriority) {
           return false;
         }
 
-        // Apply search filter if query exists
+        // Apply search filter if query exists.
         if (_searchQuery != null && _searchQuery!.isNotEmpty) {
           final query = _searchQuery!.toLowerCase();
           return task.name.toLowerCase().contains(query) ||
@@ -310,85 +316,90 @@ class _TaskListState extends State<_TaskList> {
     });
   }
 
+  /// Returns the color associated with the given priority.
   Color _getPriorityColor(TaskPriority priority) {
     switch (priority) {
       case TaskPriority.urgent:
-        return Colors.red;
+        return Colors.red; // Color for urgent priority.
       case TaskPriority.high:
-        return Colors.orange;
+        return Colors.orange; // Color for high priority.
       case TaskPriority.medium:
-        return Colors.blue;
+        return Colors.blue; // Color for medium priority.
       case TaskPriority.low:
-        return Colors.green;
+        return Colors.green; // Color for low priority.
     }
   }
 }
 
-// Improved TaskCard widget
+/// A widget that displays a card for a task with various details and actions.
+/// 
+/// The [TaskCard] widget shows the task's name, description, priority, due date,
+/// status, and progress if the task has a checklist. It also navigates to the
+/// task detail screen when tapped.
 class TaskCard extends StatelessWidget {
-  final Task task;
+  final Task task; // The task to be displayed in the card.
 
-  const TaskCard({super.key, required this.task});
+  const TaskCard({super.key, required this.task}); // Constructor for TaskCard.
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      elevation: 2, // Elevation of the card.
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8), // Margin around the card.
       child: InkWell(
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => TaskDetailScreen(task: task),
+              builder: (context) => TaskDetailScreen(task: task), // Navigate to task detail screen on tap.
             ),
           );
         },
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16), // Padding inside the card.
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
                 children: [
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
                       children: [
                         Text(
-                          task.name,
+                          task.name, // Display task name.
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.bold, // Bold text for task name.
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 4), // Space between task name and description.
                         Text(
-                          task.description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          task.description, // Display task description.
+                          maxLines: 2, // Limit description to 2 lines.
+                          overflow: TextOverflow.ellipsis, // Ellipsis for overflow text.
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
+                            color: Colors.grey[600], // Grey color for description text.
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  _buildPriorityIndicator(),
+                  const SizedBox(width: 8), // Space between description and priority indicator.
+                  _buildPriorityIndicator(), // Build priority indicator widget.
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 12), // Space between priority indicator and due date/status row.
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween, // Space between due date and status chip.
                 children: [
-                  _buildDueDate(),
-                  _buildStatusChip(),
+                  _buildDueDate(), // Build due date widget.
+                  _buildStatusChip(), // Build status chip widget.
                 ],
               ),
               if (task.checklist.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _buildProgressIndicator(),
+                const SizedBox(height: 12), // Space between status chip and progress indicator.
+                _buildProgressIndicator(), // Build progress indicator widget.
               ],
             ],
           ),
@@ -397,28 +408,29 @@ class TaskCard extends StatelessWidget {
     );
   }
 
+  /// Builds the priority indicator widget.
   Widget _buildPriorityIndicator() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), // Padding inside the container.
       decoration: BoxDecoration(
-        color: _getPriorityColor().withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        color: _getPriorityColor().withOpacity(0.1), // Background color based on priority.
+        borderRadius: BorderRadius.circular(12), // Rounded corners for the container.
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.min, // Minimize the size of the row.
         children: [
           Icon(
-            _getPriorityIcon(),
-            size: 16,
-            color: _getPriorityColor(),
+            _getPriorityIcon(), // Icon based on priority.
+            size: 16, // Icon size.
+            color: _getPriorityColor(), // Icon color based on priority.
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 4), // Space between icon and text.
           Text(
-            task.priority.toString().split('.').last,
+            task.priority.toString().split('.').last, // Display priority as text.
             style: TextStyle(
-              color: _getPriorityColor(),
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+              color: _getPriorityColor(), // Text color based on priority.
+              fontSize: 12, // Text size.
+              fontWeight: FontWeight.bold, // Bold text.
             ),
           ),
         ],
@@ -426,53 +438,55 @@ class TaskCard extends StatelessWidget {
     );
   }
 
+  /// Builds the due date widget.
   Widget _buildDueDate() {
-    final now = DateTime.now();
+    final now = DateTime.now(); // Current date and time.
     final isOverdue = task.dueDate.isBefore(now) && 
-                     task.status != TaskStatus.completed;
+                     task.status != TaskStatus.completed; // Check if the task is overdue.
 
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.min, // Minimize the size of the row.
       children: [
         Icon(
-          Icons.calendar_today,
-          size: 16,
-          color: isOverdue ? Colors.red : Colors.grey[600],
+          Icons.calendar_today, // Calendar icon.
+          size: 16, // Icon size.
+          color: isOverdue ? Colors.red : Colors.grey[600], // Icon color based on overdue status.
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 4), // Space between icon and text.
         Text(
-          DateFormat('MMM dd, yyyy').format(task.dueDate),
+          DateFormat('MMM dd, yyyy').format(task.dueDate), // Format and display due date.
           style: TextStyle(
-            color: isOverdue ? Colors.red : Colors.grey[600],
-            fontSize: 12,
+            color: isOverdue ? Colors.red : Colors.grey[600], // Text color based on overdue status.
+            fontSize: 12, // Text size.
           ),
         ),
       ],
     );
   }
 
+  /// Builds the status chip widget.
   Widget _buildStatusChip() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), // Padding inside the container.
       decoration: BoxDecoration(
-        color: _getStatusColor().withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        color: _getStatusColor().withOpacity(0.1), // Background color based on status.
+        borderRadius: BorderRadius.circular(12), // Rounded corners for the container.
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.min, // Minimize the size of the row.
         children: [
           Icon(
-            _getStatusIcon(),
-            size: 16,
-            color: _getStatusColor(),
+            _getStatusIcon(), // Icon based on status.
+            size: 16, // Icon size.
+            color: _getStatusColor(), // Icon color based on status.
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 4), // Space between icon and text.
           Text(
-            task.status.toString().split('.').last,
+            task.status.toString().split('.').last, // Display status as text.
             style: TextStyle(
-              color: _getStatusColor(),
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+              color: _getStatusColor(), // Text color based on status.
+              fontSize: 12, // Text size.
+              fontWeight: FontWeight.bold, // Bold text.
             ),
           ),
         ],
@@ -480,108 +494,114 @@ class TaskCard extends StatelessWidget {
     );
   }
 
+  /// Builds the progress indicator widget.
   Widget _buildProgressIndicator() {
     final completedItems = task.checklist
         .where((item) => item.contains('[x]'))
-        .length;
+        .length; // Count completed checklist items.
     final progress = task.checklist.isEmpty 
         ? 0.0 
-        : completedItems / task.checklist.length;
+        : completedItems / task.checklist.length; // Calculate progress.
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween, // Space between progress text and percentage.
           children: [
             Text(
-              'Progress',
+              'Progress', // Display "Progress" text.
               style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
+                color: Colors.grey[600], // Text color.
+                fontSize: 12, // Text size.
               ),
             ),
             Text(
-              '${(progress * 100).toInt()}%',
+              '${(progress * 100).toInt()}%', // Display progress percentage.
               style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
+                color: Colors.grey[600], // Text color.
+                fontSize: 12, // Text size.
+                fontWeight: FontWeight.bold, // Bold text.
               ),
             ),
           ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 4), // Space between progress text and progress bar.
         LinearProgressIndicator(
-          value: progress,
-          backgroundColor: Colors.grey[200],
+          value: progress, // Progress value.
+          backgroundColor: Colors.grey[200], // Background color of the progress bar.
           valueColor: AlwaysStoppedAnimation<Color>(
-            _getProgressColor(progress),
+            _getProgressColor(progress), // Progress bar color based on progress.
           ),
         ),
       ],
     );
   }
 
+  /// Returns the color based on the task's priority.
   Color _getPriorityColor() {
     switch (task.priority) {
       case TaskPriority.urgent:
-        return Colors.red;
+        return Colors.red; // Red color for urgent priority.
       case TaskPriority.high:
-        return Colors.orange;
+        return Colors.orange; // Orange color for high priority.
       case TaskPriority.medium:
-        return Colors.blue;
+        return Colors.blue; // Blue color for medium priority.
       case TaskPriority.low:
-        return Colors.green;
+        return Colors.green; // Green color for low priority.
     }
   }
 
+  /// Returns the icon based on the task's priority.
   IconData _getPriorityIcon() {
     switch (task.priority) {
       case TaskPriority.urgent:
-        return Icons.priority_high;
+        return Icons.priority_high; // High priority icon for urgent priority.
       case TaskPriority.high:
-        return Icons.arrow_upward;
+        return Icons.arrow_upward; // Upward arrow icon for high priority.
       case TaskPriority.medium:
-        return Icons.remove;
+        return Icons.remove; // Remove icon for medium priority.
       case TaskPriority.low:
-        return Icons.arrow_downward;
+        return Icons.arrow_downward; // Downward arrow icon for low priority.
     }
   }
 
+  /// Returns the color based on the task's status.
   Color _getStatusColor() {
     switch (task.status) {
       case TaskStatus.pending:
-        return Colors.orange;
+        return Colors.orange; // Orange color for pending status.
       case TaskStatus.inProgress:
-        return Colors.blue;
+        return Colors.blue; // Blue color for in-progress status.
       case TaskStatus.completed:
-        return Colors.green;
+        return Colors.green; // Green color for completed status.
       case TaskStatus.blocked:
-        return Colors.red;
+        return Colors.red; // Red color for blocked status.
       case TaskStatus.cancelled:
-        return Colors.grey;
+        return Colors.grey; // Grey color for cancelled status.
     }
   }
 
+  /// Returns the icon based on the task's status.
   IconData _getStatusIcon() {
     switch (task.status) {
       case TaskStatus.pending:
-        return Icons.schedule;
+        return Icons.schedule; // Schedule icon for pending status.
       case TaskStatus.inProgress:
-        return Icons.play_arrow;
+        return Icons.play_arrow; // Play arrow icon for in-progress status.
       case TaskStatus.completed:
-        return Icons.check_circle;
+        return Icons.check_circle; // Check circle icon for completed status.
       case TaskStatus.blocked:
-        return Icons.block;
+        return Icons.block; // Block icon for blocked status.
       case TaskStatus.cancelled:
-        return Icons.cancel;
+        return Icons.cancel; // Cancel icon for cancelled status.
     }
   }
 
+  /// Returns the color based on the progress value.
   Color _getProgressColor(double progress) {
-    if (progress >= 0.8) return Colors.green;
-    if (progress >= 0.5) return Colors.orange;
-    return Colors.red;
+    if (progress >= 0.8) return Colors.green; // Green color for progress >= 80%.
+    if (progress >= 0.5) return Colors.orange; // Orange color for progress >= 50%.
+    return Colors.red; // Red color for progress < 50%.
   }
 }

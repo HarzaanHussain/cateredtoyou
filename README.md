@@ -1,72 +1,111 @@
 # CateredToYou - Catering Management System
 
-A comprehensive Flutter-based catering management system with real-time event planning, inventory tracking, and staff management capabilities.
+A comprehensive Flutter-based catering management system with real-time event planning, inventory tracking, task management, and staff management capabilities.
 
 ## Features
+## Core Features
 
-### Core Features
-- Authentication & Authorization
-  - Role-based access control (RBAC)
-  - User authentication with Firebase Auth
-  - Permission management for different roles
-  - Secure data access based on organization
+## Authentication & Authorization
 
-- Event Management
-  - Create, edit, and manage catering events
-  - Real-time status updates
-  - Staff assignment and tracking
-  - Automated workflow management
-  - Resource allocation
-  - Guest count tracking
-  - Menu and supply management
+Role-based access control (RBAC) with granular permissions
+User authentication with Firebase Auth
+Organization-based data isolation
+Multi-role support: Admin, Client, Manager, Chef, Server, Staff, Driver
 
-- Inventory Management
-  - Real-time inventory tracking
-  - Low stock alerts
-  - Automatic inventory adjustments
-  - Supply reordering suggestions
-  - Transaction history
-  - Category-based organization
 
-- Staff Management
-  - Staff profiles and roles
-  - Shift scheduling
-  - Performance tracking
-  - Staff assignment to events
-  - Status monitoring
+## Event Management
 
-- Menu Management
-  - Menu item creation and management
-  - Price tracking
-  - Recipe and ingredient management
-  - Menu categorization
-  - Inventory requirements tracking
+Event creation and lifecycle management
+Real-time status updates and tracking
+Staff assignment and scheduling
+Menu planning and resource allocation
+Guest count and requirements tracking
+Event metadata for special requirements
 
-### Automated Tasks
-When creating an event, the system automatically:
-1. Validates inventory availability
-2. Reserves required supplies
-3. Creates inventory transactions
-4. Sends notifications for:
-   - Low stock alerts
-   - Staff assignments
-   - Event status changes
-   - Upcoming events
-5. Updates inventory levels
-6. Creates audit logs for all operations
+
+## Task Management
+
+Automated task generation based on events
+Task assignment and reassignment
+Priority levels and due dates
+Progress tracking with checklists
+Task status lifecycle management
+Task comments and collaboration
+Department-based task organization
+
+
+## Inventory Management
+
+Real-time inventory tracking
+Low stock alerts
+Transaction history
+Category-based organization
+Units and quantities management
+Reorder point monitoring
+
+
+## Staff Management
+
+Staff profiles and roles
+Employment status tracking
+Department assignments
+Staff availability management
+Permission management
+Password reset functionality
+
+
+## Menu Management
+
+Menu item creation and management
+Price tracking
+Inventory requirements tracking
+Menu categorization
+Dietary restrictions support
+
+
+
+## Task Automation System
+The system includes a sophisticated task automation engine that:
+
+## Event-Based Tasks
+
+Automatically generates tasks based on event requirements
+Creates timeline-based task sequences
+Assigns tasks to appropriate staff members
+Sets priorities and due dates
+
+
+## Task Categories
+
+Planning tasks
+Setup tasks
+Service tasks
+Cleanup tasks
+Inventory management tasks
+
+
+## Special Requirements Handling
+
+Dietary requirement tasks
+Equipment setup tasks
+Bar service tasks
+Large event coordination tasks
+
+
 
 ## Technical Architecture
+## State Management
 
-### State Management
-- Provider for app-wide state management
-- ChangeNotifier for reactive updates
-- Stream-based real-time updates
+Provider pattern for app-wide state management
+ChangeNotifier for reactive updates
+Stream-based real-time updates
 
-### Data Layer
-- Firebase Firestore for data storage
-- Real-time data synchronization
-- Batch operations for transactional integrity
-- Collection-based data organization
+## Data Layer
+
+Firebase Firestore for data storage
+Real-time data synchronization
+Batch operations for transactional integrity
+Collection-based data organization
 
 ### Firebase Collections Structure
  
@@ -94,27 +133,33 @@ When creating an event, the system automatically:
 
 ## Project Structure
 
- plaintext
 lib/
-├── models/                    # Data Models
-│   ├── auth_model.dart       # Authentication state
-│   ├── event_model.dart      # Event data structure
-│   ├── inventory_model.dart  # Inventory management
-│   ├── menu_model.dart       # Menu item structure
-│   └── user_model.dart       # User profile data
-
-├── services/                  # Business Logic
-│   ├── auth_service.dart     # Authentication
-│   ├── event_service.dart    # Event operations
-│   ├── inventory_service.dart # Inventory management
-│   ├── menu_service.dart     # Menu operations
-│   └── staff_service.dart    # Staff management
-
-├── views/                    # UI Screens
-│   ├── auth/                # Authentication screens
-│   ├── events/             # Event management
-│   ├── inventory/          # Inventory management
-│   └── staff/              # Staff management
+├── models/                 # Data Models
+│   ├── auth_model.dart    # Authentication state
+│   ├── event_model.dart   # Event data structure
+│   ├── task_model.dart    # Task data structure
+│   ├── inventory_model.dart
+│   ├── menu_model.dart
+│   └── user_model.dart
+│
+├── services/              # Business Logic
+│   ├── auth_service.dart
+│   ├── event_service.dart
+│   ├── task_service.dart
+│   ├── task_automation_service.dart
+│   ├── inventory_service.dart
+│   ├── menu_service.dart
+│   └── staff_service.dart
+│
+├── views/                # UI Screens
+│   ├── auth/
+│   ├── events/
+│   ├── tasks/
+│   ├── inventory/
+│   └── staff/
+│
+└── routes/              # Navigation
+    └── app_router.dart
 
 └── widgets/                 # Reusable Components
     ├── custom_button.dart
@@ -148,40 +193,28 @@ flutter pub get
 
 4. Run the application:
    
-flutter run
- 
+flutter run 
 
-## Configuration
 
-### Firebase Setup
-1. Create a new Firebase project
-2. Enable Email/Password authentication
-3. Set up Firestore with appropriate rules
-4. Add your `google-services.json` and `firebase_options.dart`
-
-### Environment Variables
-Create a `.env` file with:
- 
-FIREBASE_API_KEY=your_api_key
-FIREBASE_PROJECT_ID=your_project_id
-FIREBASE_MESSAGING_SENDER_ID=your_sender_id
  
 
 ## Security and Permissions
+## Role-Based Access Control
 
-### Role-Based Access Control
-- Admin: Full system access
-- Client: Organization management
-- Manager: Event and staff management
-- Chef: Kitchen and inventory
-- Server: Event execution
-- Driver: Delivery management
+Admin: Full system access
+Client: Organization management
+Manager: Event and staff management
+Chef: Kitchen and inventory management
+Staff: Basic access to assigned tasks
+Server: Event execution access
+Driver: Delivery management
 
-### Data Isolation
-- Organization-level data separation
-- Role-based data access
-- Secure customer information
-- Audit logging
+## Data Isolation
+
+Organization-level data separation
+Role-based data access
+Secure customer information
+Audit logging
 
 ## Contributing
 
