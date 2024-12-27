@@ -57,12 +57,24 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => AuthModel(), // Provide AuthModel instance
         ),
+         ChangeNotifierProvider(
+          create: (context) => TaskService( // Provide TaskService instance
+            context.read<OrganizationService>(), // Provide OrganizationService dependency
+            
+          ),
+        ),
+        Provider(
+      create: (context) => TaskAutomationService( // Provide TaskAutomationService instance
+        context.read<TaskService>(), // Provide TaskService dependency
+      ),
+    ),
 
         /// Event service depends on OrganizationService
         ChangeNotifierProvider(
           create: (context) => EventService(
             // Provide EventService instance with OrganizationService dependency
             context.read<OrganizationService>(),
+                    context.read<TaskAutomationService>(), // Provide TaskAutomationService dependency
           ),
         ),
         /// Menu item service depends on OrganizationService
@@ -78,17 +90,7 @@ class MyApp extends StatelessWidget {
             context.read<OrganizationService>(), // Provide OrganizationService dependency
           ),
         ),
-        ChangeNotifierProvider(
-          create: (context) => TaskService( // Provide TaskService instance
-            context.read<OrganizationService>(), // Provide OrganizationService dependency
-            
-          ),
-        ),
-        Provider(
-      create: (context) => TaskAutomationService(
-        context.read<TaskService>(),
-      ),
-    ),
+       
       ],
       child: Builder(
         builder: (context) {

@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart'; // Importing FirebaseAuth pac
 import 'package:cateredtoyou/services/organization_service.dart'; // Importing OrganizationService for organization-related operations.
 import 'package:cateredtoyou/models/event_model.dart'; // Importing Event model.
 import 'package:cateredtoyou/models/inventory_item_model.dart'; // Importing InventoryItem model.
-
+import 'package:cateredtoyou/services/task_automation_service.dart'; // Importing TaskAutomation model.
 
 class EventService extends ChangeNotifier {
   // EventService class extending ChangeNotifier for state management.
@@ -14,9 +14,11 @@ class EventService extends ChangeNotifier {
       FirebaseAuth.instance; // FirebaseAuth instance for authentication.
   final OrganizationService
       _organizationService; // OrganizationService instance for organization-related operations.
-
+  final TaskAutomationService _taskAutomationService;
   EventService(
-      this._organizationService); // Constructor initializing OrganizationService.
+    this._organizationService,
+    this._taskAutomationService,
+  ); // Constructor initializing OrganizationService.
 
   Stream<List<Event>> getEvents() async* {
     // Method to get a stream of events.
@@ -157,11 +159,12 @@ class EventService extends ChangeNotifier {
     List<EventMenuItem> menuItems = const [], // List of menu items.
     List<EventSupply> supplies = const [], // List of supplies.
     List<AssignedStaff> assignedStaff = const [], // List of assigned staff.
-    Map<String, dynamic>? metadata, // Additional metadata.
+    EventMetadata? metadata, // Additional metadata.
   }) async {
     try {
       debugPrint('Starting event creation'); // Printing debug message.
-
+      debugPrint(
+          'Starting event creation with task automation'); // Printing debug message.
       final currentUser =
           _auth.currentUser; // Getting the current authenticated user.
       if (currentUser == null) {
@@ -266,7 +269,7 @@ class EventService extends ChangeNotifier {
           'supplies': supplies.map((supply) => supply.toMap()).toList(),
           'assignedStaff': staffData,
           'totalPrice': totalPrice,
-          'metadata': metadata,
+          'metadata': metadata?.toMap(),
         };
 
         transaction.set(
@@ -301,7 +304,7 @@ class EventService extends ChangeNotifier {
         debugPrint(
             'Event creation completed successfully'); // Printing debug message.
 
-        return Event(
+      final eventObj = Event(
           // Returning the created Event object.
           id: docRef.id,
           name: name.trim(),
@@ -324,9 +327,37 @@ class EventService extends ChangeNotifier {
           supplies: supplies,
           assignedStaff: assignedStaff,
           totalPrice: totalPrice,
-          metadata: metadata,
+          metadata: metadata?.toMap(),
         );
+        await _taskAutomationService.generateTasksForEvent(eventObj);
+        return eventObj;/*(
+          // Returning the created Event object.
+          id: docRef.id,
+          name: name.trim(),
+          description: description.trim(),
+          startDate: startDate,
+          endDate: endDate,
+          location: location.trim(),
+          customerId: customerId,
+          organizationId: organization.id,
+          guestCount: guestCount,
+          minStaff: minStaff,
+          notes: notes.trim(),
+          status: EventStatus.draft,
+          startTime: startTime,
+          endTime: endTime,
+          createdBy: currentUser.uid,
+          createdAt: now,
+          updatedAt: now,
+          menuItems: menuItems,
+          supplies: supplies,
+          assignedStaff: assignedStaff,
+          totalPrice: totalPrice,
+          metadata: metadata?.toMap(),
+        );*/
+        
       });
+      
     } catch (e) {
       debugPrint(
           'Error creating event: $e'); // Printing error if event creation fails.
@@ -357,7 +388,7 @@ class EventService extends ChangeNotifier {
 
       debugPrint(
           'Starting event update for ID: ${updatedEvent.id}'); // Log the start of the update process.
-
+      debugPrint('Starting event update with task automation'); // Log the start of the update process.
       final organization = await _organizationService
           .getCurrentUserOrganization(); // Get the organization of the current user.
       if (organization == null) {
@@ -415,7 +446,11 @@ class EventService extends ChangeNotifier {
             updatedEvent.supplies.map((supply) => supply.toMap()).toList(),
         'assignedStaff': staffData,
         'totalPrice': updatedEvent.totalPrice,
-        'metadata': updatedEvent.metadata,
+        'metadata': updatedEvent.metadata != null
+            ? (updatedEvent.metadata is EventMetadata
+                ? (updatedEvent.metadata as EventMetadata).toMap()
+                : updatedEvent.metadata)
+            : null,
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       }; // Prepare update data.
 
@@ -456,6 +491,8 @@ class EventService extends ChangeNotifier {
 
       debugPrint(
           'Event update completed successfully'); // Log the successful completion of the update.
+          // Generate new tasks based on updated event data
+      await _taskAutomationService.generateTasksForEvent(updatedEvent);
       notifyListeners(); // Notify listeners about the update.
     } catch (e) {
       debugPrint('Error updating event: $e'); // Log the error.
@@ -570,5 +607,4 @@ class EventService extends ChangeNotifier {
       rethrow; // Rethrow the error.
     }
   }
-
 }

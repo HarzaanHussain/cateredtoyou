@@ -284,3 +284,46 @@ class Event {
     );
   }
 }
+class EventMetadata {
+  final bool hasDietaryRequirements;
+  final bool hasSpecialEquipment;
+  final bool hasBarService;
+  final List<String> dietaryRestrictions;
+  final List<String> specialEquipmentNeeded;
+  final String? barServiceType;
+  final Map<String, dynamic>? additionalData;
+
+  EventMetadata({
+    this.hasDietaryRequirements = false,
+    this.hasSpecialEquipment = false,
+    this.hasBarService = false,
+    this.dietaryRestrictions = const [],
+    this.specialEquipmentNeeded = const [],
+    this.barServiceType,
+    this.additionalData,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'has_dietary_requirements': hasDietaryRequirements,
+      'has_special_equipment': hasSpecialEquipment,
+      'has_bar_service': hasBarService,
+      'dietary_restrictions': dietaryRestrictions,
+      'special_equipment_needed': specialEquipmentNeeded,
+      'bar_service_type': barServiceType,
+      'additional_data': additionalData,
+    };
+  }
+
+  factory EventMetadata.fromMap(Map<String, dynamic> map) {
+    return EventMetadata(
+      hasDietaryRequirements: map['has_dietary_requirements'] ?? false,
+      hasSpecialEquipment: map['has_special_equipment'] ?? false,
+      hasBarService: map['has_bar_service'] ?? false,
+      dietaryRestrictions: List<String>.from(map['dietary_restrictions'] ?? []),
+      specialEquipmentNeeded: List<String>.from(map['special_equipment_needed'] ?? []),
+      barServiceType: map['bar_service_type'],
+      additionalData: map['additional_data'],
+    );
+  }
+}
