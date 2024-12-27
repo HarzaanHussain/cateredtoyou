@@ -301,4 +301,42 @@ class StaffService extends ChangeNotifier {
       rethrow; // Rethrow the exception
     }
   }
+   /// Stream to get departments for the current organization
+  Stream<List<String>> getDepartments() async* { 
+  try {
+    final currentUser = _auth.currentUser; // Get the current authenticated user
+    if (currentUser == null) { // If no user is authenticated, yield an empty list
+      yield [];
+      return;
+    }
+
+    final userDoc = await _firestore // Get the current user's document from Firestore
+        .collection('users')
+        .doc(currentUser.uid)
+        .get();
+
+    if (!userDoc.exists) {
+      yield [];
+      return;
+    }
+
+    final organizationId = userDoc.data()?['organizationId']; // Get the organization ID from user document
+
+    yield* _firestore // Query departments using only organizationId filter
+        .collection('users')
+        .where('organizationId', isEqualTo: organizationId)
+        .snapshots()
+        .map((snapshot) {
+          final departments = <String>{};
+          for (var doc in snapshot.docs) {
+            final userDepts = List<String>.from(doc.data()['departments'] ?? []); // Get departments from user document
+            departments.addAll(userDepts);
+          }
+          return departments.toList();
+        });
+  } catch (e) { // Print error if any exception occurs
+    debugPrint('Error getting departments: $e');
+    yield [];
+  }
+}
 }

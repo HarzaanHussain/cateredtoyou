@@ -12,6 +12,8 @@ import 'package:cateredtoyou/views/menu_item/menu_item_list_screen.dart';
 import 'package:cateredtoyou/views/staff/add_staff_screen.dart'; // Importing AddStaffScreen widget
 import 'package:cateredtoyou/views/staff/edit_staff_screen.dart'; // Importing EditStaffScreen widget
 import 'package:cateredtoyou/views/staff/staff_list_screen.dart'; // Importing StaffListScreen widget
+import 'package:cateredtoyou/views/tasks/manage_task_screen.dart';
+import 'package:cateredtoyou/views/tasks/task_list_screen.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components
 import 'package:go_router/go_router.dart'; // Importing GoRouter package for routing
 import 'package:cateredtoyou/models/auth_model.dart'; // Importing AuthModel for authentication state
@@ -164,17 +166,42 @@ class AppRouter {
       ),
       GoRoute(
         path: '/menu-items', // Path for menu items list route
-        builder: (context, state) => const MenuItemListScreen(), // Building MenuItemListScreen widget
+        builder: (context, state) =>
+            const MenuItemListScreen(), // Building MenuItemListScreen widget
       ),
       GoRoute(
         path: '/add-menu-item', // Path for add menu item route
-        builder: (context, state) => const MenuItemEditScreen(), // Building MenuItemEditScreen widget
+        builder: (context, state) =>
+            const MenuItemEditScreen(), // Building MenuItemEditScreen widget
       ),
       GoRoute(
         path: '/edit-menu-item', // Path for edit menu item route
         builder: (context, state) {
-          final menuItem = state.extra as MenuItem; // Extracting MenuItem from state
-          return MenuItemEditScreen(menuItem: menuItem); // Building MenuItemEditScreen widget with menuItem data
+          final menuItem =
+              state.extra as MenuItem; // Extracting MenuItem from state
+          return MenuItemEditScreen(
+              menuItem:
+                  menuItem); // Building MenuItemEditScreen widget with menuItem data
+        },
+      ),
+      GoRoute( // Route for tasks list
+        path: '/tasks',
+        builder: (context, state) => const TaskListScreen(), // Building TaskListScreen widget
+        redirect: (context, state) { // Redirecting to login if not authenticated
+          if (!authModel.isAuthenticated) {
+            return '/login';
+          }
+          return null;
+        },
+      ),
+      GoRoute( // Route for manage tasks
+        path: '/manage-tasks',
+        builder: (context, state) => const ManageTasksScreen(), // Building ManageTasksScreen widget
+        redirect: (context, state) { // Redirecting to login if not authenticated
+          if (!authModel.isAuthenticated) {
+            return '/login';
+          }
+          return null;
         },
       ),
     ],

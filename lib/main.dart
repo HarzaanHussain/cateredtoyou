@@ -1,5 +1,7 @@
 import 'package:cateredtoyou/services/event_service.dart';
 import 'package:cateredtoyou/services/menu_item_service.dart';
+import 'package:cateredtoyou/services/task_automation_service.dart';
+import 'package:cateredtoyou/services/task_service.dart';
 import 'package:flutter/material.dart'; // Import Flutter material package for UI components
 import 'package:provider/provider.dart'; // Import provider package for state management
 import 'package:cateredtoyou/models/auth_model.dart'; // Import AuthModel for authentication state
@@ -76,6 +78,17 @@ class MyApp extends StatelessWidget {
             context.read<OrganizationService>(), // Provide OrganizationService dependency
           ),
         ),
+        ChangeNotifierProvider(
+          create: (context) => TaskService( // Provide TaskService instance
+            context.read<OrganizationService>(), // Provide OrganizationService dependency
+            
+          ),
+        ),
+        Provider(
+      create: (context) => TaskAutomationService(
+        context.read<TaskService>(),
+      ),
+    ),
       ],
       child: Builder(
         builder: (context) {
