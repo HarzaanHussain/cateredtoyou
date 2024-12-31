@@ -13,74 +13,71 @@ class TaskService extends ChangeNotifier { // TaskService class extends ChangeNo
   TaskService(this._organizationService); // Constructor to initialize OrganizationService
 
   // Get tasks with flexible filtering
-  Stream<List<Task>> getTasks({
-    String? eventId, // Optional event ID to filter tasks by event
-    String? assignedTo, // Optional user ID to filter tasks assigned to a specific user
-    String? departmentId, // Optional department ID to filter tasks by department
-    TaskStatus? status, // Optional task status to filter tasks by status
-  }) async* {
-    try {
-      final currentUser = _auth.currentUser; // Get the current authenticated user
-      if (currentUser == null) { // If no user is authenticated
-        yield []; // Return an empty list of tasks
-        return;
-      }
-
-      final organization = await _organizationService.getCurrentUserOrganization(); // Get the organization of the current user
-      if (organization == null) { // If no organization is found
-        yield []; // Return an empty list of tasks
-        return;
-      }
-
-      // Query tasks based on organization and assigned user
-      var query = _firestore.collection('tasks').where(
-        Filter.or(
-          Filter('organizationId', isEqualTo: organization.id), // Filter tasks by organization ID
-          Filter('assignedTo', isEqualTo: currentUser.uid), // Filter tasks assigned to the current user
-        ),
-      );
-
-      if (eventId != null) { // If event ID is provided
-        query = query.where('eventId', isEqualTo: eventId); // Filter tasks by event ID
-      }
-
-      if (status != null) { // If status is provided
-        query = query.where('status', isEqualTo: status.toString().split('.').last); // Filter tasks by status
-      }
-
-      yield* query.snapshots().map((snapshot) { // Listen to query snapshots and map them to a list of tasks
-        try {
-          var tasks = snapshot.docs
-              .map((doc) => Task.fromMap(doc.data(), doc.id)) // Map each document to a Task object
-              .toList();
-
-          // Apply additional filters in memory
-          if (assignedTo != null) { // If assignedTo is provided
-            tasks = tasks.where((task) => task.assignedTo == assignedTo).toList(); // Filter tasks by assigned user
-          }
-
-          if (departmentId != null) { // If departmentId is provided
-            tasks = tasks.where((task) => task.departmentId == departmentId).toList(); // Filter tasks by department
-          }
-
-          // Sort by priority and due date
-          tasks.sort((a, b) {
-            final priorityComp = b.priority.index.compareTo(a.priority.index); // Compare tasks by priority
-            if (priorityComp != 0) return priorityComp; // If priorities are different, return the comparison result
-            return a.dueDate.compareTo(b.dueDate); // If priorities are the same, compare tasks by due date
-          });
-
-          return tasks; // Return the sorted list of tasks
-        } catch (e) {
-          debugPrint('Error mapping tasks: $e'); // Print error message if mapping fails
-          return [];
-        }
-      });
-    } catch (e) {
-      debugPrint('Error in getTasks: $e'); // Print error message if query fails
+ Stream<List<Task>> getTasks({
+  String? eventId,
+  String? assignedTo,
+  String? departmentId,
+  TaskStatus? status,
+}) async* {
+  try {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
       yield [];
+      return;
     }
+
+    final organization = await _organizationService.getCurrentUserOrganization();
+    if (organization == null) {
+      yield [];
+      return;
+    }
+
+    var query = _firestore.collection('tasks').where(
+      Filter.or(
+        Filter('organizationId', isEqualTo: organization.id),
+        Filter('assignedTo', isEqualTo: currentUser.uid),
+      ),
+    );
+
+    if (eventId != null) {
+      query = query.where('eventId', isEqualTo: eventId);
+    }
+
+    if (status != null) {
+      query = query.where('status', isEqualTo: status.toString().split('.').last);
+    }
+
+    yield* query.snapshots().map((snapshot) {
+      try {
+        var tasks = snapshot.docs
+            .map((doc) => Task.fromMap(doc.data(), doc.id))
+            .toList();
+
+        if (assignedTo != null) {
+          tasks = tasks.where((task) => task.assignedTo == assignedTo).toList();
+        }
+
+        if (departmentId != null) {
+          tasks = tasks.where((task) => task.departmentId == departmentId).toList();
+        }
+
+        tasks.sort((a, b) {
+          final priorityComp = b.priority.index.compareTo(a.priority.index);
+          if (priorityComp != 0) return priorityComp;
+          return a.dueDate.compareTo(b.dueDate);
+        });
+
+        return tasks;
+      } catch (e) {
+        debugPrint('Error mapping tasks: $e');
+        return [];
+      }
+    });
+  } catch (e) {
+    debugPrint('Error in getTasks: $e');
+    yield [];
   }
+}
 
   // Create a new task
   Future<Task> createTask({
@@ -144,40 +141,180 @@ class TaskService extends ChangeNotifier { // TaskService class extends ChangeNo
 
   // Update task status
   Future<void> updateTaskStatus(String taskId, TaskStatus newStatus) async {
-    try {
-      final currentUser = _auth.currentUser; // Get the current authenticated user
-      if (currentUser == null) throw 'Not authenticated'; // Throw an error if no user is authenticated
+  try {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) throw 'Not authenticated';
 
-      final taskDoc = await _firestore.collection('tasks').doc(taskId).get(); // Get the task document
-      if (!taskDoc.exists) throw 'Task not found'; // Throw an error if task document does not exist
+    final taskDoc = await _firestore.collection('tasks').doc(taskId).get();
+    if (!taskDoc.exists) throw 'Task not found';
+    
+    final task = Task.fromMap(taskDoc.data()!, taskId);
+    final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+    
+    if (task.assignedTo != currentUser.uid && 
+        !['client', 'admin', 'manager'].contains(userDoc.data()?['role'])) {
+      throw 'Insufficient permissions to update task';
+    }
 
-      final task = Task.fromMap(taskDoc.data()!, taskId); // Map the task document data to a Task object
-      final userDoc = await _firestore.collection('users').doc(currentUser.uid).get(); // Get the user document
+    // First check if the status transition is valid
+    if (!_isValidStatusTransition(task.status, newStatus)) {
+      throw 'Invalid status transition';
+    }
+
+    // Then handle completion status check
+    if (newStatus == TaskStatus.completed && 
+        !_areAllChecklistItemsComplete(task.checklist)) {
+      throw 'Cannot mark task as completed until all checklist items are done';
+    }
+
+    // Allow blocked and cancelled states regardless of checklist
+    if (newStatus == TaskStatus.blocked || newStatus == TaskStatus.cancelled) {
+      await taskDoc.reference.update({
+        'status': newStatus.toString().split('.').last,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } else {
+      // For other states, determine based on checklist
+      final appropriateStatus = _determineStatus(task.checklist, newStatus);
       
-      if (!userDoc.exists) throw 'User not found'; // Throw an error if user document does not exist
-      final userRole = userDoc.data()?['role'] as String?; // Get the user role
-      
-      // Check if user can update the task
-      if (task.assignedTo != currentUser.uid && 
-          !['client', 'admin', 'manager'].contains(userRole)) {
-        throw 'Insufficient permissions to update task'; // Throw an error if user does not have permission
+      // Verify the determined status transition is valid
+      if (!_isValidStatusTransition(task.status, appropriateStatus)) {
+        throw 'Invalid status transition based on checklist state';
       }
 
-      if (!_isValidStatusTransition(task.status, newStatus)) { // Check if the status transition is valid
-        throw 'Invalid status transition'; // Throw an error if the status transition is invalid
+      // If task is being completed and has inventory updates, process them
+      if (appropriateStatus == TaskStatus.completed && task.inventoryUpdates != null) {
+          debugPrint('Task completed with inventory updates: ${task.inventoryUpdates}');
+        await _processInventoryUpdates(task, currentUser.uid);
       }
 
       await taskDoc.reference.update({
-        'status': newStatus.toString().split('.').last, // Update the task status
-        'updatedAt': FieldValue.serverTimestamp(), // Update the last updated date and time
+        'status': appropriateStatus.toString().split('.').last,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+    notifyListeners();
+  } catch (e) {
+    debugPrint('Error updating task status: $e');
+    rethrow;
+  }
+}
+
+   /*Future<void> updateTaskStatus(String taskId, TaskStatus newStatus) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
+
+      final taskDoc = await _firestore.collection('tasks').doc(taskId).get();
+      if (!taskDoc.exists) throw 'Task not found';
+      
+      final task = Task.fromMap(taskDoc.data()!, taskId);
+      final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+      
+      if (task.assignedTo != currentUser.uid && 
+          !['client', 'admin', 'manager'].contains(userDoc.data()?['role'])) {
+        throw 'Insufficient permissions to update task';
+      }
+
+      // First check if the status transition is valid
+      if (!_isValidStatusTransition(task.status, newStatus)) {
+        throw 'Invalid status transition';
+      }
+
+      // Then handle completion status check
+      if (newStatus == TaskStatus.completed && 
+          !_areAllChecklistItemsComplete(task.checklist)) {
+        throw 'Cannot mark task as completed until all checklist items are done';
+      }
+
+      // Allow blocked and cancelled states regardless of checklist
+      if (newStatus == TaskStatus.blocked || newStatus == TaskStatus.cancelled) {
+        await taskDoc.reference.update({
+          'status': newStatus.toString().split('.').last,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        // For other states, determine based on checklist
+        final appropriateStatus = _determineStatus(task.checklist, newStatus);
+        // Verify the determined status transition is valid
+        if (!_isValidStatusTransition(task.status, appropriateStatus)) {
+          throw 'Invalid status transition based on checklist state';
+        }
+        await taskDoc.reference.update({
+          'status': appropriateStatus.toString().split('.').last,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating task status: $e');
+      rethrow;
+    }
+  }*/
+ Future<void> _processInventoryUpdates(Task task, String userId) async {
+  debugPrint('Processing inventory updates for task: ${task.id}'); // Add debug logging
+  debugPrint('Inventory updates data: ${task.inventoryUpdates}'); // Add debug logging
+  
+  try {
+    final batch = _firestore.batch();
+    final now = DateTime.now();
+
+    if (task.inventoryUpdates == null || task.inventoryUpdates!.isEmpty) {
+      debugPrint('No inventory updates found for task');
+      return;
+    }
+
+    for (final entry in task.inventoryUpdates!.entries) {
+      final inventoryId = entry.key;
+      debugPrint('Processing inventory item: $inventoryId'); // Add debug logging
+      
+      final updateData = entry.value as Map<String, dynamic>;
+      final quantity = updateData['quantity'] as num;
+      final type = updateData['type'] as String;
+
+      final inventoryRef = _firestore.collection('inventory').doc(inventoryId);
+      final inventoryDoc = await inventoryRef.get();
+
+      if (!inventoryDoc.exists) {
+        throw 'Inventory item $inventoryId not found';
+      }
+
+      // Calculate the quantity change based on the update type
+      final quantityChange = type == 'add' ? quantity : -quantity;
+      debugPrint('Applying quantity change: $quantityChange'); // Add debug logging
+
+      batch.update(inventoryRef, {
+        'quantity': FieldValue.increment(quantityChange),
+        'updatedAt': Timestamp.fromDate(now),
+        'lastModifiedBy': userId,
       });
 
-      notifyListeners(); // Notify listeners of changes
-    } catch (e) {
-      debugPrint('Error updating task status: $e'); // Print error message if task status update fails
-      rethrow; // Rethrow the error
+      // Create inventory transaction record
+      final transactionRef = _firestore.collection('inventory_transactions').doc();
+      batch.set(transactionRef, {
+        'itemId': inventoryId,
+        'eventId': task.eventId,
+        'taskId': task.id,
+        'type': 'task_inventory_update',
+        'quantity': quantity,
+        'timestamp': Timestamp.fromDate(now),
+        'userId': userId,
+        'organizationId': task.organizationId,
+        'notes': 'Inventory ${type == "add" ? "added" : "removed"} via task completion',
+        'previousQuantity': inventoryDoc.data()?['quantity'] ?? 0,  // Add this for consistency
+        'difference': -quantity,  // Add this for consistency
+      });
     }
+
+    await batch.commit();
+    debugPrint('Inventory updates completed successfully'); // Add debug logging
+  } catch (e) {
+    debugPrint('Error processing inventory updates: $e');
+    rethrow;
   }
+}
 
   // Add comment to task
   Future<void> addTaskComment(String taskId, String content) async {
@@ -234,7 +371,7 @@ class TaskService extends ChangeNotifier { // TaskService class extends ChangeNo
   }
   
   // Update task checklist
-  Future<void> updateTaskChecklist(String taskId, List<String> checklist) async {
+  /*Future<void> updateTaskChecklist(String taskId, List<String> checklist) async {
   try {
     // Debug print
     debugPrint('Updating checklist: $checklist'); // Print the checklist being updated
@@ -263,7 +400,44 @@ class TaskService extends ChangeNotifier { // TaskService class extends ChangeNo
     debugPrint('Error updating task checklist: $e'); // Print error message if updating checklist fails
     rethrow; // Rethrow the error
   }
-}
+}*/
+ Future<void> updateTaskChecklist(String taskId, List<String> checklist) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
+
+      // Get current task data
+      final taskDoc = await _firestore.collection('tasks').doc(taskId).get();
+      if (!taskDoc.exists) throw 'Task not found';
+      
+      final task = Task.fromMap(taskDoc.data()!, taskId);
+      final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+      
+      // Ensure user has permission to update the task
+      if (task.assignedTo != currentUser.uid && 
+          !['client', 'admin', 'manager'].contains(userDoc.data()?['role'])) {
+        throw 'Insufficient permissions to update task';
+      }
+
+      // Determine new status based on checklist completion
+      final newStatus = _determineStatus(checklist, task.status);
+      final now = DateTime.now();
+
+      // Use a transaction to ensure atomic updates
+      await _firestore.runTransaction((transaction) async {
+        transaction.update(taskDoc.reference, {
+          'checklist': checklist,
+          'status': newStatus.toString().split('.').last,
+          'updatedAt': Timestamp.fromDate(now),
+        });
+      });
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating task checklist: $e');
+      rethrow;
+    }
+  }
 
   bool _isValidStatusTransition(TaskStatus current, TaskStatus next) { // Function to validate task status transitions
     switch (current) {
@@ -498,5 +672,63 @@ class TaskService extends ChangeNotifier { // TaskService class extends ChangeNo
       rethrow;
     }
   }
+  bool _areAllChecklistItemsComplete(List<String> checklist) {
+    if (checklist.isEmpty) return false;
+    return checklist.every((item) => item.trim().startsWith('[x]'));
+  }
+
+  // Helper method to determine if any checklist items are completed
+  bool _hasAnyChecklistItemComplete(List<String> checklist) {
+    return checklist.any((item) => item.trim().startsWith('[x]'));
+  }
+
+  // Helper method to get appropriate status based on checklist completion
+  TaskStatus _determineStatus(List<String> checklist, TaskStatus currentStatus) {
+    // Don't change status if task is cancelled or blocked
+    if (currentStatus == TaskStatus.cancelled || currentStatus == TaskStatus.blocked) {
+      return currentStatus;
+    }
+
+    if (_areAllChecklistItemsComplete(checklist)) {
+      return TaskStatus.completed;
+    } else if (_hasAnyChecklistItemComplete(checklist)) {
+      return TaskStatus.inProgress;
+    } else if (currentStatus == TaskStatus.completed) {
+      // If task was completed but no items are checked now, revert to in progress
+      return TaskStatus.inProgress;
+    }
+    
+    return currentStatus;
+  }
+  Future<void> deleteTasksForEvent(String eventId) async {
+  try {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) throw 'Not authenticated';
+    
+    final organization = await _organizationService.getCurrentUserOrganization();
+    if (organization == null) throw 'Organization not found';
+
+    // Get all tasks for the event
+    final querySnapshot = await _firestore
+        .collection('tasks')
+        .where('eventId', isEqualTo: eventId)
+        .where('organizationId', isEqualTo: organization.id)
+        .get();
+
+    if (querySnapshot.docs.isEmpty) return;
+
+    // Use batch operation for better performance
+    final batch = _firestore.batch();
+    for (var doc in querySnapshot.docs) {
+      batch.delete(doc.reference);
+    }
+
+    await batch.commit();
+    notifyListeners();
+  } catch (e) {
+    debugPrint('Error deleting tasks for event: $e');
+    rethrow;
+  }
+}
   
 }

@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart'; // Importing Flutter's foundation library for debugging purposes
 import 'package:cateredtoyou/models/event_model.dart'; // Importing the Event model
 import 'package:cateredtoyou/models/task_model.dart'; // Importing the Task model
@@ -5,35 +7,184 @@ import 'package:cateredtoyou/services/task_service.dart'; // Importing the TaskS
 
 class TaskAutomationService {
   final TaskService _taskService; // Declaring a private TaskService instance
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance; // Declaring a FirebaseFirestore instance
 
   TaskAutomationService(this._taskService); // Constructor to initialize TaskService
 
-  Future<void> generateTasksForEvent(Event event) async { // Method to generate tasks for a given event
-    try {
-      final Map<String, String> staffByRole = {}; // Creating a map to store staff by their roles
-      for (final staff in event.assignedStaff) { // Looping through assigned staff
-        staffByRole[staff.role] = staff.userId; // Adding staff to the map
-      }
-
-      final daysUntilEvent = event.startDate.difference(DateTime.now()).inDays; // Calculating days until the event
-
-      if (daysUntilEvent < 7) { // Checking if the event is within a week
-        await _createUrgentTasks(event, staffByRole); // Creating urgent tasks if the event is soon
-      } else {
-        await _createStandardTasks(event, staffByRole); // Creating standard tasks otherwise
-      }
-
-      await _createInventoryTasks(event, staffByRole); // Creating inventory-related tasks
-
-      if (event.metadata != null) { // Checking if event has metadata
-        await _createCustomTasks(event, staffByRole); // Creating custom tasks based on metadata
-      }
-
-    } catch (e) {
-      debugPrint('Error generating tasks: $e'); // Printing error message
-      rethrow; // Rethrowing the error
+  Future<void> generateTasksForEvent(Event event, {Event? originalEvent}) async {
+  try {
+    final Map<String, String> staffByRole = {};
+    for (final staff in event.assignedStaff) {
+      staffByRole[staff.role] = staff.userId;
     }
+
+    // If this is an update (originalEvent exists), compare and only generate necessary tasks
+    if (originalEvent != null) {
+      await _handleEventUpdate(event, originalEvent, staffByRole);
+    } else {
+      // This is a new event, generate all tasks
+      final daysUntilEvent = event.startDate.difference(DateTime.now()).inDays;
+
+      if (daysUntilEvent < 7) {
+        await _createUrgentTasks(event, staffByRole);
+      } else {
+        await _createStandardTasks(event, staffByRole);
+      }
+
+      await _createInventoryTasks(event, staffByRole);
+
+      if (event.metadata != null) {
+        await _createCustomTasks(event, staffByRole);
+      }
+    }
+  } catch (e) {
+    debugPrint('Error generating tasks: $e');
+    rethrow;
   }
+}
+Future<void> _handleEventUpdate(Event newEvent, Event oldEvent, Map<String, String> staffByRole) async {
+  debugPrint('Starting event update handler for event: ${newEvent.id}');
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw 'Not authenticated';
+
+    // Get both user role and permissions
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    if (!userDoc.exists) throw 'User not found';
+    
+    final userRole = userDoc.data()?['role'] as String?;
+    final permDoc = await _firestore.collection('permissions').doc(user.uid).get();
+    
+    // Check if user has management role OR required permissions
+    final isManager = ['admin', 'client', 'manager'].contains(userRole);
+    final permissions = permDoc.exists ? 
+        List<String>.from(permDoc.data()?['permissions'] ?? []) : [];
+    final hasRequiredPermission = permissions.contains('manage_tasks') || 
+                                permissions.contains('manage_events');
+
+    if (!isManager && !hasRequiredPermission) {
+      debugPrint('Permission denied. User role: $userRole, Permissions: $permissions');
+      throw 'Insufficient permissions to update tasks';
+    }
+
+    // Only process updates if there are actual changes
+    if (!listEquals(oldEvent.supplies, newEvent.supplies) ||
+        oldEvent.startDate != newEvent.startDate ||
+        oldEvent.endDate != newEvent.endDate ||
+        !listEquals(oldEvent.assignedStaff, newEvent.assignedStaff) ||
+        oldEvent.metadata != newEvent.metadata) {
+      await _processBatchUpdates(newEvent, oldEvent, staffByRole);
+    }
+
+    debugPrint('Event update handler completed successfully');
+  } catch (e, stack) {
+    debugPrint('Error in event update handler: $e');
+    debugPrint('Stack trace: $stack');
+    rethrow;
+  }
+}
+
+Future<void> _processBatchUpdates(Event newEvent, Event oldEvent, Map<String, String> staffByRole) async {
+  debugPrint('Processing batch updates for event: ${newEvent.id}');
+  
+  try {
+    final querySnapshot = await _firestore
+        .collection('tasks')
+        .where('eventId', isEqualTo: newEvent.id)
+        .where('organizationId', isEqualTo: newEvent.organizationId)  // Add organization filter
+        .get();
+
+    if (querySnapshot.docs.isEmpty) {
+      debugPrint('No tasks found for event: ${newEvent.id}');
+      return;
+    }
+
+    const int batchSize = 500;
+    int processedCount = 0;
+    WriteBatch currentBatch = _firestore.batch();
+
+    for (final doc in querySnapshot.docs) {
+      final taskData = doc.data();
+      final isInventoryTask = taskData['departmentId'] == 'inventory';
+      
+      // Handle inventory tasks
+      if (isInventoryTask && !listEquals(oldEvent.supplies, newEvent.supplies)) {
+        currentBatch.delete(doc.reference);
+        processedCount++;
+        debugPrint('Deleting inventory task: ${doc.id}');
+      } else {
+        Map<String, dynamic> updates = {};
+        bool needsUpdate = false;
+
+        // Update due dates if needed
+        if (oldEvent.startDate != newEvent.startDate || 
+            oldEvent.endDate != newEvent.endDate) {
+          final isPostEvent = taskData['name'].toString().contains('Post-Event');
+          final newDueDate = isPostEvent
+              ? newEvent.endDate.add(const Duration(hours: 2))
+              : newEvent.startDate.subtract(const Duration(days: 1));
+          
+          updates['dueDate'] = Timestamp.fromDate(newDueDate);
+          updates['updatedAt'] = FieldValue.serverTimestamp();
+          needsUpdate = true;
+          debugPrint('Updating due date for task: ${doc.id}');
+        }
+
+        // Update staff assignment if needed
+        if (!listEquals(oldEvent.assignedStaff, newEvent.assignedStaff)) {
+          final role = taskData['role'] as String?;
+          if (role != null && staffByRole.containsKey(role)) {
+            updates['assignedTo'] = staffByRole[role];
+            needsUpdate = true;
+            debugPrint('Updating staff assignment for task: ${doc.id}');
+          }
+        }
+
+        if (needsUpdate) {
+          currentBatch.update(doc.reference, updates);
+          processedCount++;
+        }
+      }
+
+      // Commit batch if we've reached the size limit
+      if (processedCount >= batchSize) {
+        debugPrint('Committing batch with $processedCount updates');
+        await currentBatch.commit();
+        currentBatch = _firestore.batch();
+        processedCount = 0;
+      }
+    }
+
+    // Commit any remaining updates
+    if (processedCount > 0) {
+      debugPrint('Committing final batch with $processedCount updates');
+      await currentBatch.commit();
+    }
+
+    // Create new inventory tasks if needed
+    if (!listEquals(oldEvent.supplies, newEvent.supplies)) {
+      debugPrint('Creating new inventory tasks');
+      await _createInventoryTasks(newEvent, staffByRole);
+    }
+
+    // Handle metadata changes last
+    if (oldEvent.metadata != newEvent.metadata) {
+      debugPrint('Updating custom tasks');
+      await _createCustomTasks(newEvent, staffByRole);
+    }
+
+    debugPrint('Batch updates completed successfully');
+  } catch (e, stack) {
+    debugPrint('Error in batch updates: $e');
+    debugPrint('Stack trace: $stack');
+    rethrow;
+  }
+}
+
+
+
+
+
 
   Future<void> _createStandardTasks(Event event, Map<String, String> staffByRole) async { // Method to create standard tasks
     final List<Map<String, dynamic>> planningTasks = [ // List of standard tasks
@@ -186,52 +337,57 @@ class TaskAutomationService {
     }
   }
 
-  Future<void> _createInventoryTasks(Event event, Map<String, String> staffByRole) async { // Method to create inventory tasks
-    for (final supply in event.supplies) { // Looping through each supply
-      final inventoryUpdates = {
-        supply.inventoryId: {
-          'quantity': supply.quantity, // Quantity of supply
-          'type': 'subtract', // Type of inventory update
-          'unit': supply.unit // Unit of supply
-        }
-      };
+  Future<void> _createInventoryTasks(Event event, Map<String, String> staffByRole) async {
+  debugPrint('Creating inventory tasks for event: ${event.id}');
+  
+  final batch = _firestore.batch();
+  int processedCount = 0;
+  
+  for (final supply in event.supplies) {
+    final inventoryUpdates = {
+      supply.inventoryId: {
+        'quantity': supply.quantity,
+        'type': 'task_inventory_update',
+        'unit': supply.unit
+      }
+    };
 
-      await _taskService.createTask( // Creating task for each supply
-        eventId: event.id,
-        name: 'Prepare ${supply.name}', // Task name
-        description: 'Prepare and allocate ${supply.quantity} ${supply.unit} of ${supply.name}', // Task description
-        dueDate: event.startDate.subtract(const Duration(days: 1)), // Due date for the task
-        priority: TaskPriority.high, // Task priority
-        assignedTo: staffByRole['inventory_manager'] ?? staffByRole['chef'] ?? '', // Assigning task to the appropriate staff
-        departmentId: 'inventory', // Department responsible
-        inventoryUpdates: inventoryUpdates, // Inventory updates
-        checklist: [ // Checklist for the task
-          'Verify current stock',
-          'Allocate required quantity',
-          'Update inventory system',
-          'Label for event',
-          'Store appropriately'
-        ],
-      );
-    }
-
-    await _taskService.createTask( // Creating post-event inventory return task
-      eventId: event.id,
-      name: 'Post-Event Inventory Update', // Task name
-      description: 'Update inventory after event completion', // Task description
-      dueDate: event.endDate.add(const Duration(hours: 2)), // Due date for the task
-      priority: TaskPriority.high, // Task priority
-      assignedTo: staffByRole['inventory_manager'] ?? '', // Assigning task to the appropriate staff
-      departmentId: 'inventory', // Department responsible
-      checklist: [ // Checklist for the task
-        'Count returned items',
-        'Document usage',
+    final docRef = _firestore.collection('tasks').doc();
+    batch.set(docRef, {
+      'eventId': event.id,
+      'name': 'Prepare ${supply.name}',
+      'description': 'Prepare and allocate ${supply.quantity} ${supply.unit} of ${supply.name}',
+      'dueDate': Timestamp.fromDate(event.startDate.subtract(const Duration(days: 1))),
+      'status': TaskStatus.pending.toString().split('.').last,
+      'priority': TaskPriority.high.toString().split('.').last,
+      'assignedTo': staffByRole['inventory_manager'] ?? staffByRole['chef'] ?? '',
+      'departmentId': 'inventory',
+      'organizationId': event.organizationId,
+      'inventoryUpdates': inventoryUpdates,
+      'checklist': [
+        'Verify current stock',
+        'Allocate required quantity',
         'Update inventory system',
-        'Report discrepancies',
-        'Restock if needed'
+        'Label for event',
+        'Store appropriately'
       ],
-    );
+      'comments': [],
+      'createdBy': FirebaseAuth.instance.currentUser?.uid ?? '',
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    processedCount++;
+    if (processedCount >= 500) {
+      await batch.commit();
+      processedCount = 0;
+    }
   }
+
+  if (processedCount > 0) {
+    await batch.commit();
+  }
+}
 
   Future<void> _createCustomTasks(Event event, Map<String, String> staffByRole) async { // Method to create custom tasks
     final metadata = event.metadata; // Getting event metadata

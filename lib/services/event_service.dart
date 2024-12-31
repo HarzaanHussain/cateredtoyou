@@ -68,27 +68,17 @@ class EventService extends ChangeNotifier {
   }
 
   Future<void> _verifyInventoryAvailability(List<EventSupply> supplies) async {
-    // Method to verify inventory availability.
-    for (final supply in supplies) {
-      // Iterating through each supply item.
-      final doc = await _firestore
-          .collection('inventory')
-          .doc(supply.inventoryId)
-          .get(); // Getting the inventory item document from Firestore.
-
-      if (!doc.exists) {
-        // If the inventory item does not exist, throw an error.
-        throw 'Supply item ${supply.name} not found';
-      }
-
-      final item = InventoryItem.fromMap(doc.data()!,
-          doc.id); // Converting Firestore document to InventoryItem object.
-      if (item.quantity < supply.quantity) {
-        // If the available quantity is less than required, throw an error.
-        throw 'Insufficient quantity available for ${supply.name}. Available: ${item.quantity} ${item.unit}';
-      }
+  for (final supply in supplies) {
+    final doc = await _firestore.collection('inventory').doc(supply.inventoryId).get();
+    if (!doc.exists) {
+      throw 'Supply item ${supply.name} not found';
+    }
+    final item = InventoryItem.fromMap(doc.data()!, doc.id);
+    if (item.quantity < supply.quantity) {
+      throw 'Insufficient quantity available for ${supply.name}. Available: ${item.quantity} ${item.unit}';
     }
   }
+}
 
   Future<void> _verifyStaffAssignment(
       String organizationId, List<AssignedStaff> staff) async {
@@ -276,7 +266,7 @@ class EventService extends ChangeNotifier {
             docRef, docData); // Setting the event document data in Firestore.
         debugPrint('Event document created'); // Printing debug message.
 
-        for (final supply in supplies) {
+        /*for (final supply in supplies) {
           // Updating inventory for each supply item.
           final inventoryRef =
               _firestore.collection('inventory').doc(supply.inventoryId);
@@ -285,9 +275,9 @@ class EventService extends ChangeNotifier {
             'quantity': FieldValue.increment(-supply.quantity),
             'updatedAt': Timestamp.fromDate(now),
             'lastModifiedBy': currentUser.uid,
-          });
+          });*/
 
-          final transactionRef =
+          /*final transactionRef =
               _firestore.collection('inventory_transactions').doc();
 
           transaction.set(transactionRef, {
@@ -299,7 +289,7 @@ class EventService extends ChangeNotifier {
             'userId': currentUser.uid,
             'organizationId': organization.id,
           });
-        }
+        }*/
 
         debugPrint(
             'Event creation completed successfully'); // Printing debug message.
@@ -330,31 +320,7 @@ class EventService extends ChangeNotifier {
           metadata: metadata?.toMap(),
         );
         await _taskAutomationService.generateTasksForEvent(eventObj);
-        return eventObj;/*(
-          // Returning the created Event object.
-          id: docRef.id,
-          name: name.trim(),
-          description: description.trim(),
-          startDate: startDate,
-          endDate: endDate,
-          location: location.trim(),
-          customerId: customerId,
-          organizationId: organization.id,
-          guestCount: guestCount,
-          minStaff: minStaff,
-          notes: notes.trim(),
-          status: EventStatus.draft,
-          startTime: startTime,
-          endTime: endTime,
-          createdBy: currentUser.uid,
-          createdAt: now,
-          updatedAt: now,
-          menuItems: menuItems,
-          supplies: supplies,
-          assignedStaff: assignedStaff,
-          totalPrice: totalPrice,
-          metadata: metadata?.toMap(),
-        );*/
+        return eventObj;
         
       });
       
@@ -454,13 +420,13 @@ class EventService extends ChangeNotifier {
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       }; // Prepare update data.
 
-      if (!listEquals(originalEvent.supplies, updatedEvent.supplies)) {
+      /*if (!listEquals(originalEvent.supplies, updatedEvent.supplies)) {
         await _firestore.runTransaction((transaction) async {
           transaction.update(
               _firestore.collection('events').doc(updatedEvent.id),
-              updateData); // Update event data in Firestore.
+              updateData);*/ // Update event data in Firestore.
 
-          for (final supply in originalEvent.supplies) {
+        /*  for (final supply in originalEvent.supplies) {
             if (!updatedEvent.supplies.contains(supply)) {
               final inventoryRef =
                   _firestore.collection('inventory').doc(supply.inventoryId);
@@ -487,12 +453,17 @@ class EventService extends ChangeNotifier {
       } else {
         await _firestore.collection('events').doc(updatedEvent.id).update(
             updateData); // If supplies didn't change, just update the event.
-      }
+      }*/
+      await _firestore.collection('events').doc(updatedEvent.id).update(
+            updateData);
 
       debugPrint(
           'Event update completed successfully'); // Log the successful completion of the update.
           // Generate new tasks based on updated event data
-      await _taskAutomationService.generateTasksForEvent(updatedEvent);
+      await _taskAutomationService.generateTasksForEvent(
+      updatedEvent,
+      originalEvent: originalEvent
+    );
       notifyListeners(); // Notify listeners about the update.
     } catch (e) {
       debugPrint('Error updating event: $e'); // Log the error.
@@ -501,110 +472,82 @@ class EventService extends ChangeNotifier {
     }
   }
 
-  /// Changes the status of an event.
-  ///
-  /// Throws an error if the user is not authenticated or the event is not found.
-  ///
-  /// If the new status is 'completed' or 'cancelled', updates the inventory accordingly.
-  ///
-  /// Notifies listeners upon successful status change.
-  Future<void> changeEventStatus(String eventId, EventStatus newStatus) async {
-    try {
-      final currentUser =
-          _auth.currentUser; // Get the current authenticated user.
-      if (currentUser == null) {
-        throw 'Not authenticated'; // Throw error if user is not authenticated.
-      }
+  
 
-      if (newStatus == EventStatus.completed ||
-          newStatus == EventStatus.cancelled) {
-        await _firestore.runTransaction((transaction) async {
-          final eventDoc = await transaction.get(_firestore
-              .collection('events')
-              .doc(eventId)); // Get the event document.
+Future<void> changeEventStatus(String eventId, EventStatus newStatus) async {
+  try {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) throw 'Not authenticated';
 
-          if (!eventDoc.exists) {
-            throw 'Event not found'; // Throw error if event is not found.
-          }
-          final event = Event.fromMap(eventDoc.data()!,
-              eventDoc.id); // Convert the document data to an Event object.
+    await _firestore.collection('events').doc(eventId).update({
+      'status': newStatus.toString().split('.').last,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
 
-          transaction.update(eventDoc.reference, {
-            'status': newStatus.toString().split('.').last,
-            'updatedAt': FieldValue.serverTimestamp(),
-          }); // Update the event status.
-
-          final now = DateTime.now();
-
-          for (final supply in event.supplies) {
-            final inventoryRef =
-                _firestore.collection('inventory').doc(supply.inventoryId);
-            transaction.update(inventoryRef, {
-              'quantity': FieldValue.increment(supply.quantity),
-              'updatedAt': now,
-              'lastModifiedBy': currentUser.uid,
-            }); // Update the inventory for each supply.
-          }
-        });
-      } else {
-        await _firestore.collection('events').doc(eventId).update({
-          'status': newStatus.toString().split('.').last,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }); // Update the event status if it's not 'completed' or 'cancelled'.
-      }
-
-      notifyListeners(); // Notify listeners about the status change.
-    } catch (e) {
-      debugPrint('Error changing event status: $e'); // Log the error.
-      rethrow; // Rethrow the error.
-    }
+    notifyListeners();
+  } catch (e) {
+    debugPrint('Error changing event status: $e');
+    rethrow;
   }
-
-  /// Deletes an event.
-  ///
-  /// Throws an error if the user is not authenticated or the event is not found.
-  ///
-  /// Updates the inventory accordingly and deletes the event document from Firestore.
-  ///
-  /// Notifies listeners upon successful deletion.
+}
+ 
   Future<void> deleteEvent(String eventId) async {
-    try {
-      final currentUser =
-          _auth.currentUser; // Get the current authenticated user.
-      if (currentUser == null) {
-        throw 'Not authenticated'; // Throw error if user is not authenticated.
-      }
+  try {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) throw 'Not authenticated';
+    
+    // Get event data first to check permissions
+    final eventDoc = await _firestore.collection('events').doc(eventId).get();
+    if (!eventDoc.exists) throw 'Event not found';
 
-      await _firestore.runTransaction((transaction) async {
-        final eventDoc = await transaction.get(_firestore
-            .collection('events')
-            .doc(eventId)); // Get the event document.
+    final eventData = eventDoc.data()!;
+    final organization = await _organizationService.getCurrentUserOrganization();
+    if (organization == null) throw 'Organization not found';
 
-        if (!eventDoc.exists) {
-          throw 'Event not found'; // Throw error if event is not found.
-        }
-        final event = Event.fromMap(eventDoc.data()!,
-            eventDoc.id); // Convert the document data to an Event object.
-
-        transaction.delete(eventDoc.reference); // Delete the event document.
-
-        final now = DateTime.now();
-
-        for (final supply in event.supplies) {
-          final inventoryRef =
-              _firestore.collection('inventory').doc(supply.inventoryId);
-          transaction.update(inventoryRef, {
-            'quantity': FieldValue.increment(supply.quantity),
-            'updatedAt': now,
-            'lastModifiedBy': currentUser.uid,
-          }); // Update the inventory for each supply.
-        }
-      });
-
-      notifyListeners(); // Notify listeners about the deletion.
-    } catch (e) {
-      debugPrint('Error deleting event: $e'); // Log the error.
-      rethrow; // Rethrow the error.
+    // Check if user belongs to the same organization as the event
+    if (eventData['organizationId'] != organization.id) {
+      throw 'Event belongs to a different organization';
     }
+
+    // Check if user has permission to delete the event
+    final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+    if (!userDoc.exists) throw 'User not found';
+    
+    final userRole = userDoc.data()?['role'] as String?;
+    final creatorId = eventData['createdBy'] as String?;
+
+    // Verify user has management role or created the event
+    final hasPermission = ['admin', 'client', 'manager'].contains(userRole) || 
+                          creatorId == currentUser.uid;
+    if (!hasPermission) {
+      throw 'Insufficient permissions to delete event';
+    }
+
+    // Use batch to perform all deletions atomically
+    final batch = _firestore.batch();
+
+    // Get all tasks related to this event
+    final tasksSnapshot = await _firestore
+        .collection('tasks')
+        .where('eventId', isEqualTo: eventId)
+        .where('organizationId', isEqualTo: organization.id) // Add organization filter
+        .get();
+
+    // Add task deletions to batch
+    for (var taskDoc in tasksSnapshot.docs) {
+      batch.delete(taskDoc.reference);
+    }
+
+    // Add event deletion to batch
+    batch.delete(eventDoc.reference);
+
+    // Commit all deletions
+    await batch.commit();
+
+    notifyListeners();
+  } catch (e) {
+    debugPrint('Error deleting event and related tasks: $e');
+    rethrow;
   }
+}
 }

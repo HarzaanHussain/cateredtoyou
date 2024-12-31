@@ -1,5 +1,6 @@
 import 'package:cateredtoyou/views/tasks/manage_task_screen.dart';
 import 'package:cateredtoyou/views/tasks/task_detail_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -337,76 +338,106 @@ class _TaskListState extends State<_TaskList> {
 /// status, and progress if the task has a checklist. It also navigates to the
 /// task detail screen when tapped.
 class TaskCard extends StatelessWidget {
-  final Task task; // The task to be displayed in the card.
+  final Task task;
 
-  const TaskCard({super.key, required this.task}); // Constructor for TaskCard.
+  const TaskCard({super.key, required this.task});
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 2, // Elevation of the card.
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8), // Margin around the card.
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: InkWell(
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => TaskDetailScreen(task: task), // Navigate to task detail screen on tap.
+              builder: (context) => TaskDetailScreen(task: task),
             ),
           );
         },
         child: Padding(
-          padding: const EdgeInsets.all(16), // Padding inside the card.
+          padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          task.name, // Display task name.
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold, // Bold text for task name.
-                          ),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                task.name,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            if (task.eventId.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              FutureBuilder<DocumentSnapshot>(
+                                future: FirebaseFirestore.instance
+                                    .collection('events')
+                                    .doc(task.eventId)
+                                    .get(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasData && snapshot.data!.exists) {
+                                    final eventData = snapshot.data!.data() as Map<String, dynamic>;
+                                    return Text(
+                                      '[${eventData['name'] + '\'s Event'?? 'Unknown Event'}]',
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        color: Colors.blue[700],
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
+                            ],
+                          ],
                         ),
-                        const SizedBox(height: 4), // Space between task name and description.
+                        const SizedBox(height: 4),
                         Text(
-                          task.description, // Display task description.
-                          maxLines: 2, // Limit description to 2 lines.
-                          overflow: TextOverflow.ellipsis, // Ellipsis for overflow text.
+                          task.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600], // Grey color for description text.
+                            color: Colors.grey[600],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8), // Space between description and priority indicator.
-                  _buildPriorityIndicator(), // Build priority indicator widget.
+                  const SizedBox(width: 8),
+                  _buildPriorityIndicator(),
                 ],
               ),
-              const SizedBox(height: 12), // Space between priority indicator and due date/status row.
+              const SizedBox(height: 12),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween, // Space between due date and status chip.
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildDueDate(), // Build due date widget.
-                  _buildStatusChip(), // Build status chip widget.
+                  _buildDueDate(),
+                  _buildStatusChip(),
                 ],
               ),
               if (task.checklist.isNotEmpty) ...[
-                const SizedBox(height: 12), // Space between status chip and progress indicator.
-                _buildProgressIndicator(), // Build progress indicator widget.
+                const SizedBox(height: 12),
+                _buildProgressIndicator(),
               ],
             ],
           ),
         ),
       ),
     );
+  
   }
+  
 
   /// Builds the priority indicator widget.
   Widget _buildPriorityIndicator() {
