@@ -1,19 +1,19 @@
 import 'package:cateredtoyou/models/event_model.dart';
 import 'package:cateredtoyou/models/inventory_item_model.dart'; // Importing InventoryItem model
-import 'package:cateredtoyou/models/menu_item_model.dart';
+import 'package:cateredtoyou/models/menu_item_model.dart'; // Importing MenuItem model
 import 'package:cateredtoyou/models/user_model.dart'; // Importing User model
-import 'package:cateredtoyou/views/events/event_details_screen.dart';
-import 'package:cateredtoyou/views/events/event_edit_screen.dart';
-import 'package:cateredtoyou/views/events/event_list_screen.dart';
+import 'package:cateredtoyou/views/events/event_details_screen.dart'; // Importing EventDetailsScreen widget
+import 'package:cateredtoyou/views/events/event_edit_screen.dart'; // Importing EventEditScreen widget
+import 'package:cateredtoyou/views/events/event_list_screen.dart'; // Importing EventListScreen widget
 import 'package:cateredtoyou/views/inventory/inventory_edit_screen.dart'; // Importing InventoryEditScreen widget
 import 'package:cateredtoyou/views/inventory/inventory_list_screen.dart'; // Importing InventoryListScreen widget
-import 'package:cateredtoyou/views/menu_item/menu_item_edit_screen.dart';
-import 'package:cateredtoyou/views/menu_item/menu_item_list_screen.dart';
+import 'package:cateredtoyou/views/menu_item/menu_item_edit_screen.dart'; // Importing MenuItemEditScreen widget
+import 'package:cateredtoyou/views/menu_item/menu_item_list_screen.dart'; // Importing MenuItemListScreen widget
 import 'package:cateredtoyou/views/staff/add_staff_screen.dart'; // Importing AddStaffScreen widget
 import 'package:cateredtoyou/views/staff/edit_staff_screen.dart'; // Importing EditStaffScreen widget
 import 'package:cateredtoyou/views/staff/staff_list_screen.dart'; // Importing StaffListScreen widget
-import 'package:cateredtoyou/views/tasks/manage_task_screen.dart';
-import 'package:cateredtoyou/views/tasks/task_list_screen.dart';
+import 'package:cateredtoyou/views/tasks/manage_task_screen.dart'; // Importing ManageTasksScreen widget
+import 'package:cateredtoyou/views/tasks/task_list_screen.dart';// Importing TaskListScreen widget
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components
 import 'package:go_router/go_router.dart'; // Importing GoRouter package for routing
 import 'package:cateredtoyou/models/auth_model.dart'; // Importing AuthModel for authentication state

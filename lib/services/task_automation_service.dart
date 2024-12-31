@@ -340,52 +340,56 @@ Future<void> _processBatchUpdates(Event newEvent, Event oldEvent, Map<String, St
   Future<void> _createInventoryTasks(Event event, Map<String, String> staffByRole) async {
   debugPrint('Creating inventory tasks for event: ${event.id}');
   
-  final batch = _firestore.batch();
-  int processedCount = 0;
-  
   for (final supply in event.supplies) {
-    final inventoryUpdates = {
-      supply.inventoryId: {
-        'quantity': supply.quantity,
-        'type': 'task_inventory_update',
-        'unit': supply.unit
-      }
-    };
-
-    final docRef = _firestore.collection('tasks').doc();
-    batch.set(docRef, {
-      'eventId': event.id,
-      'name': 'Prepare ${supply.name}',
-      'description': 'Prepare and allocate ${supply.quantity} ${supply.unit} of ${supply.name}',
-      'dueDate': Timestamp.fromDate(event.startDate.subtract(const Duration(days: 1))),
-      'status': TaskStatus.pending.toString().split('.').last,
-      'priority': TaskPriority.high.toString().split('.').last,
-      'assignedTo': staffByRole['inventory_manager'] ?? staffByRole['chef'] ?? '',
-      'departmentId': 'inventory',
-      'organizationId': event.organizationId,
-      'inventoryUpdates': inventoryUpdates,
-      'checklist': [
-        'Verify current stock',
-        'Allocate required quantity',
-        'Update inventory system',
-        'Label for event',
-        'Store appropriately'
+    // Create preparation task (taking items from inventory)
+    await _taskService.createTask(
+      eventId: event.id,
+      name: 'Prepare ${supply.name}',
+      description: 'Allocate ${supply.quantity} ${supply.unit} of ${supply.name} for event',
+      dueDate: event.startDate.subtract(const Duration(days: 1)),
+      priority: TaskPriority.high,
+      assignedTo: staffByRole['inventory_manager'] ?? staffByRole['chef'] ?? '',
+      departmentId: 'inventory',
+      checklist: [
+        '[ ] Verify current stock',
+        '[ ] Check item condition',
+        '[ ] Allocate required quantity',
+        '[ ] Update inventory system',
+        '[ ] Label for event'
       ],
-      'comments': [],
-      'createdBy': FirebaseAuth.instance.currentUser?.uid ?? '',
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+      inventoryUpdates: {
+        supply.inventoryId: {
+          'quantity': supply.quantity,
+          'type': 'remove',
+          'unit': supply.unit
+        }
+      }
+    );
 
-    processedCount++;
-    if (processedCount >= 500) {
-      await batch.commit();
-      processedCount = 0;
-    }
-  }
-
-  if (processedCount > 0) {
-    await batch.commit();
+    // Create return task (putting items back in inventory)
+    await _taskService.createTask(
+      eventId: event.id,
+      name: 'Return ${supply.name}',
+      description: 'Return ${supply.quantity} ${supply.unit} of ${supply.name} to inventory after event',
+      dueDate: event.endDate.add(const Duration(hours: 2)),
+      priority: TaskPriority.high,
+      assignedTo: staffByRole['inventory_manager'] ?? staffByRole['chef'] ?? '',
+      departmentId: 'inventory',
+      checklist: [
+        '[ ] Collect all items',
+        '[ ] Check for damages',
+        '[ ] Clean if necessary',
+        '[ ] Return to storage',
+        '[ ] Update inventory record'
+      ],
+      inventoryUpdates: {
+        supply.inventoryId: {
+          'quantity': supply.quantity,
+          'type': 'add',
+          'unit': supply.unit
+        }
+      }
+    );
   }
 }
 

@@ -148,48 +148,89 @@ class TaskService extends ChangeNotifier { // TaskService class extends ChangeNo
     final taskDoc = await _firestore.collection('tasks').doc(taskId).get();
     if (!taskDoc.exists) throw 'Task not found';
     
-    final task = Task.fromMap(taskDoc.data()!, taskId);
-    final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+    final taskData = taskDoc.data()!;
+    final task = Task.fromMap(taskData, taskId);
+
+    debugPrint('Current task status: ${task.status}, New status: $newStatus');
+    debugPrint('Task has inventory updates: ${taskData['inventoryUpdates'] != null}');
     
-    if (task.assignedTo != currentUser.uid && 
-        !['client', 'admin', 'manager'].contains(userDoc.data()?['role'])) {
-      throw 'Insufficient permissions to update task';
+    // If task has inventory updates, log them
+    if (taskData['inventoryUpdates'] != null) {
+      debugPrint('Inventory updates data: ${taskData['inventoryUpdates']}');
     }
 
-    // First check if the status transition is valid
-    if (!_isValidStatusTransition(task.status, newStatus)) {
-      throw 'Invalid status transition';
-    }
-
-    // Then handle completion status check
-    if (newStatus == TaskStatus.completed && 
-        !_areAllChecklistItemsComplete(task.checklist)) {
+    // First check if all checklist items are complete
+    if (newStatus == TaskStatus.completed && !_areAllChecklistItemsComplete(task.checklist)) {
       throw 'Cannot mark task as completed until all checklist items are done';
     }
 
-    // Allow blocked and cancelled states regardless of checklist
-    if (newStatus == TaskStatus.blocked || newStatus == TaskStatus.cancelled) {
-      await taskDoc.reference.update({
-        'status': newStatus.toString().split('.').last,
-        'updatedAt': FieldValue.serverTimestamp(),
+    // Process inventory updates first if task is being completed
+    if (newStatus == TaskStatus.completed && taskData['inventoryUpdates'] != null) {
+      debugPrint('Processing inventory updates for completed task');
+      
+      await _firestore.runTransaction((transaction) async {
+        for (final entry in (taskData['inventoryUpdates'] as Map<String, dynamic>).entries) {
+          final inventoryId = entry.key;
+          final updateData = entry.value as Map<String, dynamic>;
+          final quantity = updateData['quantity'] as num;
+          final type = updateData['type'] as String;
+
+          debugPrint('Processing inventory item: $inventoryId');
+          debugPrint('Update type: $type, Quantity: $quantity');
+
+          final inventoryRef = _firestore.collection('inventory').doc(inventoryId);
+          final inventoryDoc = await transaction.get(inventoryRef);
+
+          if (!inventoryDoc.exists) {
+            throw 'Inventory item $inventoryId not found';
+          }
+
+          final currentQuantity = inventoryDoc.data()?['quantity'] ?? 0;
+          final quantityChange = type == 'add' ? quantity : -quantity;
+          final newQuantity = currentQuantity + quantityChange;
+
+          debugPrint('Current quantity: $currentQuantity, New quantity: $newQuantity');
+
+          if (newQuantity < 0) {
+            throw 'Cannot reduce inventory below 0';
+          }
+
+          // Update inventory quantity
+          transaction.update(inventoryRef, {
+            'quantity': newQuantity,
+            'updatedAt': FieldValue.serverTimestamp(),
+            'lastModifiedBy': currentUser.uid,
+          });
+
+          // Record the transaction
+          final transactionRef = _firestore.collection('inventory_transactions').doc();
+          transaction.set(transactionRef, {
+            'itemId': inventoryId,
+            'eventId': task.eventId,
+            'taskId': taskId,
+            'type': 'task_inventory_update',
+            'quantity': quantity,
+            'previousQuantity': currentQuantity,
+            'newQuantity': newQuantity,
+            'difference': quantityChange,
+            'updateType': type,
+            'timestamp': FieldValue.serverTimestamp(),
+            'userId': currentUser.uid,
+            'organizationId': task.organizationId,
+            'notes': 'Inventory ${type == "add" ? "returned" : "allocated"} via task completion',
+          });
+        }
+
+        // Update task status in the same transaction
+        transaction.update(taskDoc.reference, {
+          'status': newStatus.toString().split('.').last,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
       });
     } else {
-      // For other states, determine based on checklist
-      final appropriateStatus = _determineStatus(task.checklist, newStatus);
-      
-      // Verify the determined status transition is valid
-      if (!_isValidStatusTransition(task.status, appropriateStatus)) {
-        throw 'Invalid status transition based on checklist state';
-      }
-
-      // If task is being completed and has inventory updates, process them
-      if (appropriateStatus == TaskStatus.completed && task.inventoryUpdates != null) {
-          debugPrint('Task completed with inventory updates: ${task.inventoryUpdates}');
-        await _processInventoryUpdates(task, currentUser.uid);
-      }
-
+      // If no inventory updates or task not being completed, just update status
       await taskDoc.reference.update({
-        'status': appropriateStatus.toString().split('.').last,
+        'status': newStatus.toString().split('.').last,
         'updatedAt': FieldValue.serverTimestamp(),
       });
     }
@@ -201,115 +242,74 @@ class TaskService extends ChangeNotifier { // TaskService class extends ChangeNo
   }
 }
 
-   /*Future<void> updateTaskStatus(String taskId, TaskStatus newStatus) async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) throw 'Not authenticated';
-
-      final taskDoc = await _firestore.collection('tasks').doc(taskId).get();
-      if (!taskDoc.exists) throw 'Task not found';
-      
-      final task = Task.fromMap(taskDoc.data()!, taskId);
-      final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
-      
-      if (task.assignedTo != currentUser.uid && 
-          !['client', 'admin', 'manager'].contains(userDoc.data()?['role'])) {
-        throw 'Insufficient permissions to update task';
-      }
-
-      // First check if the status transition is valid
-      if (!_isValidStatusTransition(task.status, newStatus)) {
-        throw 'Invalid status transition';
-      }
-
-      // Then handle completion status check
-      if (newStatus == TaskStatus.completed && 
-          !_areAllChecklistItemsComplete(task.checklist)) {
-        throw 'Cannot mark task as completed until all checklist items are done';
-      }
-
-      // Allow blocked and cancelled states regardless of checklist
-      if (newStatus == TaskStatus.blocked || newStatus == TaskStatus.cancelled) {
-        await taskDoc.reference.update({
-          'status': newStatus.toString().split('.').last,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      } else {
-        // For other states, determine based on checklist
-        final appropriateStatus = _determineStatus(task.checklist, newStatus);
-        // Verify the determined status transition is valid
-        if (!_isValidStatusTransition(task.status, appropriateStatus)) {
-          throw 'Invalid status transition based on checklist state';
-        }
-        await taskDoc.reference.update({
-          'status': appropriateStatus.toString().split('.').last,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      }
-
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Error updating task status: $e');
-      rethrow;
-    }
-  }*/
+ 
  Future<void> _processInventoryUpdates(Task task, String userId) async {
-  debugPrint('Processing inventory updates for task: ${task.id}'); // Add debug logging
-  debugPrint('Inventory updates data: ${task.inventoryUpdates}'); // Add debug logging
+  debugPrint('Starting inventory updates for task: ${task.id}');
+  debugPrint('Inventory updates data: ${task.inventoryUpdates}');
   
   try {
-    final batch = _firestore.batch();
-    final now = DateTime.now();
-
     if (task.inventoryUpdates == null || task.inventoryUpdates!.isEmpty) {
       debugPrint('No inventory updates found for task');
       return;
     }
 
-    for (final entry in task.inventoryUpdates!.entries) {
-      final inventoryId = entry.key;
-      debugPrint('Processing inventory item: $inventoryId'); // Add debug logging
-      
-      final updateData = entry.value as Map<String, dynamic>;
-      final quantity = updateData['quantity'] as num;
-      final type = updateData['type'] as String;
+    await _firestore.runTransaction((transaction) async {
+      for (final entry in task.inventoryUpdates!.entries) {
+        final inventoryId = entry.key;
+        final updateData = entry.value as Map<String, dynamic>;
+        final quantity = updateData['quantity'] as num;
+        final type = updateData['type'] as String;
 
-      final inventoryRef = _firestore.collection('inventory').doc(inventoryId);
-      final inventoryDoc = await inventoryRef.get();
+        debugPrint('Processing inventory item: $inventoryId');
+        debugPrint('Update type: $type, Quantity: $quantity');
 
-      if (!inventoryDoc.exists) {
-        throw 'Inventory item $inventoryId not found';
+        final inventoryRef = _firestore.collection('inventory').doc(inventoryId);
+        final inventoryDoc = await transaction.get(inventoryRef);
+
+        if (!inventoryDoc.exists) {
+          throw 'Inventory item $inventoryId not found';
+        }
+
+        final currentQuantity = inventoryDoc.data()?['quantity'] ?? 0;
+        debugPrint('Current quantity: $currentQuantity');
+
+        final quantityChange = type == 'add' ? quantity : -quantity;
+        final newQuantity = currentQuantity + quantityChange;
+
+        if (newQuantity < 0) {
+          throw 'Cannot reduce inventory below 0. Current: $currentQuantity, Change: $quantityChange';
+        }
+
+        debugPrint('Updating quantity from $currentQuantity to $newQuantity');
+        
+        // Update inventory quantity
+        transaction.update(inventoryRef, {
+          'quantity': newQuantity,
+          'updatedAt': Timestamp.fromDate(DateTime.now()),
+          'lastModifiedBy': userId,
+        });
+
+        // Record the transaction
+        final transactionRef = _firestore.collection('inventory_transactions').doc();
+        transaction.set(transactionRef, {
+          'itemId': inventoryId,
+          'eventId': task.eventId,
+          'taskId': task.id,
+          'type': 'task_inventory_update',
+          'quantity': quantity,
+          'previousQuantity': currentQuantity,
+          'newQuantity': newQuantity,
+          'difference': quantityChange,
+          'updateType': type,
+          'timestamp': FieldValue.serverTimestamp(),
+          'userId': userId,
+          'organizationId': task.organizationId,
+          'notes': 'Inventory ${type == "add" ? "returned" : "allocated"} via task completion'
+        });
       }
+    });
 
-      // Calculate the quantity change based on the update type
-      final quantityChange = type == 'add' ? quantity : -quantity;
-      debugPrint('Applying quantity change: $quantityChange'); // Add debug logging
-
-      batch.update(inventoryRef, {
-        'quantity': FieldValue.increment(quantityChange),
-        'updatedAt': Timestamp.fromDate(now),
-        'lastModifiedBy': userId,
-      });
-
-      // Create inventory transaction record
-      final transactionRef = _firestore.collection('inventory_transactions').doc();
-      batch.set(transactionRef, {
-        'itemId': inventoryId,
-        'eventId': task.eventId,
-        'taskId': task.id,
-        'type': 'task_inventory_update',
-        'quantity': quantity,
-        'timestamp': Timestamp.fromDate(now),
-        'userId': userId,
-        'organizationId': task.organizationId,
-        'notes': 'Inventory ${type == "add" ? "added" : "removed"} via task completion',
-        'previousQuantity': inventoryDoc.data()?['quantity'] ?? 0,  // Add this for consistency
-        'difference': -quantity,  // Add this for consistency
-      });
-    }
-
-    await batch.commit();
-    debugPrint('Inventory updates completed successfully'); // Add debug logging
+    debugPrint('Inventory updates completed successfully');
   } catch (e) {
     debugPrint('Error processing inventory updates: $e');
     rethrow;

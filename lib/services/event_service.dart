@@ -265,31 +265,7 @@ class EventService extends ChangeNotifier {
         transaction.set(
             docRef, docData); // Setting the event document data in Firestore.
         debugPrint('Event document created'); // Printing debug message.
-
-        /*for (final supply in supplies) {
-          // Updating inventory for each supply item.
-          final inventoryRef =
-              _firestore.collection('inventory').doc(supply.inventoryId);
-
-          transaction.update(inventoryRef, {
-            'quantity': FieldValue.increment(-supply.quantity),
-            'updatedAt': Timestamp.fromDate(now),
-            'lastModifiedBy': currentUser.uid,
-          });*/
-
-          /*final transactionRef =
-              _firestore.collection('inventory_transactions').doc();
-
-          transaction.set(transactionRef, {
-            'itemId': supply.inventoryId,
-            'eventId': docRef.id,
-            'type': 'reservation',
-            'quantity': supply.quantity,
-            'timestamp': Timestamp.fromDate(now),
-            'userId': currentUser.uid,
-            'organizationId': organization.id,
-          });
-        }*/
+       
 
         debugPrint(
             'Event creation completed successfully'); // Printing debug message.
@@ -420,40 +396,6 @@ class EventService extends ChangeNotifier {
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       }; // Prepare update data.
 
-      /*if (!listEquals(originalEvent.supplies, updatedEvent.supplies)) {
-        await _firestore.runTransaction((transaction) async {
-          transaction.update(
-              _firestore.collection('events').doc(updatedEvent.id),
-              updateData);*/ // Update event data in Firestore.
-
-        /*  for (final supply in originalEvent.supplies) {
-            if (!updatedEvent.supplies.contains(supply)) {
-              final inventoryRef =
-                  _firestore.collection('inventory').doc(supply.inventoryId);
-              transaction.update(inventoryRef, {
-                'quantity': FieldValue.increment(supply.quantity),
-                'updatedAt': DateTime.now(),
-                'lastModifiedBy': currentUser.uid,
-              }); // Handle returned supplies.
-            }
-          }
-
-          for (final supply in updatedEvent.supplies) {
-            if (!originalEvent.supplies.contains(supply)) {
-              final inventoryRef =
-                  _firestore.collection('inventory').doc(supply.inventoryId);
-              transaction.update(inventoryRef, {
-                'quantity': FieldValue.increment(-supply.quantity),
-                'updatedAt': DateTime.now(),
-                'lastModifiedBy': currentUser.uid,
-              }); // Handle new supplies.
-            }
-          }
-        });
-      } else {
-        await _firestore.collection('events').doc(updatedEvent.id).update(
-            updateData); // If supplies didn't change, just update the event.
-      }*/
       await _firestore.collection('events').doc(updatedEvent.id).update(
             updateData);
 
