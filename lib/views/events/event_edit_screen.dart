@@ -1,5 +1,6 @@
 
 import 'package:cateredtoyou/models/customer_model.dart'; // Importing the customer model.
+import 'package:cateredtoyou/widgets/event_metadata_selection.dart';
 import 'package:cateredtoyou/widgets/staff_assignment.dart'; // Importing the staff assignment widget.
 import 'package:cloud_firestore/cloud_firestore.dart'; // Importing Firestore for database operations.
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
@@ -17,6 +18,7 @@ import 'package:cateredtoyou/widgets/add_customer_dialog.dart'; // Importing add
 
 class EventEditScreen extends StatefulWidget {
   final Event? event; // Event object to edit, if null, a new event is created.
+  
 
   const EventEditScreen({
     super.key, // Key for the widget.
@@ -48,6 +50,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
   bool _isLoading = false; // Loading state for the form submission.
   String? _error; // Error message for form submission.
   double _totalPrice = 0.0; // Total price of the event.
+  EventMetadata? _metadata; // Metadata for the event.
 
   @override
   void initState() {
@@ -69,6 +72,9 @@ class _EventEditScreenState extends State<EventEditScreen> {
       _selectedSupplies = List.from(event.supplies); // Setting the selected supplies.
       _totalPrice = event.totalPrice; // Setting the total price.
       _assignedStaff = List.from(event.assignedStaff); // Setting the assigned staff.
+      _metadata = event.metadata != null  // Setting the metadata.
+      ? EventMetadata.fromMap(event.metadata!)  
+      : null; 
     } else {
       _startDate = DateTime.now().add(const Duration(days: 1)); // Default start date.
       _endDate = DateTime.now().add(const Duration(days: 1)); // Default end date.
@@ -230,6 +236,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
           menuItems: _selectedMenuItems,
           supplies: _selectedSupplies,
           assignedStaff: _assignedStaff,
+          metadata: _metadata,
         );
       } else {
         final updatedEvent = widget.event!.copyWith(
@@ -248,6 +255,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
           supplies: _selectedSupplies,
           assignedStaff: _assignedStaff,
           totalPrice: _totalPrice,
+          metadata: _metadata?.toMap(),
         );
 
         await eventService.updateEvent(updatedEvent); // Updating the event in the database.
@@ -635,9 +643,20 @@ class _EventEditScreenState extends State<EventEditScreen> {
                             ),
                           ),
                         ),
+                       
 
                       /// A SizedBox widget to add vertical spacing of 24 pixels.
                       const SizedBox(height: 24),
+
+                       EventMetadataSection( // EventMetadataSection widget to display event metadata.
+  initialMetadata: _metadata, // Initial metadata.
+  onMetadataChanged: (metadata) { // Callback to update the metadata.
+    setState(() { // Updating the state.
+      _metadata = metadata; // Setting the metadata.
+    });
+  },
+),
+const SizedBox(height: 24), // A SizedBox widget to add vertical spacing of 24 pixels.
 
                       /// A CustomButton widget to submit the form.
                       CustomButton(

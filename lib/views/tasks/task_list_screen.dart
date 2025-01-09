@@ -344,98 +344,97 @@ class TaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      child: InkWell(
+    return Card( // Creates a card widget to display the task.
+      elevation: 2, // Sets the elevation of the card to give it a shadow effect.
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8), // Sets the margin around the card.
+      child: InkWell( // Makes the card tappable.
         onTap: () {
-          Navigator.push(
+          Navigator.push( // Navigates to the TaskDetailScreen when the card is tapped.
             context,
             MaterialPageRoute(
-              builder: (context) => TaskDetailScreen(task: task),
+              builder: (context) => TaskDetailScreen(task: task), // Passes the task to the TaskDetailScreen.
             ),
           );
         },
-        child: Padding(
+        child: Padding( // Adds padding inside the card.
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column( // Arranges the child widgets in a column.
+            crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row( // Arranges the child widgets in a row.
+                crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the row.
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  Expanded( // Expands the child widget to fill the available space.
+                    child: Column( // Arranges the child widgets in a column.
+                      crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
                       children: [
-                        Row(
+                        Row( // Arranges the child widgets in a row.
                           children: [
-                            Flexible(
+                            Flexible( // Makes the child widget flexible to avoid overflow.
                               child: Text(
-                                task.name,
+                                task.name, // Displays the task name.
                                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.bold, // Sets the text style to bold.
                                 ),
                               ),
                             ),
-                            if (task.eventId.isNotEmpty) ...[
-                              const SizedBox(width: 8),
+                            if (task.eventId.isNotEmpty) ...[ // Checks if the task is associated with an event.
+                              const SizedBox(width: 8), // Adds space between the task name and event name.
                               FutureBuilder<DocumentSnapshot>(
                                 future: FirebaseFirestore.instance
                                     .collection('events')
                                     .doc(task.eventId)
-                                    .get(),
+                                    .get(), // Fetches the event details from Firestore.
                                 builder: (context, snapshot) {
                                   if (snapshot.hasData && snapshot.data!.exists) {
                                     final eventData = snapshot.data!.data() as Map<String, dynamic>;
                                     return Text(
-                                      '[${eventData['name'] + '\'s Event'?? 'Unknown Event'}]',
+                                      '[${eventData['name'] + '\'s Event'?? 'Unknown Event'}]', // Displays the event name.
                                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        color: Colors.blue[700],
-                                        fontWeight: FontWeight.w700,
+                                        color: Colors.blue[700], // Sets the text color to blue.
+                                        fontWeight: FontWeight.w700, // Sets the text style to bold.
                                       ),
                                     );
                                   }
-                                  return const SizedBox.shrink();
+                                  return const SizedBox.shrink(); // Returns an empty widget if the event does not exist.
                                 },
                               ),
                             ],
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 4), // Adds space between the task name and description.
                         Text(
-                          task.description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          task.description, // Displays the task description.
+                          maxLines: 2, // Limits the description to 2 lines.
+                          overflow: TextOverflow.ellipsis, // Adds ellipsis if the description overflows.
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
+                            color: Colors.grey[600], // Sets the text color to grey.
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  _buildPriorityIndicator(),
+                  const SizedBox(width: 8), // Adds space between the description and priority indicator.
+                  _buildPriorityIndicator(), // Builds the priority indicator widget.
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 12), // Adds space between the priority indicator and due date/status row.
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween, // Spaces the due date and status chip evenly.
                 children: [
-                  _buildDueDate(),
-                  _buildStatusChip(),
+                  _buildDueDate(), // Builds the due date widget.
+                  _buildStatusChip(), // Builds the status chip widget.
                 ],
               ),
-              if (task.checklist.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _buildProgressIndicator(),
+              if (task.checklist.isNotEmpty) ...[ // Checks if the task has a checklist.
+                const SizedBox(height: 12), // Adds space between the status chip and progress indicator.
+                _buildProgressIndicator(), // Builds the progress indicator widget.
               ],
             ],
           ),
         ),
       ),
     );
-  
   }
   
 
