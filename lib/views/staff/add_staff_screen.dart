@@ -70,7 +70,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
         firstName: _firstNameController.text.trim(), // Get the trimmed first name from the controller
         lastName: _lastNameController.text.trim(), // Get the trimmed last name from the controller
         phoneNumber: _phoneController.text.trim(), // Get the trimmed phone number from the controller
-        role: _selectedRole, // Get the selected role
+        role: _selectedRole,  // Get the selected role
       );
 
       if (!mounted) return; // Check if the widget is still mounted
