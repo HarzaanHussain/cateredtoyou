@@ -1,7 +1,9 @@
-import 'package:cateredtoyou/services/event_service.dart';
-import 'package:cateredtoyou/services/menu_item_service.dart';
-import 'package:cateredtoyou/services/task_automation_service.dart';
-import 'package:cateredtoyou/services/task_service.dart';
+import 'package:cateredtoyou/services/event_service.dart';// Import EventService for event-related operations
+import 'package:cateredtoyou/services/menu_item_service.dart'; // Import MenuItemService for menu item-related operations
+import 'package:cateredtoyou/services/task_automation_service.dart'; // Import TaskAutomationService for task automation operations
+import 'package:cateredtoyou/services/task_service.dart'; // Import TaskService for task-related operations
+import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth package for Firebase authentication
+import 'package:firebase_core/firebase_core.dart';// Import Firebase core package for Firebase initialization
 import 'package:flutter/material.dart'; // Import Flutter material package for UI components
 import 'package:provider/provider.dart'; // Import provider package for state management
 import 'package:cateredtoyou/models/auth_model.dart'; // Import AuthModel for authentication state
@@ -13,10 +15,34 @@ import 'package:cateredtoyou/services/role_permissions.dart'; // Import RolePerm
 import 'package:cateredtoyou/services/inventory_service.dart'; // Import InventoryService for inventory-related operations
 import 'package:cateredtoyou/services/customer_service.dart'; // Import CustomerService for customer-related operations
 
+// Class to handle secondary Firebase app initialization
+class FirebaseSecondary {
+  static late FirebaseApp secondaryApp; // Secondary Firebase app instance
+  static late FirebaseAuth secondaryAuth; // Secondary FirebaseAuth instance
+  
+  // Method to initialize the secondary Firebase app
+  static Future<void> initializeSecondary() async {
+    try {
+      // Try to initialize the secondary Firebase app with the same options as the primary app
+      secondaryApp = await Firebase.initializeApp(
+        name: 'Secondary',
+        options: Firebase.app().options,
+      );
+      // Get the FirebaseAuth instance for the secondary app
+      secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+    } catch (e) {
+      // If the secondary app is already initialized, get its instance
+      secondaryApp = Firebase.app('Secondary');
+      secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+    }
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding
       .ensureInitialized(); // Ensure Flutter binding is initialized before running the app
   await FirebaseService.initialize(); // Initialize Firebase services
+   await FirebaseSecondary.initializeSecondary(); // Initialize secondary Firebase app
   runApp(const MyApp()); // Run the MyApp widget
 }
 

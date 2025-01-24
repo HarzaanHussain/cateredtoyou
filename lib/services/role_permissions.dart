@@ -112,6 +112,7 @@
         'view_menu',
       ],
       'manager': [
+        'manage_staff',
         'view_staff',
         'manage_events',
         'view_events',

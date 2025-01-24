@@ -370,37 +370,7 @@ class TaskService extends ChangeNotifier { // TaskService class extends ChangeNo
     }).whereType<TaskComment>().toList(); // Filter out null comments and return the list of TaskComment objects
   }
   
-  // Update task checklist
-  /*Future<void> updateTaskChecklist(String taskId, List<String> checklist) async {
-  try {
-    // Debug print
-    debugPrint('Updating checklist: $checklist'); // Print the checklist being updated
-    
-    final currentUser = _auth.currentUser; // Get the current authenticated user
-    if (currentUser == null) throw 'Not authenticated'; // Throw an error if no user is authenticated
-
-    final taskDoc = await _firestore.collection('tasks').doc(taskId).get(); // Get the task document
-    if (!taskDoc.exists) throw 'Task not found'; // Throw an error if task document does not exist
-
-    // Ensure all checklist items are properly formatted
-    final formattedChecklist = checklist.map((item) {
-      if (!item.startsWith('[')) { // If the checklist item does not start with '['
-        return '[ ] $item'; // Add '[ ] ' to the beginning of the item
-      }
-      return item; // Return the item as is if it is already formatted
-    }).toList();
-
-    await _firestore.collection('tasks').doc(taskId).update({
-      'checklist': formattedChecklist, // Update the task checklist
-      'updatedAt': FieldValue.serverTimestamp(), // Update the last updated date and time
-    });
-
-    notifyListeners(); // Notify listeners of changes
-  } catch (e) {
-    debugPrint('Error updating task checklist: $e'); // Print error message if updating checklist fails
-    rethrow; // Rethrow the error
-  }
-}*/
+ 
  Future<void> updateTaskChecklist(String taskId, List<String> checklist) async {
     try {
       final currentUser = _auth.currentUser;
