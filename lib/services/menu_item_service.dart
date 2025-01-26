@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart'; // Importing foundation package for Ch
 import 'package:cloud_firestore/cloud_firestore.dart'; // Importing Firestore package for database operations
 import 'package:firebase_auth/firebase_auth.dart'; // Importing Firebase Auth package for authentication
 import 'package:cateredtoyou/models/menu_item_model.dart'; // Importing MenuItem model
+import 'package:cateredtoyou/models/task_model.dart'; // Importing Task model
 import 'package:cateredtoyou/services/organization_service.dart'; // Importing OrganizationService for organization-related operations
 
 // MenuItemService class extends ChangeNotifier to provide state management
@@ -45,10 +46,10 @@ class MenuItemService extends ChangeNotifier {
           final items = snapshot.docs
               .map((doc) => MenuItem.fromMap(doc.data(), doc.id))
               .toList();
-          
+
           // Sort the menu items by name
           items.sort((a, b) => a.name.compareTo(b.name));
-          
+
           return items;
         } catch (e) {
           debugPrint('Error mapping menu items: $e'); // Print error if mapping fails
@@ -66,8 +67,10 @@ class MenuItemService extends ChangeNotifier {
     required String name, // Name of the menu item
     required String description, // Description of the menu item
     required MenuItemType type, // Type of the menu item
+    required bool plated, // If the menu item is plated
     required double price, // Price of the menu item
     required Map<String, double> inventoryRequirements, // Inventory requirements for the menu item
+    List<Task>? tasks, // Optional tasks associated with the menu item
   }) async {
     final currentUser = _auth.currentUser; // Get the current authenticated user
     if (currentUser == null) throw 'Not authenticated'; // Throw error if no user is authenticated
@@ -100,12 +103,14 @@ class MenuItemService extends ChangeNotifier {
         name: name,
         description: description,
         type: type,
+        plated: plated,
         price: price,
         organizationId: organization.id,
         inventoryRequirements: inventoryRequirements,
         createdAt: now,
         updatedAt: now,
         createdBy: currentUser.uid,
+        tasks: tasks ?? [], // Add tasks, default to empty list if not provided
       );
 
       await docRef.set(menuItem.toMap()); // Save the menu item to Firestore
@@ -118,7 +123,7 @@ class MenuItemService extends ChangeNotifier {
     }
   }
 
-  // Method to update an existing menu item
+  // Method to update an existing menu item, including tasks
   Future<void> updateMenuItem(MenuItem item) async {
     try {
       final currentUser = _auth.currentUser; // Get the current authenticated user
@@ -150,14 +155,99 @@ class MenuItemService extends ChangeNotifier {
           .collection('menu_items')
           .doc(item.id)
           .update({
-            ...item.toMap(),
-            'updatedAt': FieldValue.serverTimestamp(), // Update the updatedAt field with server timestamp
-          });
+        ...item.toMap(),
+        'updatedAt': FieldValue.serverTimestamp(), // Update the updatedAt field with server timestamp
+      });
 
       notifyListeners(); // Notify listeners about the change
     } catch (e) {
       debugPrint('Error updating menu item: $e'); // Print error if any exception occurs
       rethrow; // Rethrow the exception
+    }
+  }
+
+  // Method to add a task to a menu item
+  Future<void> addTaskToMenuItem(String menuItemId, Task task) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
+
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) throw 'Organization not found';
+
+      final menuItemDoc = await _firestore
+          .collection('menu_items')
+          .doc(menuItemId)
+          .get();
+
+      if (!menuItemDoc.exists) throw 'Menu item not found';
+
+      // Ensure the menu item belongs to the current organization
+      if (menuItemDoc.data()?['organizationId'] != organization.id) {
+        throw 'Menu item does not belong to your organization';
+      }
+
+      // Get current tasks and add the new task
+      final currentTasks = List<Map<String, dynamic>>.from(
+          menuItemDoc.data()?['tasks'] ?? []);
+      currentTasks.add(task.toMap());
+
+      // Update the menu item with the new tasks list
+      await _firestore
+          .collection('menu_items')
+          .doc(menuItemId)
+          .update({
+        'tasks': currentTasks,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error adding task to menu item: $e');
+      rethrow;
+    }
+  }
+
+  // Method to remove a task from a menu item
+  Future<void> removeTaskFromMenuItem(String menuItemId, String taskId) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
+
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) throw 'Organization not found';
+
+      final menuItemDoc = await _firestore
+          .collection('menu_items')
+          .doc(menuItemId)
+          .get();
+
+      if (!menuItemDoc.exists) throw 'Menu item not found';
+
+      // Ensure the menu item belongs to the current organization
+      if (menuItemDoc.data()?['organizationId'] != organization.id) {
+        throw 'Menu item does not belong to your organization';
+      }
+
+      // Get current tasks and remove the specified task
+      final currentTasks = List<Map<String, dynamic>>.from(
+          menuItemDoc.data()?['tasks'] ?? []);
+
+      currentTasks.removeWhere((taskMap) => taskMap['id'] == taskId);
+
+      // Update the menu item with the updated tasks list
+      await _firestore
+          .collection('menu_items')
+          .doc(menuItemId)
+          .update({
+        'tasks': currentTasks,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error removing task from menu item: $e');
+      rethrow;
     }
   }
 

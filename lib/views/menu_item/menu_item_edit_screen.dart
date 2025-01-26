@@ -26,6 +26,7 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
   final _descriptionController = TextEditingController(); // Controller for description input.
   final _priceController = TextEditingController(); // Controller for price input.
   late MenuItemType _selectedType; // Variable to store selected menu item type.
+  late bool _isPlated; // If menu item is plated
   final Map<String, double> _inventoryRequirements = {}; // Map to store inventory requirements.
   bool _isLoading = false; // Loading state for async operations.
   String? _error; // Variable to store error messages.
@@ -39,9 +40,11 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
       _descriptionController.text = menuItem.description; // Set description.
       _priceController.text = menuItem.price.toString(); // Set price.
       _selectedType = menuItem.type; // Set type.
+      _isPlated = menuItem.plated; // Set plated status.
       _inventoryRequirements.addAll(menuItem.inventoryRequirements); // Set inventory requirements.
     } else {
       _selectedType = MenuItemType.mainCourse; // Default type for new menu item.
+      _isPlated = false; // Default value for new menu item
     }
   }
 
@@ -128,6 +131,7 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
           name: _nameController.text.trim(), // Get name.
           description: _descriptionController.text.trim(), // Get description.
           type: _selectedType, // Get type.
+          plated: _isPlated, // Get plated status.
           price: price, // Get price.
           inventoryRequirements: _inventoryRequirements, // Get inventory requirements.
         );
@@ -136,6 +140,7 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
           name: _nameController.text.trim(), // Get updated name.
           description: _descriptionController.text.trim(), // Get updated description.
           type: _selectedType, // Get updated type.
+          plated: _isPlated, // Get updated plated status.
           price: price, // Get updated price.
           inventoryRequirements: _inventoryRequirements, // Get updated inventory requirements.
         );
@@ -227,6 +232,16 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
                       _selectedType = value; // Update selected type.
                     });
                   }
+                },
+              ),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                title: const Text('Plated'),
+                value: _isPlated,
+                onChanged: (bool value) {
+                  setState(() {
+                    _isPlated = value; // Toggle plated value
+                  });
                 },
               ),
               const SizedBox(height: 16),
