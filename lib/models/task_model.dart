@@ -100,7 +100,9 @@ class Task {
       organizationId: map['organizationId'] ?? '', // Organization ID from map or empty string if null
       checklist: List<String>.from(map['checklist'] ?? []), // Checklist items from map or empty list if null
       comments: List<String>.from(map['comments'] ?? []), // Comments from map or empty list if null
-      inventoryUpdates: map['inventoryUpdates'], // Inventory updates from map
+      inventoryUpdates: map['inventoryUpdates'] != null
+          ? Map<String, dynamic>.from(map['inventoryUpdates'])
+          : {}, // If inventoryUpdates is null, set it to an empty map
       createdBy: map['createdBy'] ?? '', // Creator user ID from map or empty string if null
       createdAt: map['createdAt'] is Timestamp 
           ? (map['createdAt'] as Timestamp).toDate() // Convert Firestore Timestamp to DateTime

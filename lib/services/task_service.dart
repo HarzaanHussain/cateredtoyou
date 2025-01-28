@@ -90,6 +90,7 @@ class TaskService extends ChangeNotifier { // TaskService class extends ChangeNo
     required String departmentId, // Required department ID for the task
     List<String>? checklist, // Optional checklist for the task
     Map<String, dynamic>? inventoryUpdates, // Optional inventory updates for the task
+    Map<String, String>? metadata, // Optional task metadata
   }) async {
     try {
       final currentUser = _auth.currentUser; // Get the current authenticated user

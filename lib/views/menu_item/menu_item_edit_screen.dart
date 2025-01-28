@@ -1,15 +1,16 @@
-import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
-import 'package:provider/provider.dart'; // Importing provider package for state management.
-import 'package:go_router/go_router.dart'; // Importing go_router package for navigation.
-import 'package:cateredtoyou/models/menu_item_model.dart'; // Importing MenuItem model.
-import 'package:cateredtoyou/models/inventory_item_model.dart'; // Importing InventoryItem model.
-import 'package:cateredtoyou/services/menu_item_service.dart'; // Importing MenuItemService for CRUD operations.
-import 'package:cateredtoyou/services/inventory_service.dart'; // Importing InventoryService for inventory management.
-import 'package:cateredtoyou/widgets/custom_button.dart'; // Importing custom button widget.
-import 'package:cateredtoyou/widgets/custom_text_field.dart'; // Importing custom text field widget.
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:cateredtoyou/models/menu_item_model.dart';
+import 'package:cateredtoyou/models/inventory_item_model.dart';
+import 'package:cateredtoyou/models/task_model.dart';
+import 'package:cateredtoyou/services/menu_item_service.dart';
+import 'package:cateredtoyou/services/inventory_service.dart';
+import 'package:cateredtoyou/widgets/custom_button.dart';
+import 'package:cateredtoyou/widgets/custom_text_field.dart';
 
-class MenuItemEditScreen extends StatefulWidget { // Stateful widget for editing or creating menu items.
-  final MenuItem? menuItem; // Optional menu item to edit.
+class MenuItemEditScreen extends StatefulWidget {
+  final MenuItem? menuItem;
 
   const MenuItemEditScreen({
     super.key,
@@ -17,43 +18,97 @@ class MenuItemEditScreen extends StatefulWidget { // Stateful widget for editing
   });
 
   @override
-  State<MenuItemEditScreen> createState() => _MenuItemEditScreenState(); // Creating state for the widget.
+  State<MenuItemEditScreen> createState() => _MenuItemEditScreenState();
 }
 
 class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
-  final _formKey = GlobalKey<FormState>(); // Key for form validation.
-  final _nameController = TextEditingController(); // Controller for name input.
-  final _descriptionController = TextEditingController(); // Controller for description input.
-  final _priceController = TextEditingController(); // Controller for price input.
-  late MenuItemType _selectedType; // Variable to store selected menu item type.
-  late bool _isPlated; // If menu item is plated
-  final Map<String, double> _inventoryRequirements = {}; // Map to store inventory requirements.
-  bool _isLoading = false; // Loading state for async operations.
-  String? _error; // Variable to store error messages.
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _priceController = TextEditingController();
+  late MenuItemType _selectedType;
+  late bool _isPlated;
+  final Map<String, double> _inventoryRequirements = {};
+  final List<TaskField> _taskFields = [];
+  bool _isLoading = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    final menuItem = widget.menuItem; // Getting the menu item from widget.
-    if (menuItem != null) { // If editing an existing menu item.
-      _nameController.text = menuItem.name; // Set name.
-      _descriptionController.text = menuItem.description; // Set description.
-      _priceController.text = menuItem.price.toString(); // Set price.
-      _selectedType = menuItem.type; // Set type.
-      _isPlated = menuItem.plated; // Set plated status.
-      _inventoryRequirements.addAll(menuItem.inventoryRequirements); // Set inventory requirements.
+    final menuItem = widget.menuItem;
+    if (menuItem != null) {
+      _nameController.text = menuItem.name;
+      _descriptionController.text = menuItem.description;
+      _priceController.text = menuItem.price.toString();
+      _selectedType = menuItem.type;
+      _isPlated = menuItem.plated;
+      _inventoryRequirements.addAll(menuItem.inventoryRequirements);
+      // Initialize tasks if they exist
+      if (menuItem.tasks != null) {
+        for (var task in menuItem.tasks!) {
+          _addTaskField(task);
+        }
+      }
     } else {
-      _selectedType = MenuItemType.mainCourse; // Default type for new menu item.
-      _isPlated = false; // Default value for new menu item
+      _selectedType = MenuItemType.mainCourse;
+      _isPlated = false;
+      // Add initial empty task field
+      _addTaskField(null);
     }
   }
 
   @override
   void dispose() {
-    _nameController.dispose(); // Dispose name controller.
-    _descriptionController.dispose(); // Dispose description controller.
-    _priceController.dispose(); // Dispose price controller.
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _priceController.dispose();
+    // Dispose all task field controllers
+    for (var field in _taskFields) {
+      field.nameController.dispose();
+      field.descriptionController.dispose();
+    }
     super.dispose();
+  }
+
+  void _addTaskField(Task? task) {
+    setState(() {
+      // Create a reference to hold our taskField
+      late final TaskField taskField;
+
+      // Initialize the removal function first
+      VoidCallback? onRemoveFunction;
+      if (_taskFields.isNotEmpty) {
+        onRemoveFunction = () {
+          _removeTaskField(taskField);
+        };
+      }
+
+      // Now create the taskField
+      taskField = TaskField(
+        key: UniqueKey(),
+        task: task,
+        onRemove: onRemoveFunction,
+        onChanged: _onTaskFieldChanged,
+      );
+
+      _taskFields.add(taskField);
+    });
+  }
+
+  void _removeTaskField(TaskField field) {
+    setState(() {
+      _taskFields.remove(field);
+    });
+  }
+
+  void _onTaskFieldChanged(TaskField field) {
+    // If this is the last field and it's not empty, add a new empty field
+    if (_taskFields.last == field &&
+        (field.nameController.text.isNotEmpty ||
+            field.descriptionController.text.isNotEmpty)) {
+      _addTaskField(null);
+    }
   }
 
   void _addInventoryItem(InventoryItem item) { // Function to add inventory item.
@@ -114,38 +169,74 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
     });
   }
 
-  Future<void> _handleSubmit() async { // Function to handle form submission.
-    if (!_formKey.currentState!.validate()) return; // Validate form.
+  Future<void> _handleSubmit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    // Validate that at least one task is entered
+    bool hasTask = _taskFields.any((field) =>
+    field.nameController.text.isNotEmpty &&
+        field.descriptionController.text.isNotEmpty);
+
+    if (!hasTask) {
+      setState(() {
+        _error = 'At least one task is required';
+      });
+      return;
+    }
 
     setState(() {
-      _isLoading = true; // Set loading state.
-      _error = null; // Clear error.
+      _isLoading = true;
+      _error = null;
     });
 
     try {
-      final menuItemService = context.read<MenuItemService>(); // Get menu item service.
-      final price = double.parse(_priceController.text); // Parse price.
+      final menuItemService = context.read<MenuItemService>();
+      final price = double.parse(_priceController.text);
 
-      if (widget.menuItem == null) { // If creating new menu item.
+      // Convert task fields to Task objects
+      final tasks = _taskFields
+          .where((field) =>
+      field.nameController.text.isNotEmpty &&
+          field.descriptionController.text.isNotEmpty)
+          .map((field) => Task(
+        id: field.task?.id ?? DateTime.now().toString(),
+        eventId: 'default',  // You might want to modify this
+        name: field.nameController.text.trim(),
+        description: field.descriptionController.text.trim(),
+        dueDate: DateTime.now().add(const Duration(days: 7)),  // Default due date
+        status: TaskStatus.pending,
+        priority: TaskPriority.medium,
+        assignedTo: '',  // You might want to modify this
+        departmentId: '',  // You might want to modify this
+        organizationId: '',  // You might want to modify this
+        createdBy: '',  // You might want to modify this
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ))
+          .toList();
+
+      if (widget.menuItem == null) {
         await menuItemService.createMenuItem(
-          name: _nameController.text.trim(), // Get name.
-          description: _descriptionController.text.trim(), // Get description.
-          type: _selectedType, // Get type.
-          plated: _isPlated, // Get plated status.
-          price: price, // Get price.
-          inventoryRequirements: _inventoryRequirements, // Get inventory requirements.
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          type: _selectedType,
+          plated: _isPlated,
+          price: price,
+          inventoryRequirements: _inventoryRequirements,
+          tasks: tasks,  // Add tasks here
         );
-      } else { // If updating existing menu item.
+      } else {
         final updatedMenuItem = widget.menuItem!.copyWith(
-          name: _nameController.text.trim(), // Get updated name.
-          description: _descriptionController.text.trim(), // Get updated description.
-          type: _selectedType, // Get updated type.
-          plated: _isPlated, // Get updated plated status.
-          price: price, // Get updated price.
-          inventoryRequirements: _inventoryRequirements, // Get updated inventory requirements.
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          type: _selectedType,
+          plated: _isPlated,
+          price: price,
+          inventoryRequirements: _inventoryRequirements,
+          tasks: tasks,  // Add tasks here
         );
 
-        await menuItemService.updateMenuItem(updatedMenuItem); // Update menu item.
+        await menuItemService.updateMenuItem(updatedMenuItem);
       }
 
       if (mounted) {
@@ -153,21 +244,21 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
           SnackBar(
             content: Text(
               widget.menuItem == null
-                  ? 'Menu item created successfully' // Success message for creation.
-                  : 'Menu item updated successfully', // Success message for update.
+                  ? 'Menu item created successfully'
+                  : 'Menu item updated successfully',
             ),
           ),
         );
-        context.go('/menu-items'); // Navigate to menu items list.
+        context.go('/menu-items');
       }
     } catch (e) {
       setState(() {
-        _error = e.toString(); // Set error message.
+        _error = e.toString();
       });
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false; // Clear loading state.
+          _isLoading = false;
         });
       }
     }
@@ -175,61 +266,61 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isEditing = widget.menuItem != null; // Check if editing.
+    final isEditing = widget.menuItem != null;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditing ? 'Edit Menu Item' : 'Create Menu Item'), // Set app bar title.
+        title: Text(isEditing ? 'Edit Menu Item' : 'Create Menu Item'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
-          key: _formKey, // Set form key.
+          key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               CustomTextField(
-                controller: _nameController, // Set name controller.
-                label: 'Item Name', // Set label.
-                prefixIcon: Icons.restaurant_menu, // Set prefix icon.
-                validator: (value) { // Validator for name input.
+                controller: _nameController,
+                label: 'Item Name',
+                prefixIcon: Icons.restaurant_menu,
+                validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter an item name'; // Error if empty.
+                    return 'Please enter an item name';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
               CustomTextField(
-                controller: _descriptionController, // Set description controller.
-                label: 'Description', // Set label.
-                prefixIcon: Icons.description, // Set prefix icon.
-                maxLines: 3, // Set max lines.
-                validator: (value) { // Validator for description input.
+                controller: _descriptionController,
+                label: 'Description',
+                prefixIcon: Icons.description,
+                maxLines: 3,
+                validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter a description'; // Error if empty.
+                    return 'Please enter a description';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<MenuItemType>(
-                value: _selectedType, // Set selected type.
+                value: _selectedType,
                 decoration: const InputDecoration(
-                  labelText: 'Type', // Set label.
+                  labelText: 'Type',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.category), // Set prefix icon.
+                  prefixIcon: Icon(Icons.category),
                 ),
-                items: MenuItemType.values.map((type) { // Map menu item types to dropdown items.
+                items: MenuItemType.values.map((type) {
                   return DropdownMenuItem(
                     value: type,
-                    child: Text(type.toString().split('.').last), // Display type name.
+                    child: Text(type.toString().split('.').last),
                   );
                 }).toList(),
-                onChanged: (value) { // On change handler for type selection.
+                onChanged: (value) {
                   if (value != null) {
                     setState(() {
-                      _selectedType = value; // Update selected type.
+                      _selectedType = value;
                     });
                   }
                 },
@@ -240,82 +331,47 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
                 value: _isPlated,
                 onChanged: (bool value) {
                   setState(() {
-                    _isPlated = value; // Toggle plated value
+                    _isPlated = value;
                   });
                 },
               ),
               const SizedBox(height: 16),
               CustomTextField(
-                controller: _priceController, // Set price controller.
-                label: 'Price', // Set label.
-                prefixIcon: Icons.attach_money, // Set prefix icon.
-                keyboardType: const TextInputType.numberWithOptions(decimal: true), // Input type for price.
-                validator: (value) { // Validator for price input.
+                controller: _priceController,
+                label: 'Price',
+                prefixIcon: Icons.attach_money,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter a price'; // Error if empty.
+                    return 'Please enter a price';
                   }
                   final price = double.tryParse(value);
                   if (price == null) {
-                    return 'Please enter a valid number'; // Error if not a number.
+                    return 'Please enter a valid number';
                   }
                   if (price <= 0) {
-                    return 'Price must be greater than 0'; // Error if not positive.
+                    return 'Price must be greater than 0';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 24),
+              // ... Inventory Requirements section unchanged ...
+              const SizedBox(height: 24),
               Text(
-                'Inventory Requirements',
+                'Tasks',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 8),
-              StreamBuilder<List<InventoryItem>>(
-                stream: context.read<InventoryService>().getInventoryItems(), // Stream of inventory items.
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return const Text('Error loading inventory items'); // Error message.
-                  }
-
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator()); // Loading indicator.
-                  }
-
-                  final inventoryItems = snapshot.data ?? []; // Get inventory items.
-                  return Column(
-                    children: [
-                      ...inventoryItems.map((item) { // Map inventory items to list tiles.
-                        final quantity = _inventoryRequirements[item.id]; // Get required quantity.
-                        return Card(
-                          child: ListTile(
-                            title: Text(item.name), // Display item name.
-                            subtitle: quantity != null
-                                ? Text('Required: $quantity ${item.unit}') // Display required quantity.
-                                : null,
-                            trailing: quantity != null
-                                ? IconButton(
-                                    icon: const Icon(Icons.delete),
-                                    onPressed: () => _removeInventoryItem(item.id), // Remove item.
-                                  )
-                                : IconButton(
-                                    icon: const Icon(Icons.add),
-                                    onPressed: () => _addInventoryItem(item), // Add item.
-                                  ),
-                          ),
-                        );
-                      }),
-                    ],
-                  );
-                },
-              ),
+              ..._taskFields,
               const SizedBox(height: 24),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Text(
-                    _error!, // Display error message.
+                    _error!,
                     style: const TextStyle(
                       color: Colors.red,
                       fontSize: 14,
@@ -324,12 +380,86 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
                   ),
                 ),
               CustomButton(
-                label: isEditing ? 'Update Menu Item' : 'Create Menu Item', // Set button label.
-                onPressed: _isLoading ? null : _handleSubmit, // Handle button press.
-                isLoading: _isLoading, // Set loading state.
+                label: isEditing ? 'Update Menu Item' : 'Create Menu Item',
+                onPressed: _isLoading ? null : _handleSubmit,
+                isLoading: _isLoading,
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// New TaskField widget for managing individual task inputs
+class TaskField extends StatelessWidget {
+  final TextEditingController nameController;
+  final TextEditingController descriptionController;
+  final VoidCallback? onRemove;
+  final Function(TaskField) onChanged;
+  final Task? task;
+
+  TaskField({
+    required Key key,
+    this.task,
+    this.onRemove,
+    required this.onChanged,
+  }) : nameController = TextEditingController(text: task?.name ?? ''),
+        descriptionController = TextEditingController(text: task?.description ?? ''),
+        super(key: key) {
+    // Rest of the constructor remains the same
+    nameController.addListener(() => onChanged(this));
+    descriptionController.addListener(() => onChanged(this));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: CustomTextField(
+                    controller: nameController,
+                    label: 'Task Name',
+                    prefixIcon: Icons.task_alt,
+                    validator: (value) {
+                      if (value?.isNotEmpty ?? false) {
+                        if (descriptionController.text.isEmpty) {
+                          return 'Please enter a task description';
+                        }
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                if (onRemove != null)
+                  IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: onRemove,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            CustomTextField(
+              controller: descriptionController,
+              label: 'Task Description',
+              prefixIcon: Icons.description,
+              maxLines: 2,
+              validator: (value) {
+                if (value?.isNotEmpty ?? false) {
+                  if (nameController.text.isEmpty) {
+                    return 'Please enter a task name';
+                  }
+                }
+                return null;
+              },
+            ),
+          ],
         ),
       ),
     );

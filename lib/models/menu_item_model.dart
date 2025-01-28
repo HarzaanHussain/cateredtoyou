@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'task_model.dart'; // Importing the Task model
+import 'package:flutter/foundation.dart';
+
 
 // Enum representing different types of menu items
 enum MenuItemType {
@@ -61,6 +63,9 @@ class MenuItem {
 
   // Factory constructor to create a MenuItem instance from a map
   factory MenuItem.fromMap(Map<String, dynamic> map, String docId) {
+    map.forEach((key, value) {
+      debugPrint('$key: ${value ?? "null"}'); // Print each key with value or "null" if value is null
+    });
     return MenuItem(
       id: docId, // Document ID from Firestore
       name: map['name'] ?? '', // Name from map or empty string if null
