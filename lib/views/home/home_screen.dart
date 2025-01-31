@@ -115,6 +115,19 @@ class HomeScreen extends StatelessWidget { // Defining a stateless widget for th
                           ],
                         ),
                       ),
+                      if (hasManagementAccess || user?.role == 'client') ...[
+                        const Divider(),
+                        PermissionWidget(
+                          permissionId: 'manage_tasks',
+                          child: ListTile(
+                            leading: const Icon(Icons.add_task),
+                            title: const Text('Manage Tasks'),
+                            subtitle: const Text('Create and assign tasks'),
+                            trailing: const Icon(Icons.arrow_forward_ios),
+                            onTap: () => context.push('/manage-tasks'),
+                          ),
+                        ),
+                      ],
                     ],
                   );
                 },
