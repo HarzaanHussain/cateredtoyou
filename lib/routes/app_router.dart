@@ -18,6 +18,7 @@ import 'package:cateredtoyou/views/menu_item/menu_item_list_screen.dart'; // Imp
 import 'package:cateredtoyou/views/staff/add_staff_screen.dart'; // Importing AddStaffScreen widget
 import 'package:cateredtoyou/views/staff/edit_staff_screen.dart'; // Importing EditStaffScreen widget
 import 'package:cateredtoyou/views/staff/staff_list_screen.dart'; // Importing StaffListScreen widget
+import 'package:cateredtoyou/views/staff/staff_permission_screen.dart';
 import 'package:cateredtoyou/views/tasks/manage_task_screen.dart'; // Importing ManageTasksScreen widget
 import 'package:cateredtoyou/views/tasks/task_list_screen.dart'; // Importing TaskListScreen widget
 import 'package:cateredtoyou/views/vehicles/vehicle_details_screen.dart'; // Importing VehicleDetailsScreen widget
@@ -99,6 +100,13 @@ class AppRouter {
               staff: staff); // Building EditStaffScreen widget with staff data
         },
       ),
+    GoRoute(
+      path: '/staff/:id/permissions',
+      builder: (context, state) {
+        final user = state.extra as UserModel; // Extracting UserModel from state
+        return UserPermissionsScreen(user: user); // Building UserPermissionsScreen widget with user data
+      },
+    ),
       GoRoute(
         path: '/inventory', // Path for inventory list route
         builder: (context, state) =>
