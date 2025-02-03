@@ -1,7 +1,13 @@
-import 'package:cateredtoyou/models/event_model.dart';
+import 'package:cateredtoyou/models/delivery_route_model.dart'; // Importing DeliveryRoute model
+import 'package:cateredtoyou/models/event_model.dart'; // Importing Event model
 import 'package:cateredtoyou/models/inventory_item_model.dart'; // Importing InventoryItem model
 import 'package:cateredtoyou/models/menu_item_prototype.dart'; // Importing MenuItem model
 import 'package:cateredtoyou/models/user_model.dart'; // Importing User model
+import 'package:cateredtoyou/models/vehicle_model.dart'; // Importing Vehicle model
+import 'package:cateredtoyou/views/delivery/delivery_form_screen.dart'; // Importing DeliveryFormScreen widget
+import 'package:cateredtoyou/views/delivery/delivery_list_screen.dart'; // Importing DeliveryListScreen widget
+import 'package:cateredtoyou/views/delivery/driver_deliveries_screen.dart'; // Importing DriverDeliveriesScreen widget
+import 'package:cateredtoyou/views/delivery/track_delivery_screen.dart'; // Importing TrackDeliveryScreen widget
 import 'package:cateredtoyou/views/events/event_details_screen.dart'; // Importing EventDetailsScreen widget
 import 'package:cateredtoyou/views/events/event_edit_screen.dart'; // Importing EventEditScreen widget
 import 'package:cateredtoyou/views/events/event_list_screen.dart'; // Importing EventListScreen widget
@@ -13,7 +19,10 @@ import 'package:cateredtoyou/views/staff/add_staff_screen.dart'; // Importing Ad
 import 'package:cateredtoyou/views/staff/edit_staff_screen.dart'; // Importing EditStaffScreen widget
 import 'package:cateredtoyou/views/staff/staff_list_screen.dart'; // Importing StaffListScreen widget
 import 'package:cateredtoyou/views/tasks/manage_task_screen.dart'; // Importing ManageTasksScreen widget
-import 'package:cateredtoyou/views/tasks/task_list_screen.dart';// Importing TaskListScreen widget
+import 'package:cateredtoyou/views/tasks/task_list_screen.dart'; // Importing TaskListScreen widget
+import 'package:cateredtoyou/views/vehicles/vehicle_details_screen.dart'; // Importing VehicleDetailsScreen widget
+import 'package:cateredtoyou/views/vehicles/vehicle_form_screen.dart'; // Importing VehicleFormScreen widget
+import 'package:cateredtoyou/views/vehicles/vehicle_list_screen.dart'; // Importing VehicleListScreen widget
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components
 import 'package:go_router/go_router.dart'; // Importing GoRouter package for routing
 import 'package:cateredtoyou/models/auth_model.dart'; // Importing AuthModel for authentication state
@@ -183,25 +192,80 @@ class AppRouter {
           );
         },
       ),
-      GoRoute( // Route for tasks list
+      GoRoute(
+        // Route for tasks list
         path: '/tasks',
-        builder: (context, state) => const TaskListScreen(), // Building TaskListScreen widget
-        redirect: (context, state) { // Redirecting to login if not authenticated
+        builder: (context, state) =>
+            const TaskListScreen(), // Building TaskListScreen widget
+        redirect: (context, state) {
+          // Redirecting to login if not authenticated
           if (!authModel.isAuthenticated) {
             return '/login';
           }
           return null;
         },
       ),
-      GoRoute( // Route for manage tasks
+      GoRoute(
+        // Route for manage tasks
         path: '/manage-tasks',
-        builder: (context, state) => const ManageTasksScreen(), // Building ManageTasksScreen widget
-        redirect: (context, state) { // Redirecting to login if not authenticated
+        builder: (context, state) =>
+            const ManageTasksScreen(), // Building ManageTasksScreen widget
+        redirect: (context, state) {
+          // Redirecting to login if not authenticated
           if (!authModel.isAuthenticated) {
             return '/login';
           }
           return null;
         },
+      ),
+      GoRoute(
+        path: '/vehicles', // Path for vehicle list route
+        builder: (context, state) =>
+            const VehicleListScreen(), // Building VehicleListScreen widget
+      ),
+      GoRoute(
+        path: '/add-vehicle', // Path for add vehicle route
+        builder: (context, state) =>
+            const VehicleFormScreen(), // Building VehicleFormScreen widget
+      ),
+      GoRoute(
+        path: '/edit-vehicle', // Path for edit vehicle route
+        builder: (context, state) {
+          final vehicle = state.extra as Vehicle; // Extracting Vehicle from state
+          return VehicleFormScreen(
+              vehicle: vehicle); // Building VehicleFormScreen widget with vehicle data
+        },
+      ),
+      GoRoute(
+        path: '/vehicle-details', // Path for vehicle details route
+        builder: (context, state) {
+          final vehicle = state.extra as Vehicle; // Extracting Vehicle from state
+          return VehicleDetailsScreen(
+              vehicle: vehicle); // Building VehicleDetailsScreen widget with vehicle data
+        },
+      ),
+      GoRoute(
+        path: '/track-delivery', // Path for track delivery route
+        builder: (context, state) {
+          final route = state.extra as DeliveryRoute; // Extracting DeliveryRoute from state
+          return TrackDeliveryScreen(
+              route: route); // Building TrackDeliveryScreen widget with route data
+        },
+      ),
+      GoRoute(
+        path: '/deliveries', // Path for deliveries list route
+        builder: (context, state) =>
+            const DeliveryListScreen(), // Building DeliveryListScreen widget
+      ),
+      GoRoute(
+        path: '/add-delivery', // Path for add delivery route
+        builder: (context, state) =>
+            const DeliveryFormScreen(), // Building DeliveryFormScreen widget
+      ),
+      GoRoute(
+        path: '/driver-deliveries', // Path for driver deliveries route
+        builder: (context, state) =>
+            const DriverDeliveriesScreen(), // Building DriverDeliveriesScreen widget
       ),
     ],
     errorBuilder: (context, state) => Material(
