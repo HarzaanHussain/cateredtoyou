@@ -273,6 +273,91 @@ class HomeScreen extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: 24),
+              Text(
+                'Vehicles',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Column(
+                  children: [
+                    if (hasManagementAccess)
+                      PermissionWidget(
+                        permissionId: 'manage_vehicles',
+                        child: ListTile(
+                          leading: const Icon(Icons.local_shipping),
+                          title: const Text('Fleet Management'),
+                          subtitle:
+                              const Text('Manage vehicles and assignments'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.add),
+                                onPressed: () => context.push('/add-vehicle'),
+                              ),
+                              const Icon(Icons.arrow_forward_ios),
+                            ],
+                          ),
+                          onTap: () => context.push('/vehicles'),
+                        ),
+                      ),
+                    if (user?.role == 'driver') ...[
+                      if (hasManagementAccess) const Divider(),
+                      PermissionWidget(
+                        permissionId: 'view_deliveries',
+                        child: ListTile(
+                          leading: const Icon(Icons.route),
+                          title: const Text('My Deliveries'),
+                          subtitle:
+                              const Text('View assigned routes and deliveries'),
+                          trailing: const Icon(Icons.arrow_forward_ios),
+                          onTap: () => context.push('/driver-deliveries'),
+                        ),
+                      ),
+                    ],
+                    if (hasManagementAccess) ...[
+                      const Divider(),
+                      PermissionWidget(
+                        permissionId: 'manage_routes',
+                        child: ListTile(
+                          leading: const Icon(Icons.map),
+                          title: const Text('Delivery Routes'),
+                          subtitle:
+                              const Text('Manage and track delivery routes'),
+                          trailing: const Icon(Icons.arrow_forward_ios),
+                          onTap: () => context.push('/delivery-routes'),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (hasManagementAccess) ...[
+                const Divider(),
+                PermissionWidget(
+                  permissionId: 'manage_deliveries',
+                  child: ListTile(
+                    leading: const Icon(Icons.local_shipping),
+                    title: const Text('Manage Deliveries'),
+                    subtitle: const Text('Create and track deliveries'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.add),
+                          onPressed: () => context.push('/add-delivery'),
+                        ),
+                        const Icon(Icons.arrow_forward_ios),
+                      ],
+                    ),
+                    onTap: () => context.push('/deliveries'),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
