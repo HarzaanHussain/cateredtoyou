@@ -1,6 +1,8 @@
 import 'package:cateredtoyou/models/customer_model.dart';
+import 'package:cateredtoyou/services/customer_service.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 class CustomerListScreen extends StatefulWidget {
   const CustomerListScreen({super.key});
@@ -41,6 +43,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -58,6 +61,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
       body: Column(
         children: [
+
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -84,9 +88,80 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                 });
               },
             ),
-          )
+          ),
+
+          Expanded(
+            child: StreamBuilder<List<CustomerModel>>(
+              stream: context.read<CustomerService>().getCustomers(),
+              builder: (context, snapshot){
+                if(snapshot.hasError){
+                  return Center(
+                    child: Text('Error: ${snapshot.error}'),
+                  );
+                }
+                if(snapshot.connectionState == ConnectionState.waiting){
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                }
+
+                final allCustomers = snapshot.data ?? [];
+                final filteredCustomers = _filterCustomer(allCustomers);
+
+                if(allCustomers.isEmpty){
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'No Customers Found',
+                          style: TextStyle(fontSize: 20),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () => context.push('/add_customer'),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add Customer'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                if(filteredCustomers.isEmpty){
+                  return const Center(
+                    child: Text('No Customers Match Search Criteria'),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filteredCustomers.length,
+                  itemBuilder: (context, index){
+                    final customer = filteredCustomers[index];
+                    return CustomerListItem(customer:customer);
+                  },
+                );
+
+              },
+            ),
+          ),
         ],
       ),
     );
+  }
+}
+
+class CustomerListItem extends StatelessWidget {
+  final CustomerModel customer;
+
+  const CustomerListItem({
+    super.key,
+    required this.customer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return const Placeholder();
   }
 }
