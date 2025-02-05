@@ -32,6 +32,12 @@ class RolePermissions extends ChangeNotifier {
       description: 'Create, edit, and deactivate staff members',
       category: 'Staff Management',
     ),
+    'view_customers': Permission(
+      id: 'view_customers',
+      name: 'View Customers',
+      description: 'View customer information and details',
+      category: 'Staff Management',
+    ),
     'view_staff': Permission(
       id: 'view_staff',
       name: 'View Staff',
@@ -116,6 +122,7 @@ class RolePermissions extends ChangeNotifier {
   static const Map<String, List<String>> defaultRolePermissions = {
     'admin': [
       'manage_staff',
+      'view_customers',
       'view_staff',
       'manage_events',
       'view_events',
@@ -132,6 +139,7 @@ class RolePermissions extends ChangeNotifier {
     ],
     'client': [
       'manage_staff',
+      'view_customers',
       'view_staff',
       'manage_events',
       'view_events',

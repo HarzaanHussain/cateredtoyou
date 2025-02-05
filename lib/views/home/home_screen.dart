@@ -81,6 +81,16 @@ class HomeScreen extends StatelessWidget { // Defining a stateless widget for th
                                 onTap: () => context.push('/staff'), // Navigate to staff management screen.
                               ),
                             ),
+                            PermissionWidget(
+                                permissionId: 'view_customers',
+                                child: ListTile(
+                                  leading: const Icon(Icons.handshake),
+                                  title: const Text('Customer Management'),
+                                  subtitle: const Text('View and edit customer information'),
+                                  trailing: const Icon(Icons.arrow_forward_ios),
+                                  // onTap: () => context.push(''),
+                                )
+                            ),
                             const Divider(), // Divider between options.
                             PermissionWidget( // PermissionWidget to check 'manage_events' permission.
                               permissionId: 'manage_events', // Permission ID.
