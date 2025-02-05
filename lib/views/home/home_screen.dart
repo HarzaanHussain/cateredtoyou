@@ -88,7 +88,7 @@ class HomeScreen extends StatelessWidget { // Defining a stateless widget for th
                                   title: const Text('Customer Management'),
                                   subtitle: const Text('View and edit customer information'),
                                   trailing: const Icon(Icons.arrow_forward_ios),
-                                  // onTap: () => context.push(''),
+                                  onTap: () => context.push('/customers'),
                                 )
                             ),
                             const Divider(), // Divider between options.
