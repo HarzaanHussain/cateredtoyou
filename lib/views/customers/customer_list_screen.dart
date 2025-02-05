@@ -62,6 +62,27 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search Customer...',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10)
+                ),
+                suffixIcon: _searchQuery.isNotEmpty? IconButton(
+                  icon: Icon(Icons.clear),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                ) : null,
+              ),
+              onChanged: (value){
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
             ),
           )
         ],
