@@ -4,6 +4,7 @@ import 'package:cateredtoyou/models/inventory_item_model.dart'; // Importing Inv
 import 'package:cateredtoyou/models/menu_item_model.dart'; // Importing MenuItem model
 import 'package:cateredtoyou/models/user_model.dart'; // Importing User model
 import 'package:cateredtoyou/models/vehicle_model.dart'; // Importing Vehicle model
+import 'package:cateredtoyou/views/customers/add_customer_screen.dart';
 import 'package:cateredtoyou/views/customers/customer_list_screen.dart';
 import 'package:cateredtoyou/views/delivery/delivery_form_screen.dart'; // Importing DeliveryFormScreen widget
 import 'package:cateredtoyou/views/delivery/delivery_list_screen.dart'; // Importing DeliveryListScreen widget
@@ -106,6 +107,16 @@ class AppRouter {
       builder: (context, state) =>
           const CustomerListScreen(),
     ),
+      GoRoute(
+        path: '/add_customer',
+        builder: (context, state) =>
+        const AddCustomerScreen(),
+      ),
+      GoRoute(
+        path: '/edit_customer',
+        builder: (context, state) =>
+        const CustomerListScreen(),
+      ),
     GoRoute(
       path: '/staff/:id/permissions',
       builder: (context, state) {
