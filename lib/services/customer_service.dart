@@ -60,6 +60,63 @@ class CustomerService extends ChangeNotifier {
     }
   }
 
+  Future<bool> createCustomerStandalone({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String phoneNumber,
+  }) async {
+    try{
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        throw 'Not authenticated. Please login and try again.'; // Throw error if no user is authenticated
+      }
+
+      final organization = await _organizationService.getCurrentUserOrganization(); // Get the organization of the current user
+      if (organization == null) {
+        throw 'Organization not found. Please try again.'; // Throw error if no organization is found
+      }
+
+      if (!email.contains('@')) {
+        throw 'Invalid email address format'; // Validate email format
+      }
+
+      final docRef = _firestore.collection('customers').doc(); // Reference to a new customer document
+      final now = DateTime.now(); // Current timestamp
+
+      final customer = CustomerModel(
+        id: docRef.id,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        phoneNumber: phoneNumber.trim(),
+        organizationId: organization.id,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: currentUser.uid,
+      ); // Create a new customer model
+
+      await _firestore.runTransaction((transaction) async {
+        final existingCustomers = await _firestore
+            .collection('customers')
+            .where('organizationId', isEqualTo: organization.id)
+            .where('email', isEqualTo: email.trim())
+            .get(); // Check if email is already in use within the organization
+
+        if (existingCustomers.docs.isNotEmpty) {
+          throw 'A customer with this email already exists'; // Throw error if email is already in use
+        }
+
+        transaction.set(docRef, customer.toMap()); // Save the customer document in a transaction
+      });
+      notifyListeners();
+      return true;
+    }catch (e){
+      debugPrint('CustomerService: Error creating customer: $e'); // Log error
+      throw _getReadableError(e); // Throw a readable error
+    }
+  }
+
   /// Creates a new customer in the Firestore database
   Future<CustomerModel> createCustomer({
     required String firstName,
