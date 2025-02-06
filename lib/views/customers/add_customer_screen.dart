@@ -1,8 +1,8 @@
 import 'package:cateredtoyou/services/customer_service.dart';
 import 'package:cateredtoyou/utils/validators.dart';
+import 'package:cateredtoyou/widgets/custom_button.dart';
 import 'package:cateredtoyou/widgets/custom_text_field.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -137,7 +137,38 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                 prefixIcon: Icons.person,
                 validator: Validators.validateName,
               ),
-
+              const SizedBox(height: 16,),
+              CustomTextField(
+                controller: _emailController,
+                label: 'Email',
+                prefixIcon: Icons.person,
+                validator: Validators.validateEmail,
+              ),
+              const SizedBox(height: 16,),
+              CustomTextField(
+                controller: _phoneNumberController,
+                label: 'Phone Number',
+                prefixIcon: Icons.person,
+                validator: Validators.validatePhone,
+              ),
+              const SizedBox(height: 16,),
+              if(_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              CustomButton(
+                label: 'Add Customer',
+                onPressed: _isLoading ? null : _handleAddCustomer,
+                isLoading: _isLoading,
+              ),
             ],
           ),
         ),
