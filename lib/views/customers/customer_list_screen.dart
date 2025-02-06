@@ -1,5 +1,9 @@
 import 'package:cateredtoyou/models/customer_model.dart';
+import 'package:cateredtoyou/models/user_model.dart';
+import 'package:cateredtoyou/services/auth_service.dart';
 import 'package:cateredtoyou/services/customer_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -162,6 +166,59 @@ class CustomerListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Placeholder();
+    final theme = Theme.of(context);
+    final customerService = context.read<CustomerService>();
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        onTap: () => context.push('/edit_customer', extra: customer),
+        leading: CircleAvatar(
+          backgroundColor: theme.colorScheme.primary,
+          child: Text(
+            customer.firstName[0] + customer.lastName[0],
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+        title: Text(
+          customer.fullName,
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4,),
+            Text(customer.email),
+            const SizedBox(height: 4,),
+            Text(customer.phoneNumber),
+          ],
+        ),
+        trailing: StreamBuilder<UserModel?>(
+          stream: context.read<AuthService>().authStateChanges.asyncMap((user) async{
+            if(user == null) return null;
+            final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+            if(!doc.exists) return null;
+            return UserModel.fromMap(doc.data()!);
+          }),
+          builder: (context, snapshot){
+            if(!snapshot.hasData) return const SizedBox.shrink();
+            final currentUser = snapshot.data!;
+            final canManageCustomers = ['admin', 'client', 'manager'].contains(currentUser.role);
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if(canManageCustomers)
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    tooltip: 'Edit Customer',
+                    onPressed: () => context.push('/edit_customer', extra: customer),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
   }
 }
