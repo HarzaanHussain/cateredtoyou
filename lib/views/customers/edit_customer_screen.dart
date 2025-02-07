@@ -58,6 +58,34 @@ class _EditCustomerScreenState extends State<EditCustomerScreen> {
     super.dispose();
   }
 
+  Future<void> _handleDelete() async{
+    if(!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try{
+      await _customerService.deleteCustomer(widget.customer.id);
+      if(!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Customer Deleted Successfully')));
+      context.go('/customers');
+    }catch (e){
+      if(!mounted) return;
+      setState(() {
+        _error = e.toString();
+      });
+    }finally{
+      if(mounted){
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+
+  }
+
   Future<void> _handleUpdate() async{
     if(!_formKey.currentState!.validate()) return;
 
@@ -149,7 +177,18 @@ class _EditCustomerScreenState extends State<EditCustomerScreen> {
                 onPressed: _isLoading ? null : _handleUpdate,
                 isLoading: _isLoading,
               ),
-              const SizedBox(height: 16,)
+              const SizedBox(height: 16,),
+              OutlinedButton(
+                onPressed: _isLoading ? null : _handleDelete,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: BorderSide(
+                    color: Colors.red
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text('Delete Customer', style: TextStyle(color: Colors.red),),
+              )
             ],
           ),
         ),
