@@ -57,4 +57,24 @@ class CustomerModel {
       createdBy: map['createdBy'] ?? '', // Creator's ID from map or empty string if null
     );
   }
+  CustomerModel copyWith({
+    String? firstName,
+    String? lastName,
+    String? phoneNumber,
+    String? email,
+    String? organizationId,
+  }) {
+    return CustomerModel(
+      id: id,
+      email: email ?? this.email,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      createdBy: createdBy,
+      organizationId: organizationId ?? this.organizationId,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
+    );
+  }
+
 }
