@@ -6,6 +6,7 @@ import 'package:cateredtoyou/models/user_model.dart'; // Importing User model
 import 'package:cateredtoyou/models/vehicle_model.dart'; // Importing Vehicle model
 import 'package:cateredtoyou/views/customers/add_customer_screen.dart';
 import 'package:cateredtoyou/views/customers/customer_list_screen.dart';
+import 'package:cateredtoyou/views/customers/edit_customer_screen.dart';
 import 'package:cateredtoyou/views/delivery/delivery_form_screen.dart'; // Importing DeliveryFormScreen widget
 import 'package:cateredtoyou/views/delivery/delivery_list_screen.dart'; // Importing DeliveryListScreen widget
 import 'package:cateredtoyou/views/delivery/driver_deliveries_screen.dart'; // Importing DriverDeliveriesScreen widget
@@ -31,7 +32,9 @@ import 'package:go_router/go_router.dart'; // Importing GoRouter package for rou
 import 'package:cateredtoyou/models/auth_model.dart'; // Importing AuthModel for authentication state
 import 'package:cateredtoyou/views/auth/login_screen.dart'; // Importing LoginScreen widget
 import 'package:cateredtoyou/views/auth/register_screen.dart'; // Importing RegisterScreen widget
-import 'package:cateredtoyou/views/home/home_screen.dart'; // Importing HomeScreen widget
+import 'package:cateredtoyou/views/home/home_screen.dart';
+
+import '../models/customer_model.dart'; // Importing HomeScreen widget
 
 class AppRouter {
   final AuthModel authModel; // Declaring a final variable for AuthModel
@@ -114,8 +117,10 @@ class AppRouter {
       ),
       GoRoute(
         path: '/edit_customer',
-        builder: (context, state) =>
-        const CustomerListScreen(),
+        builder: (context, state){
+          final customer = state.extra as CustomerModel;
+          return EditCustomerScreen(customer: customer);
+        },
       ),
     GoRoute(
       path: '/staff/:id/permissions',
