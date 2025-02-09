@@ -241,32 +241,57 @@ class CustomerService extends ChangeNotifier {
   }
 
   /// Deletes a customer from the Firestore database
-  Future<void> deleteCustomer(String customerId) async {
-    try {
-      final currentUser = _auth.currentUser; // Get the current authenticated user
-      if (currentUser == null) {
-        throw 'Not authenticated. Please login and try again.'; // Throw error if no user is authenticated
-      }
-
-      final organization = await _organizationService.getCurrentUserOrganization(); // Get the organization of the current user
-      if (organization == null) {
-        throw 'Organization not found. Please try again.'; // Throw error if no organization is found
-      }
-
-      final eventsWithCustomer = await _firestore
-          .collection('events')
-          .where('customerId', isEqualTo: customerId)
-          .get(); // Check for existing events with the customer
-
-      if (eventsWithCustomer.docs.isNotEmpty) {
-        throw 'Cannot delete customer with existing events'; // Throw error if customer has existing events
-      }
-
-      await _firestore.collection('customers').doc(customerId).delete(); // Delete the customer document
-      notifyListeners(); // Notify listeners about the change
-    } catch (e) {
-      debugPrint('CustomerService: Error deleting customer: $e'); // Log error
-      throw _getReadableError(e); // Throw a readable error
+Future<void> deleteCustomer(String customerId) async {
+  try {
+    final currentUser = _auth.currentUser; // Get the current authenticated user
+    if (currentUser == null) {
+      throw 'Not authenticated. Please login and try again.'; // Throw error if no user is authenticated
     }
+
+    final organization = await _organizationService.getCurrentUserOrganization(); // Get the organization of the current user
+    if (organization == null) {
+      throw 'Organization not found. Please try again.'; // Throw error if no organization is found
+    }
+
+    // Get the customer document first to verify organization
+    final customerDoc = await _firestore.collection('customers').doc(customerId).get();
+    
+    if (!customerDoc.exists) {
+      throw 'Customer not found'; // Throw error if customer does not exist
+    }
+
+    if (customerDoc.data()?['organizationId'] != organization.id) {
+      throw 'Cannot delete customer from another organization'; // Throw error if customer belongs to another organization
+    }
+
+    // Check if user has management role
+    final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+    final userRole = userDoc.data()?['role'];
+    if (!['admin', 'client', 'manager'].contains(userRole)) {
+      throw 'You do not have permission to delete customers'; // Throw error if user does not have permission
+    }
+
+    // Check for existing events with this customer
+    final eventsQuery = await _firestore
+        .collection('events')
+        .where('customerId', isEqualTo: customerId)
+        .where('organizationId', isEqualTo: organization.id)
+        .get();
+
+    if (eventsQuery.docs.isNotEmpty) {
+      throw 'Cannot delete customer with existing events. Please delete or reassign their events first.'; // Throw error if customer has existing events
+    }
+
+    // Perform the deletion in a transaction
+    await _firestore.runTransaction((transaction) async {
+      // Delete the customer document
+      transaction.delete(_firestore.collection('customers').doc(customerId)); // Delete the customer document in a transaction
+    });
+
+    notifyListeners(); // Notify listeners about the change
+  } catch (e) {
+    debugPrint('CustomerService: Error deleting customer: $e'); // Log error
+    throw _getReadableError(e); // Throw a readable error
   }
+}
 }
