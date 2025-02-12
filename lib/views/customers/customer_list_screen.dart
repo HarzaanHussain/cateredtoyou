@@ -3,7 +3,6 @@ import 'package:cateredtoyou/models/user_model.dart';
 import 'package:cateredtoyou/services/auth_service.dart';
 import 'package:cateredtoyou/services/customer_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -36,7 +35,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
     return customerList.where((customer) {
       final searchLower = _searchQuery.toLowerCase(); // Convert search query to lowercase.
-      final phoneNumber = customer.phoneNumber?.replaceAll(RegExp(r'\D'), '') ?? '';
+      final phoneNumber = customer.phoneNumber.replaceAll(RegExp(r'\D'), '');
 
       return customer.fullName.toLowerCase().contains(searchLower) || // Check if full name contains search query.
           customer.email.toLowerCase().contains(searchLower) || // Check if email contains search query.
@@ -167,7 +166,7 @@ class CustomerListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final customerService = context.read<CustomerService>();
+    context.read<CustomerService>();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
