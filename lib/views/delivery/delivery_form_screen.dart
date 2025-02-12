@@ -1,41 +1,46 @@
-import 'dart:math'; // Importing the math library for mathematical functions.
-import 'package:cateredtoyou/services/delivery_route_service.dart'; // Importing the delivery route service.
-import 'package:cateredtoyou/services/organization_service.dart'; // Importing the organization service.
-import 'package:firebase_auth/firebase_auth.dart'; // Importing Firebase authentication.
-import 'package:flutter/foundation.dart' show kIsWeb; // Importing Flutter foundation to check if the platform is web.
-import 'package:flutter/material.dart'; // Importing Flutter material design library.
-import 'package:google_maps_flutter/google_maps_flutter.dart'; // Importing Google Maps Flutter package.
-import 'package:cloud_firestore/cloud_firestore.dart'; // Importing Cloud Firestore for database operations.
-import 'package:provider/provider.dart'; // Importing Provider for state management.
-import 'package:go_router/go_router.dart'; // Importing GoRouter for navigation.
-import 'package:http/http.dart' as http; // Importing HTTP package for making network requests.
-import 'dart:convert'; // Importing Dart convert library for JSON encoding and decoding.
-import 'dart:async'; // Importing Dart async library for asynchronous programming.
-import 'package:geolocator/geolocator.dart'; // Importing Geolocator for location services.
-import 'package:intl/intl.dart'; // Importing Intl for date and time formatting.
-import 'package:shared_preferences/shared_preferences.dart'; // Importing SharedPreferences for local storage.
+import 'dart:async'; // Importing the async library for using Timer and Future.
+import 'package:cateredtoyou/models/user_model.dart'; // Importing the user model.
+import 'package:cateredtoyou/models/vehicle_model.dart'; // Importing the vehicle model.
+import 'package:cateredtoyou/services/staff_service.dart'; // Importing the staff service.
+import 'package:cateredtoyou/services/vehicle_service.dart'; // Importing the vehicle service.
+import 'package:cateredtoyou/views/delivery/widgets/delivery_map.dart'; // Importing the delivery map widget.
+import 'package:cateredtoyou/views/delivery/widgets/delivery_map_controller.dart'; // Importing the delivery map controller.
+import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
+import 'package:flutter_map/flutter_map.dart'; // Importing flutter_map for map functionalities.
+import 'package:latlong2/latlong.dart'; // Importing latlong2 for handling geographical coordinates.
+import 'package:cloud_firestore/cloud_firestore.dart'; // Importing cloud_firestore for Firestore database operations.
+import 'package:firebase_auth/firebase_auth.dart'; // Importing firebase_auth for authentication.
+import 'package:provider/provider.dart'; // Importing provider for state management.
+import 'package:go_router/go_router.dart'; // Importing go_router for navigation.
+import 'package:http/http.dart' as http; // Importing http for making network requests.
+import 'dart:convert'; // Importing convert for JSON encoding and decoding.
+import 'package:geolocator/geolocator.dart'; // Importing geolocator for location services.
+import 'package:intl/intl.dart'; // Importing intl for date and time formatting.
+import 'package:shared_preferences/shared_preferences.dart'; // Importing shared_preferences for local storage.
+import 'package:cateredtoyou/services/delivery_route_service.dart'; // Importing delivery route service.
+import 'package:cateredtoyou/services/organization_service.dart'; // Importing organization service.
 
 class DeliveryFormScreen extends StatefulWidget {
   const DeliveryFormScreen({super.key}); // Constructor for the DeliveryFormScreen widget.
 
   @override
-  State<DeliveryFormScreen> createState() => _DeliveryFormScreenState(); // Creating the state for the DeliveryFormScreen widget.
+  State<DeliveryFormScreen> createState() => _DeliveryFormScreenState(); // Creating state for the widget.
 }
 
 class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
-  final _formKey = GlobalKey<FormState>(); // Key for the form.
-
-  // Text Controllers
-  late final TextEditingController _pickupAddressController; // Controller for the pickup address text field.
-  late final TextEditingController _deliveryAddressController; // Controller for the delivery address text field.
-  late final TextEditingController _notesController; // Controller for the notes text field.
+  // Controllers
+  final _formKey = GlobalKey<FormState>(); // Form key for form validation.
+  final DeliveryMapController _mapController = DeliveryMapController(); // Controller for the delivery map.
+  late final TextEditingController _pickupAddressController; // Controller for the pickup address input.
+  late final TextEditingController _deliveryAddressController; // Controller for the delivery address input.
+  late final TextEditingController _notesController; // Controller for the notes input.
 
   // Form Fields
   String? _selectedEventId; // Selected event ID.
   String? _selectedVehicleId; // Selected vehicle ID.
   String? _selectedDriverId; // Selected driver ID.
-  DateTime? _startTime; // Start time for the delivery.
-  DateTime? _estimatedEndTime; // Estimated end time for the delivery.
+  DateTime? _startTime; // Selected start time.
+  DateTime? _estimatedEndTime; // Estimated end time.
   DateTime? _eventStartDate; // Event start date.
   DateTime? _eventEndDate; // Event end date.
 
@@ -50,18 +55,11 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
   bool _isLoading = false; // Loading state.
   String? _errorMessage; // Error message.
   String? _selectedEventName; // Selected event name.
-  GoogleMapController? _mapController; // Google Map controller.
-  final Set<Marker> _markers = {}; // Set of map markers.
-  final Set<Polyline> _polylines = {}; // Set of map polylines.
   Timer? _debounceTimer; // Timer for debouncing.
   bool _mapInitialized = false; // Map initialization state.
 
-  // Platform-specific flags
-  final bool _isWebPlatform = kIsWeb; // Flag to check if the platform is web.
-  bool _locationPermissionChecked = false; // Flag to check if location permission is checked.
-
   // Constants
-  static const String googleMapsApiKey = 'AIzaSyCFK5EBD3_mQrzVAAGqRl3P1zOCI0Erinc'; // Replace with your API key.
+  static const String osmRoutingUrl = 'https://router.project-osrm.org/route/v1/driving/'; // URL for routing API.
   static const LatLng defaultLocation = LatLng(34.2381, -118.5267); // Default location coordinates.
 
   @override
@@ -69,13 +67,7 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
     super.initState();
     _initializeControllers(); // Initialize text controllers.
     _initializeLocation(); // Initialize location services.
-    _loadLastKnownLocation(); // Load the last known location.
-  }
-
-  void _initializeControllers() {
-    _pickupAddressController = TextEditingController(); // Initialize pickup address controller.
-    _deliveryAddressController = TextEditingController(); // Initialize delivery address controller.
-    _notesController = TextEditingController(); // Initialize notes controller.
+    _loadLastKnownLocation(); // Load last known location from local storage.
   }
 
   @override
@@ -83,9 +75,15 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
     _pickupAddressController.dispose(); // Dispose pickup address controller.
     _deliveryAddressController.dispose(); // Dispose delivery address controller.
     _notesController.dispose(); // Dispose notes controller.
-    _mapController?.dispose(); // Dispose map controller.
-    _debounceTimer?.cancel(); // Cancel debounce timer.
+    _mapController.dispose(); // Dispose map controller.
+    _debounceTimer?.cancel(); // Cancel debounce timer if active.
     super.dispose();
+  }
+
+  void _initializeControllers() {
+    _pickupAddressController = TextEditingController(); // Initialize pickup address controller.
+    _deliveryAddressController = TextEditingController(); // Initialize delivery address controller.
+    _notesController = TextEditingController(); // Initialize notes controller.
   }
 
   Future<void> _loadLastKnownLocation() async {
@@ -96,389 +94,118 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
 
       if (lat != null && lng != null) {
         setState(() {
-          _currentLocation = LatLng(lat, lng); // Set current location.
+          _currentLocation = LatLng(lat, lng); // Set current location from stored values.
         });
       }
     } catch (e) {
-      _handleError('Error loading last location', e); // Handle error.
+      _handleError('Error loading last location', e); // Handle error if loading fails.
+    }
+  }
+
+  Future<void> _initializeLocation() async {
+    try {
+      final status = await Geolocator.checkPermission(); // Check location permission status.
+      if (status == LocationPermission.denied) {
+        final requestStatus = await Geolocator.requestPermission(); // Request location permission.
+        if (requestStatus == LocationPermission.denied) {
+          _handleLocationPermissionDenied(); // Handle permission denied.
+          return;
+        }
+      }
+
+      if (status == LocationPermission.deniedForever) {
+        _handleLocationPermissionDenied(permanent: true); // Handle permanently denied permission.
+        return;
+      }
+
+      // Get current position with the newer settings approach
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high, // Set high accuracy for location.
+          timeLimit: Duration(seconds: 5), // Set time limit for location request.
+        ),
+      );
+
+      final location = LatLng(position.latitude, position.longitude); // Create LatLng from position.
+
+      if (mounted) {
+        setState(() {
+          _currentLocation = location; // Set current location.
+          _pickupLocation = location; // Set pickup location to current location.
+        });
+
+        await _saveCurrentLocation(location); // Save current location to local storage.
+        await _getAddressFromCoordinates(location, true); // Get address from coordinates.
+        _updateMapCamera(location); // Update map camera to current location.
+      }
+    } catch (e) {
+      debugPrint('Error getting current position: $e'); // Print error if getting position fails.
+      await _tryLastKnownPosition(); // Try to get last known position if current position fails.
+    }
+  }
+
+  void _handleLocationPermissionDenied({bool permanent = false}) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            permanent 
+              ? 'Location permission permanently denied. Please enable in settings.' // Message for permanently denied permission.
+              : 'Location permission is required for better experience', // Message for temporarily denied permission.
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+          action: permanent ? SnackBarAction(
+            label: 'Settings',
+            onPressed: () => Geolocator.openAppSettings(), // Open app settings if permission is permanently denied.
+          ) : null,
+        ),
+      );
+      setState(() {
+        _currentLocation = defaultLocation; // Set current location to default if permission is denied.
+      });
+      _updateMapCamera(defaultLocation); // Update map camera to default location.
     }
   }
 
   Future<void> _saveCurrentLocation(LatLng location) async {
     try {
       final prefs = await SharedPreferences.getInstance(); // Get shared preferences instance.
-      await prefs.setDouble('last_known_lat', location.latitude); // Save latitude.
-      await prefs.setDouble('last_known_lng', location.longitude); // Save longitude.
+      await prefs.setDouble('last_known_lat', location.latitude); // Save latitude to local storage.
+      await prefs.setDouble('last_known_lng', location.longitude); // Save longitude to local storage.
     } catch (e) {
-      _handleError('Error saving location', e); // Handle error.
+      _handleError('Error saving location', e); // Handle error if saving fails.
     }
-  }
-
-  Future<void> _initializeLocation() async {
-    try {
-      if (!_isWebPlatform) {
-        await _handleMobileLocation(); // Handle mobile location.
-      } else {
-        await _handleWebLocation(); // Handle web location.
-      }
-    } catch (e) {
-      _handleError('Error initializing location', e); // Handle error.
-    }
-  }
-
-  Future<void> _handleMobileLocation() async {
-    if (_locationPermissionChecked) return;
-
-    try {
-      LocationPermission permission = await Geolocator.checkPermission(); // Check location permission.
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission(); // Request location permission.
-      }
-
-      if (permission == LocationPermission.whileInUse ||
-          permission == LocationPermission.always) {
-        Position position = await Geolocator.getCurrentPosition(
-          locationSettings: LocationSettings(
-            accuracy: LocationAccuracy.high,
-          ),
-        );
-
-        final location = LatLng(position.latitude, position.longitude);
-
-        if (mounted) {
-          setState(() {
-            _currentLocation = location; // Set current location.
-            _pickupLocation = location; // Set pickup location.
-          });
-
-          await _saveCurrentLocation(location); // Save current location.
-          await _getAddressFromCoordinates(location, true); // Get address from coordinates.
-          _updateMapCamera(location); // Update map camera.
-        }
-      } else {
-        _handleLocationPermissionDenied(); // Handle location permission denied.
-      }
-    } catch (e) {
-      debugPrint('Error getting current position: $e');
-      await _tryLastKnownPosition(); // Try last known position.
-    }
-
-    _locationPermissionChecked = true; // Set location permission checked.
-  }
-
-  void _handleLocationPermissionDenied() {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Location permission is required for better experience'),
-          behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 4),
-        ),
-      );
-      setState(() {
-        _currentLocation = defaultLocation; // Set default location.
-      });
-      _updateMapCamera(defaultLocation); // Update map camera.
-    }
-  }
-
-  Future<void> _handleWebLocation() async {
-    setState(() {
-      _currentLocation = _currentLocation ?? defaultLocation; // Set current location or default location.
-    });
-    _updateMapCamera(_currentLocation!); // Update map camera.
   }
 
   Future<void> _tryLastKnownPosition() async {
     try {
       final position = await Geolocator.getLastKnownPosition(); // Get last known position.
       if (position != null && mounted) {
-        final location = LatLng(position.latitude, position.longitude);
+        final location = LatLng(position.latitude, position.longitude); // Create LatLng from position.
         setState(() {
           _currentLocation = location; // Set current location.
-          _pickupLocation = location; // Set pickup location.
+          _pickupLocation = location; // Set pickup location to last known location.
         });
         await _getAddressFromCoordinates(location, true); // Get address from coordinates.
-        _updateMapCamera(location); // Update map camera.
+        _updateMapCamera(location); // Update map camera to last known location.
+      } else {
+        setState(() {
+          _currentLocation = defaultLocation; // Set current location to default if no last known position.
+        });
+        _updateMapCamera(defaultLocation); // Update map camera to default location.
       }
     } catch (e) {
-      _handleError('Error getting last position', e); // Handle error.
-      // Fall back to default location
+      _handleError('Error getting last position', e); // Handle error if getting last position fails.
       setState(() {
-        _currentLocation = defaultLocation; // Set default location.
+        _currentLocation = defaultLocation; // Set current location to default if error occurs.
       });
-      _updateMapCamera(defaultLocation); // Update map camera.
+      _updateMapCamera(defaultLocation); // Update map camera to default location.
     }
-  }
-
-  Future<void> _searchAddress(String query, bool isPickup) async {
-    if (query.length < 3) return;
-
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
-      try {
-        final response = await http.get(
-          Uri.https('maps.googleapis.com', '/maps/api/place/autocomplete/json', {
-            'input': query,
-            'key': googleMapsApiKey,
-            'components': 'country:us',
-            'types': 'address',
-            'sessiontoken': _generateSearchSessionToken(), // Add session token.
-          }),
-        );
-
-        if (!mounted) return;
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          if (data['status'] == 'OK') {
-            await _showAddressSuggestions(data['predictions'] as List, isPickup); // Show address suggestions.
-          } else {
-            _handleError('Error fetching addresses', data['status']); // Handle error.
-          }
-        }
-      } catch (e) {
-        _handleError('Error searching address', e); // Handle error.
-      }
-    });
-  }
-
-  // Add this function to generate session tokens
-  String _generateSearchSessionToken() {
-    return DateTime.now().millisecondsSinceEpoch.toString(); // Generate session token.
-  }
-
-  Future<void> _showAddressSuggestions(List predictions, bool isPickup) async {
-    if (!mounted) return;
-
-    final placeId = await showModalBottomSheet<String>(
-      context: context,
-      builder: (context) => ListView.builder(
-        itemCount: predictions.length,
-        itemBuilder: (context, index) {
-          final prediction = predictions[index];
-          return ListTile(
-            leading: const Icon(Icons.location_on),
-            title: Text(prediction['structured_formatting']['main_text']),
-            subtitle: Text(prediction['structured_formatting']['secondary_text']),
-            onTap: () => Navigator.pop(context, prediction['place_id']),
-          );
-        },
-      ),
-    );
-
-    if (placeId != null) {
-      await _getPlaceDetails(placeId, isPickup); // Get place details.
-    }
-  }
-
-  Future<void> _getPlaceDetails(String placeId, bool isPickup) async {
-    try {
-      final response = await http.get(
-        Uri.https('maps.googleapis.com', '/maps/api/place/details/json', {
-          'place_id': placeId,
-          'key': googleMapsApiKey,
-          'fields': 'formatted_address,geometry',
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'OK') {
-          final location = data['result']['geometry']['location'];
-          final latLng = LatLng(location['lat'], location['lng']);
-          final address = data['result']['formatted_address'];
-
-          setState(() {
-            if (isPickup) {
-              _pickupLocation = latLng; // Set pickup location.
-              _pickupAddressController.text = address; // Set pickup address.
-            } else {
-              _deliveryLocation = latLng; // Set delivery location.
-              _deliveryAddressController.text = address; // Set delivery address.
-            }
-          });
-
-          _updateMapMarkersAndPolylines(); // Update map markers and polylines.
-
-          if (_pickupLocation != null && _deliveryLocation != null) {
-            await _getRouteDetails(); // Get route details.
-          }
-
-          _updateMapBounds(); // Update map bounds.
-        }
-      }
-    } catch (e) {
-      _handleError('Error getting place details', e); // Handle error.
-    }
-  }
-
-  Future<void> _getAddressFromCoordinates(LatLng location, bool isPickup) async {
-    try {
-      final response = await http.get(
-        Uri.https('maps.googleapis.com', '/maps/api/geocode/json', {
-          'latlng': '${location.latitude},${location.longitude}',
-          'key': googleMapsApiKey,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'OK') {
-          final address = data['results'][0]['formatted_address'];
-          setState(() {
-            if (isPickup) {
-              _pickupAddressController.text = address; // Set pickup address.
-            } else {
-              _deliveryAddressController.text = address; // Set delivery address.
-            }
-          });
-        }
-      }
-    } catch (e) {
-      _handleError('Error getting address', e); // Handle error.
-    }
-  }
-
-  Future<void> _getRouteDetails() async {
-    if (_pickupLocation == null || _deliveryLocation == null) return;
-
-    try {
-      final response = await http.get(
-        Uri.https('maps.googleapis.com', '/maps/api/directions/json', {
-          'origin': '${_pickupLocation!.latitude},${_pickupLocation!.longitude}',
-          'destination': '${_deliveryLocation!.latitude},${_deliveryLocation!.longitude}',
-          'key': googleMapsApiKey,
-          'departure_time': 'now',
-          'traffic_model': 'best_guess',
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'OK') {
-          final route = data['routes'][0];
-          final leg = route['legs'][0];
-
-          setState(() {
-            _routeDetails = {
-              'distance': leg['distance']['text'], // Set route distance.
-              'duration': leg['duration']['text'], // Set route duration.
-              'duration_in_traffic': leg['duration_in_traffic']['text'], // Set route duration in traffic.
-            };
-
-            _routePoints = _decodePolyline(route['overview_polyline']['points']); // Decode polyline.
-            _updateMapMarkersAndPolylines(); // Update map markers and polylines.
-
-            if (_startTime != null) {
-              final trafficDuration = leg['duration_in_traffic']['value'];
-              _estimatedEndTime = _startTime!.add(Duration(seconds: trafficDuration)); // Set estimated end time.
-            }
-          });
-        }
-      }
-    } catch (e) {
-      _handleError('Error getting route details', e); // Handle error.
-    }
-  }
-
-  List<LatLng> _decodePolyline(String encoded) {
-    List<LatLng> points = []; // List to store decoded points.
-    int index = 0, len = encoded.length; // Initialize index and length of encoded string.
-    int lat = 0, lng = 0; // Initialize latitude and longitude.
-
-    while (index < len) {
-      int b, shift = 0, result = 0; // Initialize variables for decoding.
-      do {
-        b = encoded.codeUnitAt(index++) - 63; // Decode character.
-        result |= (b & 0x1f) << shift; // Update result with decoded value.
-        shift += 5; // Increment shift.
-      } while (b >= 0x20); // Continue until b is less than 0x20.
-      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1)); // Calculate delta latitude.
-      lat += dlat; // Update latitude.
-
-      shift = 0; // Reset shift.
-      result = 0; // Reset result.
-      do {
-        b = encoded.codeUnitAt(index++) - 63; // Decode character.
-        result |= (b & 0x1f) << shift; // Update result with decoded value.
-        shift += 5; // Increment shift.
-      } while (b >= 0x20); // Continue until b is less than 0x20.
-      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1)); // Calculate delta longitude.
-      lng += dlng; // Update longitude.
-
-      points.add(LatLng(lat / 1E5, lng / 1E5)); // Add decoded point to list.
-    }
-    return points; // Return list of decoded points.
-  }
-
-  void _updateMapMarkersAndPolylines() {
-    setState(() {
-      _markers.clear(); // Clear existing markers.
-      _polylines.clear(); // Clear existing polylines.
-
-      if (_pickupLocation != null) {
-        _markers.add(Marker(
-          markerId: const MarkerId('pickup'), // Marker ID for pickup location.
-          position: _pickupLocation!, // Position of pickup location.
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen), // Green marker icon.
-          infoWindow: const InfoWindow(title: 'Pickup Location'), // Info window for pickup location.
-        ));
-      }
-
-      if (_deliveryLocation != null) {
-        _markers.add(Marker(
-          markerId: const MarkerId('delivery'), // Marker ID for delivery location.
-          position: _deliveryLocation!, // Position of delivery location.
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed), // Red marker icon.
-          infoWindow: const InfoWindow(title: 'Delivery Location'), // Info window for delivery location.
-        ));
-      }
-
-      if (_routePoints.isNotEmpty) {
-        _polylines.add(Polyline(
-          polylineId: const PolylineId('route'), // Polyline ID for route.
-          points: _routePoints, // Points of the route.
-          color: Colors.blue, // Color of the polyline.
-          width: 5, // Width of the polyline.
-        ));
-      }
-    });
-  }
-
-  void _updateMapBounds() {
-    if (_mapController == null) return; // Return if map controller is null.
-    if (_pickupLocation == null || _deliveryLocation == null) return; // Return if pickup or delivery location is null.
-
-    final bounds = LatLngBounds(
-      southwest: LatLng(
-        min(_pickupLocation!.latitude, _deliveryLocation!.latitude), // Calculate southwest latitude.
-        min(_pickupLocation!.longitude, _deliveryLocation!.longitude), // Calculate southwest longitude.
-      ),
-      northeast: LatLng(
-        max(_pickupLocation!.latitude, _deliveryLocation!.latitude), // Calculate northeast latitude.
-        max(_pickupLocation!.longitude, _deliveryLocation!.longitude), // Calculate northeast longitude.
-      ),
-    );
-
-    _mapController!.animateCamera(
-      CameraUpdate.newLatLngBounds(bounds, 50), // Animate camera to fit bounds with padding.
-    );
-  }
-
-  void _updateMapCamera(LatLng target) {
-    _mapController?.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: target, // Target position for the camera.
-          zoom: 12, // Zoom level.
-        ),
-      ),
-    );
   }
 
   void _handleError(String message, dynamic error) {
-    debugPrint('$message: $error'); // Print error message to debug console.
+    debugPrint('$message: $error'); // Print error message.
     if (mounted) {
       setState(() {
         _errorMessage = '$message: ${error.toString()}'; // Set error message.
@@ -487,732 +214,1082 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Delivery'), // App bar title.
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16), // Padding for the list view.
-          children: [
-            if (_errorMessage != null) _buildErrorCard(), // Show error card if there is an error message.
-            _buildEventSection(), // Build event section.
-            const SizedBox(height: 16), // Add spacing.
-            _buildLocationSection(), // Build location section.
-            _buildDeliveryDetailsSection(), // Build delivery details section.
-            _buildNotesSection(), // Build notes section.
-            const SizedBox(height: 24), // Add spacing.
-            _buildSubmitButton(), // Build submit button.
-          ],
-        ),
-      ),
-    );
+  void _updateMapCamera(LatLng target) {
+    _mapController.moveCamera(target); // Move map camera to target location.
   }
 
-  Widget _buildErrorCard() {
-    return Card(
-      color: Theme.of(context).colorScheme.errorContainer, // Error card background color.
-      child: Padding(
-        padding: const EdgeInsets.all(16), // Padding for the card.
-        child: Row(
-          children: [
-            Icon(
-              Icons.error_outline, // Error icon.
-              color: Theme.of(context).colorScheme.error, // Error icon color.
-            ),
-            const SizedBox(width: 16), // Add spacing.
-            Expanded(
-              child: Text(
-                _errorMessage!, // Error message text.
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error, // Error message text color.
-                ),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close), // Close icon.
-              onPressed: () => setState(() => _errorMessage = null), // Clear error message on press.
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEventSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16), // Padding for the card.
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start, // Align children to start.
-          children: [
-            Text(
-              'Event Details', // Event details title.
-              style: Theme.of(context).textTheme.titleLarge, // Title text style.
-            ),
-            const SizedBox(height: 16), // Add spacing.
-            _buildEventDropdown(), // Build event dropdown.
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLocationSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16), // Padding for the card.
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start, // Align children to start.
-          children: [
-            Text(
-              'Delivery Locations', // Delivery locations title.
-              style: Theme.of(context).textTheme.titleLarge, // Title text style.
-            ),
-            const SizedBox(height: 16), // Add spacing.
-            // Pickup Location
-            TextFormField(
-              controller: _pickupAddressController, // Controller for pickup address.
-              decoration: const InputDecoration(
-                labelText: 'Pickup Location', // Label text.
-                hintText: 'Enter pickup address', // Hint text.
-                prefixIcon: Icon(Icons.location_on), // Prefix icon.
-              ),
-              onChanged: (value) {
-                if (value.length > 3) {
-                  _searchAddress(value, true); // Search address if input length is greater than 3.
-                }
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter pickup location'; // Validate input.
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16), // Add spacing.
-            // Delivery Location
-            TextFormField(
-              controller: _deliveryAddressController, // Controller for delivery address.
-              decoration: const InputDecoration(
-                labelText: 'Delivery Location', // Label text.
-                hintText: 'Enter delivery address', // Hint text.
-                prefixIcon: Icon(Icons.location_on), // Prefix icon.
-              ),
-              onChanged: (value) {
-                if (value.length > 3) {
-                  _searchAddress(value, false); // Search address if input length is greater than 3.
-                }
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter delivery location'; // Validate input.
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16), // Add spacing.
-            // Map View
-            SizedBox(
-              height: 300, // Height of the map view.
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12), // Rounded corners for the map view.
-                child: GoogleMap(
-                  onMapCreated: (controller) {
-                    _mapController = controller; // Set map controller.
-                    if (_currentLocation != null && !_mapInitialized) {
-                      _updateMapCamera(_currentLocation!); // Update map camera if current location is available.
-                      _mapInitialized = true; // Set map initialized flag.
-                    }
-                  },
-                  initialCameraPosition: CameraPosition(
-                    target: _currentLocation ?? defaultLocation, // Initial camera position.
-                    zoom: 12, // Initial zoom level.
-                  ),
-                  markers: _markers, // Set of markers.
-                  polylines: _polylines, // Set of polylines.
-                  myLocationEnabled: true, // Enable my location.
-                  myLocationButtonEnabled: true, // Enable my location button.
-                  compassEnabled: true, // Enable compass.
-                  zoomControlsEnabled: false, // Disable zoom controls.
-                ),
-              ),
-            ),
-            if (_routeDetails != null) _buildRouteDetails(), // Build route details if available.
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Builds a widget displaying route details.
-  /// 
-  /// This widget shows the distance, duration, and duration in traffic for the route.
-  Widget _buildRouteDetails() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 16), // Adds padding to the top of the widget.
-      child: Container(
-        padding: const EdgeInsets.all(12), // Adds padding inside the container.
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest, // Sets the background color of the container.
-          borderRadius: BorderRadius.circular(8), // Rounds the corners of the container.
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
-          children: [
-            Text(
-              'Route Details',
-              style: Theme.of(context).textTheme.titleMedium, // Sets the text style for the title.
-            ),
-            const SizedBox(height: 8), // Adds vertical space between the title and the details.
-            Text('Distance: ${_routeDetails!['distance']}'), // Displays the distance of the route.
-            Text('Duration: ${_routeDetails!['duration']}'), // Displays the duration of the route.
-            Text('With Traffic: ${_routeDetails!['duration_in_traffic']}'), // Displays the duration with traffic.
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Builds a widget displaying delivery details section.
-  /// 
-  /// This widget contains dropdowns for vehicle and driver selection, and time pickers.
-  Widget _buildDeliveryDetailsSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16), // Adds padding inside the card.
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
-          children: [
-            Text(
-              'Delivery Details',
-              style: Theme.of(context).textTheme.titleLarge, // Sets the text style for the title.
-            ),
-            const SizedBox(height: 16), // Adds vertical space between the title and the dropdowns.
-            _buildVehicleDropdown(), // Builds the vehicle dropdown.
-            const SizedBox(height: 16), // Adds vertical space between the dropdowns.
-            _buildDriverDropdown(), // Builds the driver dropdown.
-            const SizedBox(height: 16), // Adds vertical space between the dropdown and the time pickers.
-            _buildTimePickers(), // Builds the time pickers.
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Builds a widget displaying additional notes section.
-  /// 
-  /// This widget contains a text field for entering special instructions or notes.
-  Widget _buildNotesSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16), // Adds padding inside the card.
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
-          children: [
-            Text(
-              'Additional Notes',
-              style: Theme.of(context).textTheme.titleLarge, // Sets the text style for the title.
-            ),
-            const SizedBox(height: 16), // Adds vertical space between the title and the text field.
-            TextFormField(
-              controller: _notesController, // Sets the controller for the text field.
-              decoration: const InputDecoration(
-                hintText: 'Enter any special instructions or notes', // Sets the hint text for the text field.
-                border: OutlineInputBorder(), // Adds a border around the text field.
-              ),
-              maxLines: 3, // Allows the text field to have up to 3 lines.
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Builds a submit button widget.
-  /// 
-  /// This button submits the form when pressed, and shows a loading indicator if the form is being submitted.
-  Widget _buildSubmitButton() {
-    return ElevatedButton(
-      onPressed: _isLoading ? null : _submitForm, // Disables the button if loading, otherwise submits the form.
-      child: _isLoading
-          ? const Row(
-              mainAxisAlignment: MainAxisAlignment.center, // Centers the loading indicator and text.
-              children: [
-                SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2), // Shows a loading indicator.
-                ),
-                SizedBox(width: 12), // Adds horizontal space between the loading indicator and the text.
-                Text('Creating Delivery...'), // Shows loading text.
-              ],
-            )
-          : const Text('Create Delivery'), // Shows the submit button text.
-    );
-  }
-
-  /// Builds a dropdown widget for selecting an event.
-  /// 
-  /// This widget fetches the current user's organization and displays events associated with that organization.
-  Widget _buildEventDropdown() {
-    return Consumer<OrganizationService>(
-      builder: (context, orgService, child) {
-        return FutureBuilder<String?>(
-          future: orgService.getCurrentUserOrganization().then((org) => org?.id), // Fetches the current user's organization ID.
-          builder: (context, orgSnapshot) {
-            if (!orgSnapshot.hasData) {
-              return const Center(child: CircularProgressIndicator()); // Shows a loading indicator while fetching the organization ID.
-            }
-
-            return StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('events')
-                  .where('organizationId', isEqualTo: orgSnapshot.data) // Filters events by the organization ID.
-                  .where('status', whereIn: ['confirmed', 'in_progress']) // Filters events by status.
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Text('Error: ${snapshot.error}'); // Shows an error message if there is an error.
-                }
-
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator()); // Shows a loading indicator while fetching events.
-                }
-
-                final events = snapshot.data!.docs; // Gets the list of events.
-
-                return DropdownButtonFormField<String>(
-                  value: _selectedEventId, // Sets the selected event ID.
-                  decoration: const InputDecoration(
-                    labelText: 'Select Event', // Sets the label text for the dropdown.
-                    hintText: 'Choose an event for delivery', // Sets the hint text for the dropdown.
-                    prefixIcon: Icon(Icons.event), // Adds an icon to the dropdown.
-                  ),
-                  items: events.map((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    return DropdownMenuItem(
-                      value: doc.id, // Sets the value of the dropdown item to the event ID.
-                      child: Text(data['name'] ?? 'Unnamed Event'), // Sets the text of the dropdown item to the event name.
-                    );
-                  }).toList(),
-                  onChanged: (value) => _handleEventSelection(value), // Handles event selection.
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please select an event'; // Validates that an event is selected.
-                    }
-                    return null;
-                  },
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-  
-
-  Future<void> _handleEventSelection(String? value) async {
-    if (value != null) {
-      final eventDoc = await FirebaseFirestore.instance
-          .collection('events') // Access the 'events' collection in Firestore.
-          .doc(value) // Get the document with the specified event ID.
-          .get(); // Fetch the document.
-
-      if (eventDoc.exists && mounted) {
-        final data = eventDoc.data()!; // Get the data from the document.
-        final startDate = (data['startDate'] as Timestamp).toDate(); // Convert the start date from Timestamp to DateTime.
-        final endDate = (data['endDate'] as Timestamp).toDate(); // Convert the end date from Timestamp to DateTime.
-        
-        setState(() {
-          _selectedEventId = value; // Set the selected event ID.
-          _selectedEventName = data['name']; // Set the selected event name.
-          _eventStartDate = startDate; // Set the event start date.
-          _eventEndDate = endDate; // Set the event end date.
-          
-          // Reset times when event changes
-          _startTime = null; // Reset the start time.
-          _estimatedEndTime = null; // Reset the estimated end time.
-        });
-      }
-    }
-  }
-
-  Widget _buildVehicleDropdown() {
-    return Consumer<OrganizationService>(
-      builder: (context, orgService, child) {
-        return FutureBuilder<String?>(
-          future: orgService.getCurrentUserOrganization().then((org) => org?.id), // Fetch the current user's organization ID.
-          builder: (context, orgSnapshot) {
-            if (!orgSnapshot.hasData) {
-              return const Center(child: CircularProgressIndicator()); // Show a loading indicator while fetching the organization ID.
-            }
-
-            return StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('vehicles') // Access the 'vehicles' collection in Firestore.
-                  .where('organizationId', isEqualTo: orgSnapshot.data) // Filter vehicles by the organization ID.
-                  .where('status', isEqualTo: 'available') // Filter vehicles by status.
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Text('Error: ${snapshot.error}'); // Show an error message if there is an error.
-                }
-
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator()); // Show a loading indicator while fetching vehicles.
-                }
-
-                final vehicles = snapshot.data!.docs; // Get the list of vehicles.
-
-                return DropdownButtonFormField<String>(
-                  value: _selectedVehicleId, // Set the selected vehicle ID.
-                  decoration: const InputDecoration(
-                    labelText: 'Select Vehicle', // Set the label text for the dropdown.
-                    hintText: 'Choose a vehicle', // Set the hint text for the dropdown.
-                    prefixIcon: Icon(Icons.local_shipping), // Add an icon to the dropdown.
-                  ),
-                  items: vehicles.map((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    return DropdownMenuItem(
-                      value: doc.id, // Set the value of the dropdown item to the vehicle ID.
-                      child: Text('${data['make']} ${data['model']} - ${data['licensePlate']}'), // Set the text of the dropdown item to the vehicle details.
-                    );
-                  }).toList(),
-                  onChanged: (value) => setState(() => _selectedVehicleId = value), // Handle vehicle selection.
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please select a vehicle'; // Validate that a vehicle is selected.
-                    }
-                    return null;
-                  },
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildDriverDropdown() {
-    return Consumer<OrganizationService>(
-      builder: (context, orgService, child) {
-        return FutureBuilder<String?>(
-          future: orgService.getCurrentUserOrganization().then((org) => org?.id), // Fetch the current user's organization ID.
-          builder: (context, orgSnapshot) {
-            if (!orgSnapshot.hasData) {
-              return const Center(child: CircularProgressIndicator()); // Show a loading indicator while fetching the organization ID.
-            }
-
-            return StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('users') // Access the 'users' collection in Firestore.
-                  .where('organizationId', isEqualTo: orgSnapshot.data) // Filter users by the organization ID.
-                  .where('role', isEqualTo: 'driver') // Filter users by role.
-                  .where('employmentStatus', isEqualTo: 'active') // Filter users by employment status.
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Text('Error: ${snapshot.error}'); // Show an error message if there is an error.
-                }
-
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator()); // Show a loading indicator while fetching drivers.
-                }
-
-                final drivers = snapshot.data!.docs; // Get the list of drivers.
-
-                return DropdownButtonFormField<String>(
-                  value: _selectedDriverId, // Set the selected driver ID.
-                  decoration: const InputDecoration(
-                    labelText: 'Select Driver', // Set the label text for the dropdown.
-                    hintText: 'Choose a driver', // Set the hint text for the dropdown.
-                    prefixIcon: Icon(Icons.person), // Add an icon to the dropdown.
-                  ),
-                  items: drivers.map((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    return DropdownMenuItem(
-                      value: doc.id, // Set the value of the dropdown item to the driver ID.
-                      child: Text('${data['firstName']} ${data['lastName']}'), // Set the text of the dropdown item to the driver details.
-                    );
-                  }).toList(),
-                  onChanged: (value) => setState(() => _selectedDriverId = value), // Handle driver selection.
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please select a driver'; // Validate that a driver is selected.
-                    }
-                    return null;
-                  },
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildTimePickers() {
-    return Column(
-      children: [
-        ListTile(
-          title: const Text('Start Time'), // Set the title for the start time picker.
-          subtitle: Text(
-            _startTime != null
-                ? DateFormat('h:mm a').format(_startTime!) // Format the start time if it is selected.
-                : 'Select start time', // Show a placeholder if the start time is not selected.
-          ),
-          trailing: const Icon(Icons.access_time), // Add an icon to the start time picker.
-          onTap: () => _selectStartTime(), // Handle start time selection.
-        ),
-        const SizedBox(height: 8), // Add vertical space between the time pickers.
-        ListTile(
-          title: const Text('Estimated End Time'), // Set the title for the estimated end time picker.
-          subtitle: Text(
-            _estimatedEndTime != null
-                ? DateFormat('h:mm a').format(_estimatedEndTime!) // Format the estimated end time if it is selected.
-                : 'Select estimated end time', // Show a placeholder if the estimated end time is not selected.
-          ),
-          trailing: const Icon(Icons.access_time), // Add an icon to the estimated end time picker.
-          onTap: () => _selectEndTime(), // Handle estimated end time selection.
-        ),
-      ],
-    );
-  }
-
-  Future<void> _selectStartTime() async {
-    if (_eventStartDate == null || _eventEndDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select an event first'), // Show a message if no event is selected.
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(), // Show the current time as the initial time.
-    );
-
-    if (time != null) {
-      // Create start time on event date
-      final startTime = DateTime(
-        _eventStartDate!.year,
-        _eventStartDate!.month,
-        _eventStartDate!.day,
-        time.hour,
-        time.minute,
-      );
-
-      // Validate time is within event window
-      if (startTime.isBefore(_eventStartDate!) || 
-          startTime.isAfter(_eventEndDate!)) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Delivery time must be within event duration'), // Show a message if the time is outside the event duration.
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-        return;
-      }
-
-      setState(() => _startTime = startTime); // Set the start time.
-
-      // Update route details with new start time
-      if (_pickupLocation != null && _deliveryLocation != null) {
-        await _getRouteDetailsWithTime(startTime); // Fetch route details with the new start time.
-      }
-    }
-  }
-
-  Future<void> _getRouteDetailsWithTime(DateTime startTime) async {
-    if (_pickupLocation == null || _deliveryLocation == null) return;
-
+  Future<void> _getAddressFromCoordinates(LatLng location, bool isPickup) async {
     try {
-      final timestamp = (startTime.millisecondsSinceEpoch / 1000).round();
-      
       final response = await http.get(
-        Uri.https('maps.googleapis.com', '/maps/api/directions/json', {
-          'origin': '${_pickupLocation!.latitude},${_pickupLocation!.longitude}',
-          'destination': '${_deliveryLocation!.latitude},${_deliveryLocation!.longitude}',
-          'key': googleMapsApiKey,
-          'departure_time': timestamp.toString(),
-          'traffic_model': 'best_guess',
-        }),
+        Uri.parse(
+          'https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}', // URL for reverse geocoding.
+        ),
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'CateredToYou/1.0', // User-Agent header for the request.
+        },
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'OK') {
-          final route = data['routes'][0];
-          final leg = route['legs'][0];
-          
-          final durationInTraffic = leg['duration_in_traffic']['value'];
-          
-          setState(() {
-            _routeDetails = {
-              'distance': leg['distance']['text'],
-              'duration': leg['duration']['text'],
-              'duration_in_traffic': leg['duration_in_traffic']['text'],
-              'duration_value': durationInTraffic,
-            };
-
-            _routePoints = _decodePolyline(route['overview_polyline']['points']);
-            _updateMapMarkersAndPolylines();
-
-            // Automatically set estimated end time based on traffic
-            _estimatedEndTime = _startTime!.add(Duration(seconds: durationInTraffic));
-          });
-        }
+        final data = json.decode(response.body); // Decode JSON response.
+        final address = data['display_name']; // Get address from response.
+        setState(() {
+          if (isPickup) {
+            _pickupAddressController.text = address; // Set pickup address.
+          } else {
+            _deliveryAddressController.text = address; // Set delivery address.
+          }
+        });
       }
     } catch (e) {
-      _handleError('Error getting route details', e);
+      _handleError('Error getting address', e); // Handle error if getting address fails.
     }
   }
 
+  Future<void> _searchAddress(String query, bool isPickup) async {
+    if (query.length < 3) return; // Return if query is too short.
 
-  Future<void> _selectEndTime() async {
-    if (_startTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select start time first'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
+    _debounceTimer?.cancel(); // Cancel previous debounce timer.
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
+      try {
+        setState(() => _isLoading = true); // Set loading state to true.
 
-    final time = await showTimePicker(
+        final response = await http.get(
+          Uri.parse(
+            'https://nominatim.openstreetmap.org/search?format=json&q=$query&limit=5&countrycodes=us', // URL for address search.
+          ),
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'CateredToYou/1.0', // User-Agent header for the request.
+          },
+        );
+
+        if (!mounted) return;
+
+        if (response.statusCode == 200) {
+          final results = json.decode(response.body) as List; // Decode JSON response.
+          if (results.isNotEmpty) {
+            await _showAddressSuggestions(results, isPickup); // Show address suggestions.
+          }
+        }
+      } catch (e) {
+        _handleError('Error searching address', e); // Handle error if searching address fails.
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false); // Set loading state to false.
+        }
+      }
+    });
+  }
+
+  Future<void> _showAddressSuggestions(List results, bool isPickup) async {
+    if (!mounted) return;
+
+    final selected = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
-      initialTime: _estimatedEndTime != null
-          ? TimeOfDay.fromDateTime(_estimatedEndTime!)
-          : TimeOfDay.fromDateTime(_startTime!.add(const Duration(hours: 1))),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.4,
+        minChildSize: 0.2,
+        maxChildSize: 0.75,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)), // Rounded top corners.
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4), // Handle color.
+                  borderRadius: BorderRadius.circular(2), // Rounded handle.
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  itemCount: results.length,
+                  itemBuilder: (context, index) {
+                    final result = results[index];
+                    return ListTile(
+                      leading: const Icon(Icons.location_on), // Location icon.
+                      title: Text(
+                        result['display_name'],
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis, // Ellipsis for long text.
+                      ),
+                      onTap: () => Navigator.pop(context, result), // Return selected result.
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
 
-    if (time != null) {
-      final estimatedEnd = DateTime(
-        DateTime.now().year,
-        DateTime.now().month,
-        DateTime.now().day,
-        time.hour,
-        time.minute,
+    if (selected != null) {
+      final latLng = LatLng(
+        double.parse(selected['lat']),
+        double.parse(selected['lon']),
       );
-
-      if (estimatedEnd.isBefore(_startTime!)) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('End time must be after start time'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+      
+      setState(() {
+        if (isPickup) {
+          _pickupLocation = latLng; // Set pickup location.
+          _pickupAddressController.text = selected['display_name']; // Set pickup address.
+        } else {
+          _deliveryLocation = latLng; // Set delivery location.
+          _deliveryAddressController.text = selected['display_name']; // Set delivery address.
         }
-        return;
+      });
+
+      _updateMapMarkersAndPolylines(); // Update map markers and polylines.
+
+      if (_pickupLocation != null && _deliveryLocation != null) {
+        await _getRouteDetails(); // Get route details if both locations are set.
       }
 
-      setState(() => _estimatedEndTime = estimatedEnd);
+      _updateMapBounds(); // Update map bounds.
     }
+  }
+
+  Future<void> _getRouteDetails() async {
+    if (_pickupLocation == null || _deliveryLocation == null) return;
+
+    setState(() => _isLoading = true); // Set loading state to true.
+
+    try {
+      final url = '$osmRoutingUrl${_pickupLocation!.longitude},${_pickupLocation!.latitude};'
+          '${_deliveryLocation!.longitude},${_deliveryLocation!.latitude}'
+          '?overview=full&geometries=geojson&steps=true'; // URL for routing API.
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Accept': 'application/json'}, // Accept JSON response.
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body); // Decode JSON response.
+        if (data['code'] == 'Ok') {
+          final route = data['routes'][0];
+          
+          // Extract route points from GeoJSON geometry
+          final coordinates = route['geometry']['coordinates'] as List;
+          final points = coordinates
+              .map((coord) => LatLng(coord[1].toDouble(), coord[0].toDouble()))
+              .toList();
+
+          // Calculate estimated time with traffic
+          final baseDuration = route['duration'] as num;
+          final distance = route['distance'] as num;
+          final trafficFactor = 1.3; // Assume 30% more time during traffic
+          final durationWithTraffic = baseDuration * trafficFactor;
+
+          setState(() {
+            _routeDetails = {
+              'distance': '${(distance * 0.000621371).toStringAsFixed(1)} miles', // Convert distance to miles.
+              'duration': '${(baseDuration / 60).toStringAsFixed(0)} min', // Convert duration to minutes.
+              'durationWithTraffic': '${(durationWithTraffic / 60).toStringAsFixed(0)} min', // Convert duration with traffic to minutes.
+              'steps': route['legs'][0]['steps'], // Route steps.
+            };
+            _routePoints = points.cast<LatLng>(); // Set route points.
+          });
+
+          _updateMapMarkersAndPolylines(); // Update map markers and polylines.
+          
+          if (_startTime != null) {
+            setState(() {
+              _estimatedEndTime = _startTime!.add(
+                Duration(seconds: durationWithTraffic.round()), // Calculate estimated end time.
+              );
+            });
+          }
+        }
+      }
+    } catch (e) {
+      _handleError('Error getting route details', e); // Handle error if getting route details fails.
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false); // Set loading state to false.
+      }
+    }
+  }
+
+void _updateMapMarkersAndPolylines() {
+  final markers = <Marker>[]; // Initialize an empty list of markers.
+  
+  if (_pickupLocation != null) {
+    markers.add(MapMarkerHelper.createMarker(
+      point: _pickupLocation!,  // Add a marker for the pickup location.
+      id: 'pickup', // Set the marker ID to 'pickup'.
+      color: Colors.green, // Set the marker color to green.
+      icon: Icons.location_on, // Set the marker icon.
+      title: 'Pickup', // Set the marker title.
+    ));
+  }
+
+  if (_deliveryLocation != null) {
+    markers.add(MapMarkerHelper.createMarker(
+      point: _deliveryLocation!,  // Add a marker for the delivery location.
+      id: 'delivery', // Set the marker ID to 'delivery'.
+      color: Colors.red, // Set the marker color to red.
+      icon: Icons.location_on, // Set the marker icon.
+      title: 'Delivery', // Set the marker title.
+    ));
+  }
+
+  final polylines = <Polyline>[]; // Initialize an empty list of polylines.
+  if (_routePoints.isNotEmpty) {
+    polylines.add(MapMarkerHelper.createRoute(
+      points: _routePoints, // Add a polyline for the route points.
+      color: Theme.of(context).colorScheme.primary, // Set the polyline color.
+    ));
+  }
+
+  _mapController.updateMarkers(markers); // Update the map with the new markers.
+  _mapController.updatePolylines(polylines); // Update the map with the new polylines.
+}
+
+void _updateMapBounds() {
+  if (_pickupLocation == null || _deliveryLocation == null) return; // Return if either location is null.
+
+  final points = [_pickupLocation!, _deliveryLocation!]; // Create a list of points with pickup and delivery locations.
+  if (_currentLocation != null) {
+    points.add(_currentLocation!); // Add the current location to the points list if it's not null.
+  }
+
+  _mapController.fitBounds(
+    points, // Fit the map bounds to include all points.
+    padding: const EdgeInsets.all(50), // Add padding around the bounds.
+  );
+}
+
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text('Create Delivery'), // Set the app bar title.
+    ),
+    body: Form(
+      key: _formKey, // Set the form key for validation.
+      child: ListView(
+        padding: const EdgeInsets.all(16), // Add padding around the list view.
+        children: [
+          if (_errorMessage != null) _buildErrorCard(), // Show error card if there's an error message.
+          _buildEventSection(), // Build the event section.
+          const SizedBox(height: 16), // Add vertical spacing.
+          _buildLocationSection(), // Build the location section.
+          _buildDeliveryDetailsSection(), // Build the delivery details section.
+          _buildNotesSection(), // Build the notes section.
+          const SizedBox(height: 24), // Add vertical spacing.
+          _buildSubmitButton(), // Build the submit button.
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildLocationSection() {
+  return Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16), // Add padding inside the card.
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch, // Stretch children to fill the column width.
+        children: [
+          Text(
+            'Delivery Locations', // Section title.
+            style: Theme.of(context).textTheme.titleLarge, // Set the text style.
+          ),
+          const SizedBox(height: 16), // Add vertical spacing.
+          _buildAddressInput(
+            controller: _pickupAddressController, // Set the controller for the pickup address input.
+            label: 'Pickup Location', // Set the label for the pickup address input.
+            hint: 'Enter pickup address', // Set the hint for the pickup address input.
+            isPickup: true, // Indicate that this is the pickup address input.
+          ),
+          const SizedBox(height: 16), // Add vertical spacing.
+          _buildAddressInput(
+            controller: _deliveryAddressController, // Set the controller for the delivery address input.
+            label: 'Delivery Location', // Set the label for the delivery address input.
+            hint: 'Enter delivery address', // Set the hint for the delivery address input.
+            isPickup: false, // Indicate that this is the delivery address input.
+          ),
+          const SizedBox(height: 16), // Add vertical spacing.
+          _buildMapSection(), // Build the map section.
+          if (_routeDetails != null) ...[
+            const SizedBox(height: 16), // Add vertical spacing.
+            _buildRouteDetails(), // Build the route details section.
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildAddressInput({
+  required TextEditingController controller, // Required controller for the input.
+  required String label, // Required label for the input.
+  required String hint, // Required hint for the input.
+  required bool isPickup, // Required flag to indicate if this is the pickup address input.
+}) {
+  return TextFormField(
+    controller: controller, // Set the controller for the input.
+    decoration: InputDecoration(
+      labelText: label, // Set the label text.
+      hintText: hint, // Set the hint text.
+      prefixIcon: const Icon(Icons.location_on), // Set the prefix icon.
+      border: const OutlineInputBorder(), // Set the border style.
+      suffixIcon: controller.text.isNotEmpty
+        ? IconButton(
+            icon: const Icon(Icons.clear), // Set the clear icon.
+            onPressed: () {
+              controller.clear(); // Clear the input text.
+              setState(() {
+                if (isPickup) {
+                  _pickupLocation = null; // Clear the pickup location.
+                } else {
+                  _deliveryLocation = null; // Clear the delivery location.
+                }
+                _updateMapMarkersAndPolylines(); // Update the map markers and polylines.
+              });
+            },
+          )
+        : null, // Show the clear icon only if the input text is not empty.
+    ),
+    onChanged: (value) {
+      if (value.length > 3) {
+        _searchAddress(value, isPickup); // Search for the address if the input text length is greater than 3.
+      }
+    },
+    validator: (value) {
+      if (value == null || value.isEmpty) {
+        return isPickup ? 'Please enter pickup location' : 'Please enter delivery location'; // Validate the input.
+      }
+      return null;
+    },
+  );
+}
+
+Widget _buildMapSection() {
+  return SizedBox(
+    height: 300, // Set the height of the map section.
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(12), // Set the border radius.
+      child: Stack(
+        fit: StackFit.expand, // Expand the stack to fill the available space.
+        children: [
+          DeliveryMap(
+            mapController: _mapController.mapController, // Set the map controller.
+            markers: _mapController.markers, // Set the markers.
+            polylines: _mapController.polylines, // Set the polylines.
+            initialPosition: _currentLocation ?? defaultLocation, // Set the initial position.
+            isLoading: _isLoading, // Set the loading state.
+            onMapTap: (tapPosition, point) async {
+              if (_pickupLocation == null) {
+                setState(() => _pickupLocation = point); // Set the pickup location on map tap.
+                await _getAddressFromCoordinates(point, true); // Get the address from coordinates.
+              } else if (_deliveryLocation == null) {
+                setState(() => _deliveryLocation = point); // Set the delivery location on map tap.
+                await _getAddressFromCoordinates(point, false); // Get the address from coordinates.
+              }
+              _updateMapMarkersAndPolylines(); // Update the map markers and polylines.
+              if (_pickupLocation != null && _deliveryLocation != null) {
+                await _getRouteDetails(); // Get the route details if both locations are set.
+                _updateMapBounds(); // Update the map bounds.
+              }
+            },
+            onMapReady: () {
+              if (_currentLocation != null && !_mapInitialized) {
+                _updateMapCamera(_currentLocation!); // Update the map camera to the current location.
+                _mapInitialized = true; // Set the map initialized flag to true.
+              }
+            },
+          ),
+          Positioned(
+            right: 16, // Position the button 16 pixels from the right.
+            bottom: 16, // Position the button 16 pixels from the bottom.
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min, // Minimize the column size.
+                children: [
+                  if (_currentLocation != null)
+                    FloatingActionButton.small(
+                      heroTag: 'my_location', // Set the hero tag for the button.
+                      onPressed: () => _updateMapCamera(_currentLocation!), // Update the map camera to the current location.
+                      child: const Icon(Icons.my_location), // Set the button icon.
+                    ),
+                  if (_pickupLocation != null && _deliveryLocation != null) ...[
+                    const SizedBox(height: 8), // Add vertical spacing.
+                    FloatingActionButton.small(
+                      heroTag: 'fit_bounds', // Set the hero tag for the button.
+                      onPressed: _updateMapBounds, // Update the map bounds.
+                      child: const Icon(Icons.route), // Set the button icon.
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          if (_isLoading)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.3), // Set the overlay color.
+                child: const Center(
+                  child: CircularProgressIndicator(), // Show a loading indicator.
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildRouteDetails() {
+  return Padding(
+    padding: const EdgeInsets.only(top: 16), // Add padding at the top.
+    child: Container(
+      padding: const EdgeInsets.all(12), // Add padding inside the container.
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest, // Set the background color.
+        borderRadius: BorderRadius.circular(8), // Set the border radius.
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
+        children: [
+          Text(
+            'Route Details', // Section title.
+            style: Theme.of(context).textTheme.titleMedium, // Set the text style.
+          ),
+          const SizedBox(height: 8), // Add vertical spacing.
+          Row(
+            children: [
+              const Icon(Icons.straighten, size: 18), // Set the icon.
+              const SizedBox(width: 8), // Add horizontal spacing.
+              Text('Distance: ${_routeDetails!['distance']}'), // Show the route distance.
+            ],
+          ),
+          const SizedBox(height: 4), // Add vertical spacing.
+          Row(
+            children: [
+              const Icon(Icons.timer_outlined, size: 18), // Set the icon.
+              const SizedBox(width: 8), // Add horizontal spacing.
+              Text('Normal duration: ${_routeDetails!['duration']}'), // Show the normal duration.
+            ],
+          ),
+          const SizedBox(height: 4), // Add vertical spacing.
+          Row(
+            children: [
+              const Icon(Icons.traffic, size: 18), // Set the icon.
+              const SizedBox(width: 8), // Add horizontal spacing.
+              Text('With traffic: ${_routeDetails!['durationWithTraffic']}'), // Show the duration with traffic.
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildDeliveryDetailsSection() {
+  return Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16), // Add padding inside the card.
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
+        children: [
+          Text(
+            'Delivery Details', // Section title.
+            style: Theme.of(context).textTheme.titleLarge, // Set the text style.
+          ),
+          const SizedBox(height: 16), // Add vertical spacing.
+          _buildVehicleDropdown(), // Build the vehicle dropdown.
+          const SizedBox(height: 16), // Add vertical spacing.
+          _buildDriverDropdown(), // Build the driver dropdown.
+          const SizedBox(height: 16), // Add vertical spacing.
+          _buildTimePickers(), // Build the time pickers.
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildEventSection() {
+  final orgService = context.read<OrganizationService>(); // Get the organization service.
+  return FutureBuilder<String?>(
+    future: orgService.getCurrentUserOrganization().then((org) => org?.id), // Get the current user's organization ID.
+    builder: (context, orgSnapshot) {
+      if (!orgSnapshot.hasData) {
+        return const Center(child: CircularProgressIndicator()); // Show a loading indicator if the organization ID is not available.
+      }
+
+      return StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('events')
+            .where('organizationId', isEqualTo: orgSnapshot.data) // Filter events by organization ID.
+            .where('status', whereIn: ['confirmed', 'in_progress']) // Filter events by status.
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Text('Error: ${snapshot.error}'); // Show an error message if there's an error.
+          }
+
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator()); // Show a loading indicator if the events are not available.
+          }
+
+          final events = snapshot.data!.docs; // Get the list of events.
+
+          return DropdownButtonFormField<String>(
+            value: _selectedEventId, // Set the selected event ID.
+            decoration: const InputDecoration(
+              labelText: 'Select Event', // Set the label text.
+              hintText: 'Choose an event for delivery', // Set the hint text.
+              prefixIcon: Icon(Icons.event), // Set the prefix icon.
+            ),
+            items: events.map((doc) {
+              final data = doc.data() as Map<String, dynamic>; // Get the event data.
+              return DropdownMenuItem(
+                value: doc.id, // Set the event ID.
+                child: Text(data['name'] ?? 'Unnamed Event'), // Set the event name.
+              );
+            }).toList(),
+            onChanged: (value) {
+              if (value != null) {
+                _handleEventSelection(value); // Handle event selection.
+              }
+            },
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please select an event'; // Validate the input.
+              }
+              return null;
+            },
+          );
+        },
+      );
+    },
+  );
+}
+
+Future<void> _handleEventSelection(String value) async {
+  try {
+    setState(() => _isLoading = true); // Set the loading state to true.
+    
+    final eventDoc = await FirebaseFirestore.instance
+        .collection('events')
+        .doc(value)
+        .get(); // Get the event document.
+
+    if (eventDoc.exists && mounted) {
+      final data = eventDoc.data()!; // Get the event data.
+      final startDate = (data['startDate'] as Timestamp).toDate(); // Get the event start date.
+      final endDate = (data['endDate'] as Timestamp).toDate(); // Get the event end date.
+      
+      setState(() {
+        _selectedEventId = value; // Set the selected event ID.
+        _selectedEventName = data['name']; // Set the selected event name.
+        _eventStartDate = startDate; // Set the event start date.
+        _eventEndDate = endDate; // Set the event end date.
+        
+        // Reset time selections when event changes
+        _startTime = null; // Reset the start time.
+        _estimatedEndTime = null; // Reset the estimated end time.
+      });
+
+      // Show event duration to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Event duration: ${DateFormat('MMM d, h:mm a').format(startDate)} - '
+              '${DateFormat('MMM d, h:mm a').format(endDate)}' // Show the event duration.
+            ),
+            behavior: SnackBarBehavior.floating, // Set the snack bar behavior.
+            duration: const Duration(seconds: 3), // Set the snack bar duration.
+          ),
+        );
+      }
+    }
+  } catch (e) {
+    _handleError('Error loading event details', e); // Handle error if loading event details fails.
+  } finally {
+    if (mounted) {
+      setState(() => _isLoading = false); // Set the loading state to false.
+    }
+  }
+}
+
+Widget _buildVehicleDropdown() {
+  return Consumer<VehicleService>(
+    builder: (context, vehicleService, _) {
+      return StreamBuilder<List<Vehicle>>(
+        stream: vehicleService.getVehicles(), // Get the list of vehicles.
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Text('Error: ${snapshot.error}'); // Show an error message if there's an error.
+          }
+
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator()); // Show a loading indicator if the vehicles are not available.
+          }
+
+          final vehicles = snapshot.data!
+              .where((vehicle) => vehicle.status == VehicleStatus.available) // Filter available vehicles.
+              .toList();
+
+          if (vehicles.isEmpty) {
+            return const Text('No available vehicles'); // Show a message if there are no available vehicles.
+          }
+
+          return DropdownButtonFormField<String>(
+            value: _selectedVehicleId, // Set the selected vehicle ID.
+            decoration: const InputDecoration(
+              labelText: 'Select Vehicle', // Set the label text.
+              hintText: 'Choose a vehicle', // Set the hint text.
+              prefixIcon: Icon(Icons.local_shipping), // Set the prefix icon.
+            ),
+            items: vehicles.map((vehicle) {
+              return DropdownMenuItem(
+                value: vehicle.id, // Set the vehicle ID.
+                child: Text('${vehicle.make} ${vehicle.model} - ${vehicle.licensePlate}'), // Set the vehicle details.
+              );
+            }).toList(),
+            onChanged: (value) => setState(() => _selectedVehicleId = value), // Handle vehicle selection.
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please select a vehicle'; // Validate the input.
+              }
+              return null;
+            },
+          );
+        },
+      );
+    },
+  );
+}
+
+ Widget _buildDriverDropdown() {
+  return Consumer<StaffService>( // Use Consumer to access the StaffService.
+    builder: (context, staffService, _) {
+    return StreamBuilder<List<UserModel>>( // Use StreamBuilder to listen to the stream of staff members.
+      stream: staffService.getStaffMembers(), // Get the stream of staff members.
+      builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return Text('Error: ${snapshot.error}'); // Show error message if there's an error.
+      }
+
+      if (!snapshot.hasData) {
+        return const Center(child: CircularProgressIndicator()); // Show loading indicator while data is loading.
+      }
+
+      final drivers = snapshot.data!
+        .where((staff) => 
+          staff.role == 'driver' && 
+          staff.employmentStatus == 'active') // Filter active drivers.
+        .toList();
+
+      if (drivers.isEmpty) {
+        return const Text('No available drivers'); // Show message if no drivers are available.
+      }
+
+      return DropdownButtonFormField<String>( // Create a dropdown form field for selecting a driver.
+        value: _selectedDriverId, // Set the selected driver ID.
+        decoration: const InputDecoration(
+        labelText: 'Select Driver', // Set the label text.
+        hintText: 'Choose a driver', // Set the hint text.
+        prefixIcon: Icon(Icons.person), // Set the prefix icon.
+        ),
+        items: drivers.map((driver) {
+        return DropdownMenuItem(
+          value: driver.uid, // Set the driver ID.
+          child: Text('${driver.firstName} ${driver.lastName}'), // Set the driver name.
+        );
+        }).toList(),
+        onChanged: (value) => setState(() => _selectedDriverId = value), // Update the selected driver ID.
+        validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please select a driver'; // Validate the input.
+        }
+        return null;
+        },
+      );
+      },
+    );
+    },
+  );
+  }
+
+  Widget _buildTimePickers() {
+  return Column(
+    children: [
+    ListTile(
+      title: const Text('Start Time'), // Set the title for the start time picker.
+      subtitle: Text(
+      _startTime != null
+        ? DateFormat('h:mm a').format(_startTime!) // Format the selected start time.
+        : 'Select start time', // Show hint text if no start time is selected.
+      ),
+      trailing: const Icon(Icons.access_time), // Set the trailing icon.
+      onTap: () => _selectStartTime(), // Show the start time picker when tapped.
+    ),
+    const SizedBox(height: 8), // Add vertical spacing.
+    ListTile(
+      title: const Text('Estimated End Time'), // Set the title for the estimated end time picker.
+      subtitle: Text(
+      _estimatedEndTime != null
+        ? DateFormat('h:mm a').format(_estimatedEndTime!) // Format the selected estimated end time.
+        : 'Select estimated end time', // Show hint text if no estimated end time is selected.
+      ),
+      trailing: const Icon(Icons.access_time), // Set the trailing icon.
+      onTap: () => _selectEndTime(), // Show the estimated end time picker when tapped.
+    ),
+    ],
+  );
+  }
+
+  Widget _buildNotesSection() {
+  return Card(
+  child: SingleChildScrollView(  // Add this
+    padding: const EdgeInsets.all(16), // Add padding inside the card.
+    child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
+    children: [
+      Text(
+      'Additional Notes', // Set the section title.
+      style: Theme.of(context).textTheme.titleLarge, // Set the text style.
+      ),
+      const SizedBox(height: 16), // Add vertical spacing.
+      TextFormField(
+      controller: _notesController, // Set the controller for the notes input.
+      decoration: const InputDecoration(
+        hintText: 'Enter any special instructions or notes', // Set the hint text.
+        border: OutlineInputBorder(), // Set the border style.
+      ),
+      maxLines: 3, // Allow multiple lines of input.
+      ),
+    ],
+    ),
+  ),
+  );
+}
+
+  Widget _buildErrorCard() {
+  return Card(
+    color: Theme.of(context).colorScheme.errorContainer, // Set the background color.
+    child: Padding(
+    padding: const EdgeInsets.all(16), // Add padding inside the card.
+    child: Row(
+      children: [
+      Icon(
+        Icons.error_outline, // Set the error icon.
+        color: Theme.of(context).colorScheme.error, // Set the icon color.
+      ),
+      const SizedBox(width: 16), // Add horizontal spacing.
+      Expanded(
+        child: Text(
+        _errorMessage!, // Show the error message.
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.error, // Set the text color.
+        ),
+        ),
+      ),
+      IconButton(
+        icon: const Icon(Icons.close), // Set the close icon.
+        onPressed: () => setState(() => _errorMessage = null), // Clear the error message when the button is pressed.
+      ),
+      ],
+    ),
+    ),
+  );
+  }
+
+  Widget _buildSubmitButton() {
+  return ElevatedButton(
+    onPressed: _isLoading ? null : _submitForm, // Disable the button if loading.
+    child: _isLoading
+      ? const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+        SizedBox(
+          height: 20,
+          width: 20,
+          child: CircularProgressIndicator(strokeWidth: 2), // Show loading indicator.
+        ),
+        SizedBox(width: 12), // Add horizontal spacing.
+        Text('Creating Delivery...'), // Show loading text.
+        ],
+      )
+      : const Text('Create Delivery'), // Show submit text.
+  );
+  }
+ Future<void> _selectStartTime() async {
+  if (_eventStartDate == null || _eventEndDate == null) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Please select an event first'), // Show message if no event is selected.
+      behavior: SnackBarBehavior.floating,
+    ),
+    );
+    return;
+  }
+
+  if (!mounted) return;
+
+  // Calculate valid date range
+  final DateTime firstValidDate = _eventStartDate!.subtract(const Duration(days: 7)); // Set the first valid date.
+  final DateTime lastValidDate = _eventEndDate!; // Set the last valid date.
+  final DateTime initialDate = DateTime.now().isAfter(firstValidDate) ? 
+                 DateTime.now() : 
+                 firstValidDate; // Set the initial date.
+
+  // First select date
+  final DateTime? selectedDate = await showDatePicker(
+    context: context,
+    initialDate: initialDate, // Set the initial date.
+    firstDate: firstValidDate, // Set the first valid date.
+    lastDate: lastValidDate, // Set the last valid date.
+  );
+
+  if (selectedDate == null || !mounted) return;
+
+  // Then select time
+  final TimeOfDay? time = await showTimePicker(
+    context: context,
+    initialTime: TimeOfDay.now(), // Set the initial time.
+    builder: (BuildContext context, Widget? child) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+      timePickerTheme: TimePickerThemeData(
+        backgroundColor: Theme.of(context).colorScheme.surface, // Set the background color.
+      ),
+      ),
+      child: child!,
+    );
+    },
+  );
+
+  if (time != null && mounted) {
+    final selectedDateTime = DateTime(
+    selectedDate.year,
+    selectedDate.month,
+    selectedDate.day,
+    time.hour,
+    time.minute,
+    );
+
+    setState(() {
+    _startTime = selectedDateTime; // Set the selected start time.
+    // Automatically update estimated end time based on route details
+    if (_routeDetails != null) {
+      final trafficDuration = _routeDetails!['durationWithTraffic']; // Get the traffic duration.
+      if (trafficDuration != null) {
+      final minutes = int.tryParse(trafficDuration.replaceAll(RegExp(r'[^0-9]'), '')); // Parse the duration.
+      if (minutes != null) {
+        _estimatedEndTime = _startTime!.add(Duration(minutes: minutes)); // Set the estimated end time.
+      }
+      }
+    }
+    });
+  }
+  }
+
+  Future<void> _selectEndTime() async {
+  if (_startTime == null) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Please select start time first'), // Show message if no start time is selected.
+      behavior: SnackBarBehavior.floating,
+    ),
+    );
+    return;
+  }
+
+  if (!mounted) return;
+  // First select date
+  final DateTime? selectedDate = await showDatePicker(
+    context: context,
+    initialDate: _estimatedEndTime ?? _startTime!, // Set the initial date.
+    firstDate: _startTime!, // Set the first valid date.
+    lastDate: _eventEndDate!.add(const Duration(days: 1)), // Set the last valid date.
+  );
+
+  if (selectedDate == null || !mounted) return;
+
+  // Then select time
+  final TimeOfDay? time = await showTimePicker(
+    context: context,
+    initialTime: _estimatedEndTime != null
+      ? TimeOfDay.fromDateTime(_estimatedEndTime!) // Set the initial time.
+      : TimeOfDay.fromDateTime(_startTime!.add(const Duration(hours: 1))), // Set the initial time.
+    builder: (BuildContext context, Widget? child) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+      timePickerTheme: TimePickerThemeData(
+        backgroundColor: Theme.of(context).colorScheme.surface, // Set the background color.
+      ),
+      ),
+      child: child!,
+    );
+    },
+  );
+
+  if (time != null && mounted) {
+    final selectedDateTime = DateTime(
+    selectedDate.year,
+    selectedDate.month,
+    selectedDate.day,
+    time.hour,
+    time.minute,
+    );
+
+    if (selectedDateTime.isBefore(_startTime!)) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+      content: Text('End time must be after start time'), // Show message if end time is before start time.
+      behavior: SnackBarBehavior.floating,
+      ),
+    );
+    return;
+    }
+
+    setState(() => _estimatedEndTime = selectedDateTime); // Set the selected end time.
+  }
   }
 
   Future<void> _submitForm() async {
   if (!_validateForm()) return;
 
   setState(() {
-    _isLoading = true;
-    _errorMessage = null;
+    _isLoading = true; // Set loading state to true.
+    _errorMessage = null; // Clear error message.
   });
 
   try {
-    final deliveryService = context.read<DeliveryRouteService>();
-    final currentUser = FirebaseAuth.instance.currentUser;
+    final deliveryService = context.read<DeliveryRouteService>(); // Get the delivery route service.
+    final currentUser = FirebaseAuth.instance.currentUser; // Get the current user.
     
     if (currentUser == null) {
-      throw 'User not authenticated';
+    throw 'User not authenticated'; // Throw error if user is not authenticated.
     }
 
     // Convert LatLng to GeoPoint for Firestore
     final List<GeoPoint> waypoints = [
-      GeoPoint(_pickupLocation!.latitude, _pickupLocation!.longitude),
-      GeoPoint(_deliveryLocation!.latitude, _deliveryLocation!.longitude),
+    GeoPoint(_pickupLocation!.latitude, _pickupLocation!.longitude), // Convert pickup location to GeoPoint.
+    GeoPoint(_deliveryLocation!.latitude, _deliveryLocation!.longitude), // Convert delivery location to GeoPoint.
     ];
 
-    // Create complete metadata
+    // Create metadata with route information
+    // Flatten nested structures to avoid array issues
     final metadata = {
-      'notes': _notesController.text.trim(),
-      'eventName': _selectedEventName,
-      'routeDetails': _routeDetails,
-      'pickupAddress': _pickupAddressController.text,
-      'deliveryAddress': _deliveryAddressController.text,
-      'estimatedDistance': _routeDetails?['distance'],
-      'estimatedDuration': _routeDetails?['duration'],
-      'trafficDuration': _routeDetails?['duration_in_traffic'],
-      'createdBy': currentUser.uid,
-      'updatedBy': currentUser.uid,
-      'status': 'pending',
-      'eventStartDate': _eventStartDate?.millisecondsSinceEpoch,
-      'eventEndDate': _eventEndDate?.millisecondsSinceEpoch,
+    'notes': _notesController.text.trim(), // Add notes.
+    'eventName': _selectedEventName, // Add event name.
+    'pickupAddress': _pickupAddressController.text, // Add pickup address.
+    'deliveryAddress': _deliveryAddressController.text, // Add delivery address.
+    'distance': _routeDetails?['distance'], // Add distance.
+    'estimatedDuration': _routeDetails?['duration'], // Add estimated duration.
+    'trafficDuration': _routeDetails?['durationWithTraffic'], // Add traffic duration.
+    'createdBy': currentUser.uid, // Add created by user ID.
+    'updatedBy': currentUser.uid, // Add updated by user ID.
+    'status': 'pending', // Set status to pending.
+    'eventStartDate': _eventStartDate?.millisecondsSinceEpoch, // Add event start date.
+    'eventEndDate': _eventEndDate?.millisecondsSinceEpoch, // Add event end date.
+    'lastUpdated': FieldValue.serverTimestamp(), // Add last updated timestamp.
     };
 
-    // Call service to create delivery route
+    // Create delivery route
     await deliveryService.createDeliveryRoute(
-      eventId: _selectedEventId!,
-      vehicleId: _selectedVehicleId!,
-      driverId: _selectedDriverId!,
-      startTime: _startTime!,
-      estimatedEndTime: _estimatedEndTime!,
-      waypoints: waypoints,
-      metadata: metadata,
+    eventId: _selectedEventId!, // Add event ID.
+    vehicleId: _selectedVehicleId!, // Add vehicle ID.
+    driverId: _selectedDriverId!, // Add driver ID.
+    startTime: _startTime!, // Add start time.
+    estimatedEndTime: _estimatedEndTime!, // Add estimated end time.
+    waypoints: waypoints, // Add waypoints.
+    metadata: metadata, // Add metadata.
     );
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Delivery route created successfully'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      context.pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+      content: Text('Delivery route created successfully'), // Show success message.
+      behavior: SnackBarBehavior.floating,
+      ),
+    );
+    context.pop(); // Navigate back.
     }
   } catch (e) {
     setState(() {
-      _errorMessage = 'Error creating delivery route: $e';
-      _isLoading = false;
+    _errorMessage = 'Error creating delivery route: $e'; // Set error message.
+    _isLoading = false; // Set loading state to false.
     });
   }
-}
+  }
 
   bool _validateForm() {
-    if (!_formKey.currentState!.validate()) return false;
-    
-    if (_startTime == null) {
-      setState(() => _errorMessage = 'Please select a start time');
-      return false;
-    }
-    
-    if (_estimatedEndTime == null) {
-      setState(() => _errorMessage = 'Please select an estimated end time');
-      return false;
-    }
+  if (!_formKey.currentState!.validate()) return false;
+  
+  if (_startTime == null) {
+    _setError('Please select a start time'); // Show error if no start time is selected.
+    return false;
+  }
+  
+  if (_estimatedEndTime == null) {
+    _setError('Please select an estimated end time'); // Show error if no estimated end time is selected.
+    return false;
+  }
 
-    if (_pickupLocation == null) {
-      setState(() => _errorMessage = 'Please enter pickup location');
-      return false;
-    }
+  if (_pickupLocation == null) {
+    _setError('Please select a pickup location'); // Show error if no pickup location is selected.
+    return false;
+  }
 
-    if (_deliveryLocation == null) {
-      setState(() => _errorMessage = 'Please enter delivery location');
-      return false;
-    }
+  if (_deliveryLocation == null) {
+    _setError('Please select a delivery location'); // Show error if no delivery location is selected.
+    return false;
+  }
 
-    return true;
+  if (_selectedEventId == null) {
+    _setError('Please select an event'); // Show error if no event is selected.
+    return false;
+  }
+
+  if (_selectedVehicleId == null) {
+    _setError('Please select a vehicle'); // Show error if no vehicle is selected.
+    return false;
+  }
+
+  if (_selectedDriverId == null) {
+    _setError('Please select a driver'); // Show error if no driver is selected.
+    return false;
+  }
+
+  if (_routeDetails == null) {
+    _setError('Unable to calculate route details. Please try again.'); // Show error if route details are not available.
+    return false;
+  }
+
+  return true;
+  }
+
+  void _setError(String message) {
+  setState(() => _errorMessage = message); // Set error message.
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message), // Show error message.
+      behavior: SnackBarBehavior.floating,
+    ),
+    );
+  }
   }
 }

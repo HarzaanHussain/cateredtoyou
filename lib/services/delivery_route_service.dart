@@ -122,48 +122,48 @@ class DeliveryRouteService extends ChangeNotifier { // Define a service class ex
   }
 
   // Update route status
-  Future<void> updateRouteStatus(String routeId, String newStatus) async {
-  try {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) throw 'Not authenticated';
+  Future<void> updateRouteStatus(String routeId, String newStatus) async { // Method to update the status of a delivery route
+    try {
+      final currentUser = _auth.currentUser; // Get current authenticated user
+      if (currentUser == null) throw 'Not authenticated'; // Throw error if not authenticated
 
-    final routeDoc = await _firestore.collection('delivery_routes').doc(routeId).get();
-    if (!routeDoc.exists) throw 'Route not found';
+      final routeDoc = await _firestore.collection('delivery_routes').doc(routeId).get(); // Get route document
+      if (!routeDoc.exists) throw 'Route not found'; // Throw error if route not found
 
-    final route = DeliveryRoute.fromMap(routeDoc.data()!, routeId);
+      final route = DeliveryRoute.fromMap(routeDoc.data()!, routeId); // Convert document data to DeliveryRoute object
 
-    // Check if user is the assigned driver
-    if (route.driverId != currentUser.uid) {
-      throw 'Only the assigned driver can update this route';
+      // Check if user is the assigned driver
+      if (route.driverId != currentUser.uid) {
+        throw 'Only the assigned driver can update this route'; // Throw error if user is not the assigned driver
+      }
+
+      final updateData = {
+        'status': newStatus, // Update status
+        'updatedAt': FieldValue.serverTimestamp(), // Update time
+      };
+
+      if (newStatus == 'completed') { // If the new status is 'completed'
+        updateData['actualEndTime'] = FieldValue.serverTimestamp(); // Set actual end time
+        updateData['metadata.completedAt'] = FieldValue.serverTimestamp(); // Set completion time in metadata
+      }
+
+      await _firestore.collection('delivery_routes').doc(routeId).update(updateData); // Update route document with new data
+
+      // If completed, update vehicle status
+      if (newStatus == 'completed') {
+        await _firestore.collection('vehicles').doc(route.vehicleId).update({
+          'status': 'available', // Update vehicle status to available
+          'currentDeliveryId': null, // Clear current delivery ID
+          'updatedAt': FieldValue.serverTimestamp(), // Update time
+        });
+      }
+
+      notifyListeners(); // Notify listeners of changes
+    } catch (e) {
+      debugPrint('Error updating route status: $e'); // Print error message
+      rethrow; // Rethrow error
     }
-
-    final updateData = {
-      'status': newStatus,
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-
-    if (newStatus == 'completed') {
-      updateData['actualEndTime'] = FieldValue.serverTimestamp();
-      updateData['metadata.completedAt'] = FieldValue.serverTimestamp();
-    }
-
-    await _firestore.collection('delivery_routes').doc(routeId).update(updateData);
-
-    // If completed, update vehicle status
-    if (newStatus == 'completed') {
-      await _firestore.collection('vehicles').doc(route.vehicleId).update({
-        'status': 'available',
-        'currentDeliveryId': null,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    }
-
-    notifyListeners();
-  } catch (e) {
-    debugPrint('Error updating route status: $e');
-    rethrow;
   }
-}
   // Update estimated arrival time
   Future<void> updateEstimatedTime(String routeId, DateTime newEstimatedTime) async {
     try {

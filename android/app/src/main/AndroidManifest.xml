@@ -9,12 +9,6 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">
-        
-
-        <!-- Add Google Maps API Key metadata before the activity -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyCFK5EBD3_mQrzVAAGqRl3P1zOCI0Erinc"/>
 
         <activity
             android:name=".MainActivity"
@@ -41,11 +35,4 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
-
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT"/>
-            <data android:mimeType="text/plain"/>
-        </intent>
-    </queries>
 </manifest>

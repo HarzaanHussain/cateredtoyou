@@ -34,6 +34,7 @@ class _EditCustomerScreenState extends State<EditCustomerScreen> {
 
   @override
   void initState(){
+    super.initState();
     _customerService = Provider.of<CustomerService>(context, listen: false);
     _firstNameController = TextEditingController(
       text: widget.customer.firstName
