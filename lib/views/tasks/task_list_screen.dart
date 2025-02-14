@@ -16,43 +16,42 @@ class TaskListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4, // Specifies the number of tabs.
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Tasks'), // Title of the AppBar.
+          title: const Text('Tasks'),
           bottom: const TabBar(
-            isScrollable: true, // Allows the tabs to be scrollable.
+            isScrollable: true,
             tabs: [
-              Tab(text: 'My Tasks'), // Tab for "My Tasks".
-              Tab(text: 'Department'), // Tab for "Department".
-              Tab(text: 'All Tasks'), // Tab for "All Tasks".
-              Tab(text: 'Completed'), // Tab for "Completed".
+              Tab(text: 'My Tasks'),
+              Tab(text: 'Department'),
+              Tab(text: 'All Tasks'),
+              Tab(text: 'Completed'),
             ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.add), // Icon for adding a new task.
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ManageTasksScreen(), // Navigates to the ManageTasksScreen.
-                ),
-              ),
-            ),
-          ],
         ),
         body: const TabBarView(
           children: [
-            _TaskList(listType: TaskListType.assigned), // Displays assigned tasks.
-            _TaskList(listType: TaskListType.department), // Displays department tasks.
-            _TaskList(listType: TaskListType.all), // Displays all tasks.
-            _TaskList(listType: TaskListType.completed), // Displays completed tasks.
+            _TaskList(listType: TaskListType.assigned),
+            _TaskList(listType: TaskListType.department),
+            _TaskList(listType: TaskListType.all),
+            _TaskList(listType: TaskListType.completed),
           ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ManageTasksScreen(),
+            ),
+          ),
+          child: const Icon(Icons.add),
         ),
       ),
     );
   }
 }
+
 
 /// Enum representing different types of task lists.
 enum TaskListType { assigned, department, all, completed }
@@ -116,16 +115,6 @@ class _TaskListState extends State<_TaskList> {
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               color: Colors.grey[600],
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          ElevatedButton(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const ManageTasksScreen(), // Navigates to the ManageTasksScreen.
-                              ),
-                            ),
-                            child: const Text('Create Task'), // Button to create a new task.
                           ),
                         ],
                       ),
