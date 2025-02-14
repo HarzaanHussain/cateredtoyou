@@ -74,9 +74,10 @@ class HomeScreen extends StatelessWidget {
                 // Checking if the user has 'manage_staff' permission.
                 builder: (context,
                     snapshot) { // Builder to build the UI based on the snapshot.
-                  if (!snapshot.hasData || !snapshot.data!)
+                  if (!snapshot.hasData || !snapshot.data!) {
                     return const SizedBox
                         .shrink(); // If no data or permission denied, return an empty widget.
+                  }
 
                   return Column( // Column widget to arrange management section vertically.
                     crossAxisAlignment: CrossAxisAlignment.start,
