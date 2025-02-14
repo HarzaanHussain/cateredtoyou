@@ -214,6 +214,21 @@ class HomeScreen extends StatelessWidget {
               Card( // Card widget for operations options.
                 child: Column( // Column widget to arrange options vertically.
                   children: [
+                    PermissionWidget( // PermissionWidget to check 'view_tasks' permission.
+                      permissionId: 'view_tasks', // Permission ID.
+                      child: ListTile( // ListTile for viewing tasks.
+                        leading: const Icon(Icons.task),
+                        // Leading icon.
+                        title: const Text('View Tasks'),
+                        // Title.
+                        subtitle: const Text('Check assigned tasks'),
+                        // Subtitle.
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        // Trailing arrow icon.
+                        onTap: () =>
+                            context.push('/tasks'), // Navigate to tasks screen.
+                      ),
+                    ),
                     PermissionWidget( // PermissionWidget to check 'view_events' permission.
                       permissionId: 'view_events', // Permission ID.
                       child: ListTile( // ListTile for viewing events.
@@ -277,40 +292,6 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-              // Tasks Section
-              const SizedBox(height: 24), // SizedBox for spacing.
-              Text( // Text widget for the section title.
-                'Tasks', // Section title.
-                style: Theme
-                    .of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith( // Text style.
-                  fontWeight: FontWeight.bold, // Bold font weight.
-                ),
-              ),
-              const SizedBox(height: 16), // SizedBox for spacing.
-              Card( // Card widget for tasks options.
-                child: Column( // Column widget to arrange options vertically.
-                  children: [
-                    PermissionWidget( // PermissionWidget to check 'view_tasks' permission.
-                      permissionId: 'view_tasks', // Permission ID.
-                      child: ListTile( // ListTile for viewing tasks.
-                        leading: const Icon(Icons.task),
-                        // Leading icon.
-                        title: const Text('View Tasks'),
-                        // Title.
-                        subtitle: const Text('Check assigned tasks'),
-                        // Subtitle.
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                        // Trailing arrow icon.
-                        onTap: () =>
-                            context.push('/tasks'), // Navigate to tasks screen.
-                      ),
-                    ),
-                  ],
-                ),
-              ),
 
               // Vehicle and Delivery Section
               FutureBuilder<
