@@ -33,6 +33,7 @@ import 'package:cateredtoyou/models/auth_model.dart'; // Importing AuthModel for
 import 'package:cateredtoyou/views/auth/login_screen.dart'; // Importing LoginScreen widget
 import 'package:cateredtoyou/views/auth/register_screen.dart'; // Importing RegisterScreen widget
 import 'package:cateredtoyou/views/home/home_screen.dart';
+import 'package:cateredtoyou/views/calendar/calendarscreen.dart';
 
 import '../models/customer_model.dart'; // Importing HomeScreen widget
 
@@ -298,7 +299,13 @@ class AppRouter {
         builder: (context, state) =>
             const DriverDeliveriesScreen(), // Building DriverDeliveriesScreen widget
       ),
+    GoRoute(
+  path: '/calendar',
+  builder: (context, state) => const CalendarScreen(),
+),
+
     ],
+    
     errorBuilder: (context, state) => Material(
       child: Center(
         child: Text('Error: ${state.error}'), // Displaying error message
