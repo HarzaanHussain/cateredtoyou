@@ -289,6 +289,17 @@ class HomeScreen extends StatelessWidget {
                                 '/inventory'), // Navigate to inventory screen.
                       ),
                     ),
+                    //calendar section
+                  ListTile(
+  leading: const Icon(Icons.calendar_today),
+  title: const Text('Calendar'),
+  subtitle: const Text('View calendar events and schedules'),
+  trailing: const Icon(Icons.arrow_forward_ios),
+  onTap: () => context.push('/calendar'),
+),
+
+                  
+
                   ],
                 ),
               ),
