@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "328369352197",
-    "project_id": "cateredtoyou-7eeed",
-    "storage_bucket": "cateredtoyou-7eeed.firebasestorage.app"
+    "project_number": "416890687838",
+    "project_id": "cateredtoyoutest",
+    "storage_bucket": "cateredtoyoutest.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:328369352197:android:b4117760c126493f18f66c",
+        "mobilesdk_app_id": "1:416890687838:android:7c8c80a8146d6dbf067fcf",
         "android_client_info": {
           "package_name": "com.example.cateredtoyou"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBcCo4wFbrgE6jmO-9mUEYLwfVMP-ZqEfw"
+          "current_key": "AIzaSyDK8ffkKGv8be38yeC1ehxxHjzSoRVtR8w"
         }
       ],
       "services": {

@@ -5,8 +5,14 @@ import 'package:cateredtoyou/services/event_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:cateredtoyou/models/task_model.dart';
+import 'package:cateredtoyou/models/task/task_model.dart';
 import 'package:cateredtoyou/services/task_service.dart';
+
+// Placeholder variables
+Stream<List<Event>> _eventsStream = Stream.empty();
+String? _selectedEventId;
+String? _assignedTo;
+String? _departmentId;
 
 class ManageTasksScreen extends StatefulWidget {
   const ManageTasksScreen({super.key});
@@ -14,46 +20,51 @@ class ManageTasksScreen extends StatefulWidget {
   @override
   State<ManageTasksScreen> createState() => _ManageTasksScreenState();
 }
-
 class _ManageTasksScreenState extends State<ManageTasksScreen> {
-  final _formKey = GlobalKey<FormState>(); // Key to identify the form and validate it
-  final _nameController = TextEditingController(); // Controller for task name input
-  final _descriptionController = TextEditingController(); // Controller for task description input
-  DateTime? _dueDate; // Variable to store the selected due date
-  TimeOfDay? _dueTime; // Variable to store the selected due time
-  TaskPriority _priority = TaskPriority.medium; // Default priority for the task
-  String? _assignedTo; // Variable to store the selected staff member
-  String? _departmentId; // Variable to store the selected department
-  String? _selectedEventId; // Variable to store the selected event ID
-  final List<String> _checklist = []; // List to store checklist items
-  late Stream<List<UserModel>> _staffStream; // Stream to fetch staff members
-  late Stream<List<String>> _departmentStream; // Stream to fetch departments
-  late Stream<List<Event>> _eventsStream; // Stream to fetch events
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  DateTime? _dueDate;
+  TimeOfDay? _dueTime;
+  TaskPriority _priority = TaskPriority.medium;
+  String? _assignedTo;
+  String? _departmentId;
+  String? _selectedEventId;
+  late Stream<List<UserModel>> _staffStream;
+  late Stream<List<String>> _departmentStream;
+  late Stream<List<Event>> _eventsStream;
 
   @override
   void initState() {
     super.initState();
-    _initializeStreams(); // Initialize the streams when the widget is created
+    _initializeStreams();
   }
 
   void _initializeStreams() {
-    final staffService = context.read<StaffService>(); // Get the staff service from the context
-    final eventService = context.read<EventService>(); // Get the event service from the context
+    final staffService = context.read<StaffService>();
+    final eventService = context.read<EventService>();
 
-    _staffStream = staffService.getStaffMembers(); // Fetch the staff members
-    _departmentStream = staffService.getDepartments(); // Fetch the departments
-    _eventsStream = eventService.getEvents(); // Fetch the events
+    _staffStream = staffService.getStaffMembers();
+    _departmentStream = staffService.getDepartments();
+    _eventsStream = eventService.getEvents();
 
-    _assignedTo = null; // Reset the assigned staff member
-    _departmentId = null; // Reset the selected department
-    _selectedEventId = null; // Reset the selected event
+    _assignedTo = null;
+    _departmentId = null;
+    _selectedEventId = null;
   }
 
   @override
   void dispose() {
-    _nameController.dispose(); // Dispose the name controller to free resources
-    _descriptionController.dispose(); // Dispose the description controller to free resources
+    _nameController.dispose();
+    _descriptionController.dispose();
     super.dispose();
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    if (mounted) {
+      super.setState(fn);
+    }
   }
 
   Future<void> _selectDateTime(BuildContext context) async {
@@ -89,44 +100,6 @@ class _ManageTasksScreenState extends State<ManageTasksScreen> {
     }
   }
 
-  void _addChecklistItem() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        final controller = TextEditingController(); // Controller for the checklist item input
-        return AlertDialog(
-          title: const Text('Add Checklist Item'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              hintText: 'Enter checklist item',
-              border: OutlineInputBorder(),
-            ),
-            textCapitalization: TextCapitalization.sentences,
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context), // Close the dialog without adding an item
-              child: const Text('CANCEL'),
-            ),
-            TextButton(
-              onPressed: () {
-                if (controller.text.isNotEmpty) {
-                  setState(() {
-                    _checklist.add('[ ] ${controller.text.trim()}'); // Add the checklist item
-                  });
-                  Navigator.pop(context); // Close the dialog after adding the item
-                }
-              },
-              child: const Text('ADD'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   Future<void> _createTask() async {
     if (!_formKey.currentState!.validate()) return; // Validate the form
     if (_dueDate == null) {
@@ -139,14 +112,14 @@ class _ManageTasksScreenState extends State<ManageTasksScreen> {
     try {
       final taskService = context.read<TaskService>(); // Get the task service from the context
       await taskService.createTask(
-        eventId: _selectedEventId ?? 'no_event', // Use 'no_event' if no event is selected
-        name: _nameController.text, // Get the task name from the controller
-        description: _descriptionController.text, // Get the task description from the controller
-        dueDate: _dueDate!, // Use the selected due date
-        priority: _priority, // Use the selected priority
-        assignedTo: _assignedTo!, // Use the selected staff member
-        departmentId: _departmentId!, // Use the selected department
-        checklist: _checklist, // Use the checklist items
+        eventId: _selectedEventId ?? 'no_event',
+        name: _nameController.text,
+        description: _descriptionController.text,
+        dueDate: _dueDate!,
+        priority: _priority,
+        assignedTo: _assignedTo!,
+        departmentId: _departmentId!,
+        taskType: 'default', // Temporary fix for the required taskType parameter
       );
 
       if (mounted) {
@@ -188,8 +161,6 @@ class _ManageTasksScreenState extends State<ManageTasksScreen> {
               const SizedBox(height: 16),
               _buildAssignmentSection(), // Widget to assign the task
               const SizedBox(height: 24),
-              _buildChecklistSection(), // Widget to manage checklist items
-              const SizedBox(height: 24),
               _buildSubmitButton(), // Button to submit the form and create the task
               const SizedBox(height: 32),
             ],
@@ -199,99 +170,8 @@ class _ManageTasksScreenState extends State<ManageTasksScreen> {
     );
   }
 
-  Widget _buildEventSelector() {
-    return StreamBuilder<List<Event>>(
-      stream: _eventsStream, // Stream to fetch events
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text('Error loading events'), // Show error message if events fail to load
-            ),
-          );
-        }
-
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator()); // Show loading indicator while fetching events
-        }
-
-        final upcomingEvents = snapshot.data!
-            .where((event) => event.startDate.isAfter(DateTime.now())) // Filter upcoming events
-            .toList()
-          ..sort((a, b) => a.startDate.compareTo(b.startDate)); // Sort events by start date
-
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Text(
-                    'Event (Optional)',
-                    style: Theme.of(context).textTheme.titleMedium, // Title for the event selector
-                  ),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String?>(
-                  value: _selectedEventId, // Selected event ID
-                  decoration: const InputDecoration(
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
-                    border: InputBorder.none,
-                    hintText: 'Select an event', // Hint text for the dropdown
-                  ),
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('No Event'), // Option to select no event
-                    ),
-                    ...upcomingEvents.map((event) => DropdownMenuItem(
-                          value: event.id,
-                          child: Text(
-                            '${event.name} (${DateFormat('MMM dd').format(event.startDate)})', // Display event name and date
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        )),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedEventId = value; // Update the selected event ID
-                      // If an event is selected, update department and staff based on the event
-                      if (value != null) {
-                        final event =
-                            upcomingEvents.firstWhere((e) => e.id == value);
-                        if (event.assignedStaff.isNotEmpty) {
-                          _departmentId = event.assignedStaff.first.role; // Update department based on event
-                          // Update the _assignedTo value based on the selected event's assigned staff
-                          _assignedTo = event.assignedStaff.first.userId; // Update assigned staff based on event
-                        } else {
-                          // Reset _departmentId and _assignedTo if no assigned staff found
-                          _departmentId = null;
-                          _assignedTo = null;
-                        }
-                        // Trigger a rebuild of the department and staff dropdowns
-                        _initializeStreams(); // Reinitialize streams to fetch updated data
-                      } else {
-                        // Reset _departmentId, _assignedTo, and streams when no event is selected
-                        _departmentId = null;
-                        _assignedTo = null;
-                        _initializeStreams(); // Reinitialize streams to fetch updated data
-                      }
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   /// Builds the basic details section of the task form.
-  /// 
+  ///
   /// This section includes:
   /// - Task name input field
   /// - Description input field
@@ -401,7 +281,7 @@ class _ManageTasksScreenState extends State<ManageTasksScreen> {
   }
 
   /// Builds the assignment section of the task form.
-  /// 
+  ///
   /// This section includes:
   /// - Department dropdown
   /// - Staff member dropdown
@@ -427,7 +307,7 @@ class _ManageTasksScreenState extends State<ManageTasksScreen> {
   }
 
   /// Builds the department dropdown.
-  /// 
+  ///
   /// This dropdown is populated with data from a stream of department names.
   Widget _buildDepartmentDropdown() {
     return StreamBuilder<List<String>>(
@@ -474,7 +354,7 @@ class _ManageTasksScreenState extends State<ManageTasksScreen> {
   }
 
   /// Builds the staff member dropdown.
-  /// 
+  ///
   /// This dropdown is populated with data from a stream of staff members.
   Widget _buildStaffDropdown() {
     return StreamBuilder<List<UserModel>>(
@@ -519,81 +399,8 @@ class _ManageTasksScreenState extends State<ManageTasksScreen> {
     );
   }
 
-  /// Builds the checklist section of the task form.
-  /// 
-  /// This section includes:
-  /// - A list of checklist items
-  /// - An option to add new checklist items
-  Widget _buildChecklistSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0), // Adds padding around the card
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween, // Aligns children to the space between
-              children: [
-                Text(
-                  'Checklist',
-                  style: Theme.of(context).textTheme.titleMedium, // Applies medium title style
-                ),
-                IconButton(
-                  icon: const Icon(Icons.add), // Icon for adding checklist items
-                  onPressed: _addChecklistItem, // Adds a new checklist item when pressed
-                  tooltip: 'Add checklist item', // Tooltip for the button
-                ),
-              ],
-            ),
-            if (_checklist.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16.0), // Adds vertical padding
-                child: Text('No checklist items added'), // Message when no checklist items are present
-              )
-            else
-              ListView.builder(
-                shrinkWrap: true, // Shrinks the list view to fit its content
-                physics: const NeverScrollableScrollPhysics(), // Disables scrolling
-                itemCount: _checklist.length, // Number of checklist items
-                itemBuilder: (context, index) {
-                  final item =
-                      _checklist[index].replaceAll(RegExp(r'\[.\]'), '').trim(); // Removes special characters from the item
-                  return Dismissible(
-                    key: Key('checklist_$index'), // Unique key for each checklist item
-                    background: Container(
-                      color: Colors.red, // Background color when dismissing
-                      alignment: Alignment.centerRight, // Aligns the icon to the right
-                      padding: const EdgeInsets.only(right: 16), // Adds padding to the right
-                      child: const Icon(Icons.delete, color: Colors.white), // Delete icon
-                    ),
-                    direction: DismissDirection.endToStart, // Dismisses from end to start
-                    onDismissed: (direction) {
-                      setState(() {
-                        _checklist.removeAt(index); // Removes the checklist item
-                      });
-                    },
-                    child: ListTile(
-                      title: Text(item), // Checklist item text
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete), // Delete icon
-                        onPressed: () {
-                          setState(() {
-                            _checklist.removeAt(index); // Removes the checklist item
-                          });
-                        },
-                      ),
-                    ),
-                  );
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   /// Builds the submit button for the task form.
-  /// 
+  ///
   /// This button triggers the task creation process when pressed.
   Widget _buildSubmitButton() {
     return ElevatedButton(
@@ -606,7 +413,7 @@ class _ManageTasksScreenState extends State<ManageTasksScreen> {
   }
 
   /// Returns the color associated with the given task priority.
-  /// 
+  ///
   /// - [TaskPriority.urgent]: Red
   /// - [TaskPriority.high]: Orange
   /// - [TaskPriority.medium]: Blue
@@ -623,5 +430,95 @@ class _ManageTasksScreenState extends State<ManageTasksScreen> {
         return Colors.green; // Color for low priority
     }
   }
-}
 
+  Widget _buildEventSelector() {
+    return StreamBuilder<List<Event>>(
+      stream: _eventsStream, // Stream to fetch events
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('Error loading events'), // Show error message if events fail to load
+            ),
+          );
+        }
+
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator()); // Show loading indicator while fetching events
+        }
+
+        final upcomingEvents = snapshot.data!
+            .where((event) => event.startDate.isAfter(DateTime.now())) // Filter upcoming events
+            .toList()
+          ..sort((a, b) => a.startDate.compareTo(b.startDate)); // Sort events by start date
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Text(
+                    'Event (Optional)',
+                    style: Theme.of(context).textTheme.titleMedium, // Title for the event selector
+                  ),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String?>(
+                  value: _selectedEventId, // Selected event ID
+                  decoration: const InputDecoration(
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                    border: InputBorder.none,
+                    hintText: 'Select an event', // Hint text for the dropdown
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('No Event'), // Option to select no event
+                    ),
+                    ...upcomingEvents.map((event) => DropdownMenuItem(
+                      value: event.id,
+                      child: Text(
+                        '${event.name} (${DateFormat('MMM dd').format(event.startDate)})', // Display event name and date
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    )),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedEventId = value; // Update the selected event ID
+                      // If an event is selected, update department and staff based on the event
+                      if (value != null) {
+                        final event =
+                        upcomingEvents.firstWhere((e) => e.id == value);
+                        if (event.assignedStaff.isNotEmpty) {
+                          _departmentId = event.assignedStaff.first.role; // Update department based on event
+                          // Update the _assignedTo value based on the selected event's assigned staff
+                          _assignedTo = event.assignedStaff.first.userId; // Update assigned staff based on event
+                        } else {
+                          // Reset _departmentId and _assignedTo if no assigned staff found
+                          _departmentId = null;
+                          _assignedTo = null;
+                        }
+                        // Trigger a rebuild of the department and staff dropdowns
+                        _initializeStreams(); // Reinitialize streams to fetch updated data
+                      } else {
+                        // Reset _departmentId, _assignedTo, and streams when no event is selected
+                        _departmentId = null;
+                        _assignedTo = null;
+                        _initializeStreams(); // Reinitialize streams to fetch updated data
+                      }
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

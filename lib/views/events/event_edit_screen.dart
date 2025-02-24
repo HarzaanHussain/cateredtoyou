@@ -1,3 +1,4 @@
+// lib/views/events/event_edit_screen.dart
 
 import 'package:cateredtoyou/models/customer_model.dart'; // Importing the customer model.
 import 'package:cateredtoyou/widgets/event_metadata_selection.dart';
@@ -15,6 +16,7 @@ import 'package:cateredtoyou/widgets/customer_selector.dart'; // Importing custo
 import 'package:cateredtoyou/widgets/event_menu_selection.dart'; // Importing event menu selection widget.
 import 'package:cateredtoyou/widgets/event_supplies_selection.dart'; // Importing event supplies selection widget.
 import 'package:cateredtoyou/widgets/add_customer_dialog.dart'; // Importing add customer dialog widget.
+import 'package:cateredtoyou/models/menu_item_model.dart'; // Importing the menu item model.
 
 class EventEditScreen extends StatefulWidget {
   final Event? event; // Event object to edit, if null, a new event is created.
@@ -39,7 +41,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
   final _notesController = TextEditingController(); // Controller for additional notes.
 
   String? _selectedCustomerId; // Selected customer ID.
-  List<EventMenuItem> _selectedMenuItems = []; // List of selected menu items.
+  List<SelectedMenuItem> _selectedMenuItems = []; // List of selected menu items.
   List<EventSupply> _selectedSupplies = []; // List of selected supplies.
   List<AssignedStaff> _assignedStaff = []; // List of assigned staff.
 
@@ -50,7 +52,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
   bool _isLoading = false; // Loading state for the form submission.
   String? _error; // Error message for form submission.
   double _totalPrice = 0.0; // Total price of the event.
-  EventMetadata? _metadata; // Metadata for the event.
+  Map<String, dynamic>? _metadata; // Metadata for the event.
 
   @override
   void initState() {
@@ -73,7 +75,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
       _totalPrice = event.totalPrice; // Setting the total price.
       _assignedStaff = List.from(event.assignedStaff); // Setting the assigned staff.
       _metadata = event.metadata != null  // Setting the metadata.
-      ? EventMetadata.fromMap(event.metadata!)  
+      ? event.metadata as Map<String, dynamic>
       : null; 
     } else {
       _startDate = DateTime.now().add(const Duration(days: 1)); // Default start date.
@@ -100,7 +102,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
     // Calculate menu items total
     final menuTotal = _selectedMenuItems.fold(
       0.0,
-      (total, item) => total + (item.price * item.quantity), // Calculating the total price of menu items.
+      (total, item) => total + item.totalPrice, // Calculating the total price of menu items.
     );
 
     // Calculate supplies total
@@ -186,6 +188,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
     }
   }
 
+  //TODO:refactor out handlesubmit int another file. Make sure that the event's members are
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return; // Validating the form.
 
@@ -233,7 +236,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
           notes: _notesController.text.trim(),
           startTime: startDateTime,
           endTime: endDateTime,
-          menuItems: _selectedMenuItems,
+          menuItems: _selectedMenuItems.map((item) => item.toMenuItem()).toList(),
           supplies: _selectedSupplies,
           assignedStaff: _assignedStaff,
           metadata: _metadata,
@@ -251,11 +254,11 @@ class _EventEditScreenState extends State<EventEditScreen> {
           notes: _notesController.text.trim(),
           startTime: startDateTime,
           endTime: endDateTime,
-          menuItems: _selectedMenuItems,
+          menuItems: _selectedMenuItems.map((item) => item.toMenuItem()).toList(),
           supplies: _selectedSupplies,
           assignedStaff: _assignedStaff,
           totalPrice: _totalPrice,
-          metadata: _metadata?.toMap(),
+          metadata: _metadata,
         );
 
         await eventService.updateEvent(updatedEvent); // Updating the event in the database.
@@ -648,14 +651,14 @@ class _EventEditScreenState extends State<EventEditScreen> {
                       /// A SizedBox widget to add vertical spacing of 24 pixels.
                       const SizedBox(height: 24),
 
-                       EventMetadataSection( // EventMetadataSection widget to display event metadata.
-  initialMetadata: _metadata, // Initial metadata.
-  onMetadataChanged: (metadata) { // Callback to update the metadata.
-    setState(() { // Updating the state.
-      _metadata = metadata; // Setting the metadata.
-    });
-  },
-),
+//                        EventMetadataSection( // EventMetadataSection widget to display event metadata.
+//   initialMetadata: _metadata, // Initial metadata.
+//   onMetadataChanged: (metadata) { // Callback to update the metadata.
+//     setState(() { // Updating the state.
+//       _metadata = metadata; // Setting the metadata.
+//     });
+//   },
+// ),//todo:fix this section
 const SizedBox(height: 24), // A SizedBox widget to add vertical spacing of 24 pixels.
 
                       /// A CustomButton widget to submit the form.

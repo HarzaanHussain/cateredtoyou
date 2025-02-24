@@ -1,6 +1,8 @@
+import 'package:cateredtoyou/services/department_provider.dart';
 import 'package:cateredtoyou/services/event_service.dart';// Import EventService for event-related operations
 import 'package:cateredtoyou/services/menu_item_service.dart'; // Import MenuItemService for menu item-related operations
-import 'package:cateredtoyou/services/task_automation_service.dart'; // Import TaskAutomationService for task automation operations
+import 'package:cateredtoyou/services/menu_item_prototype_service.dart'; // Import MenuItemPrototypeService for menu item prototype-related operations
+// Import TaskAutomationService for task automation operations
 import 'package:cateredtoyou/services/task_service.dart'; // Import TaskService for task-related operations
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth package for Firebase authentication
 import 'package:firebase_core/firebase_core.dart';// Import Firebase core package for Firebase initialization
@@ -14,6 +16,7 @@ import 'package:cateredtoyou/services/staff_service.dart'; // Import StaffServic
 import 'package:cateredtoyou/services/role_permissions.dart'; // Import RolePermissions for role-based permissions
 import 'package:cateredtoyou/services/inventory_service.dart'; // Import InventoryService for inventory-related operations
 import 'package:cateredtoyou/services/customer_service.dart'; // Import CustomerService for customer-related operations
+import 'package:cateredtoyou/services/department_service.dart'; // Import DepartmentService for department-related operations
 
 // Class to handle secondary Firebase app initialization
 class FirebaseSecondary {
@@ -58,7 +61,19 @@ class MyApp extends StatelessWidget {
           create: (_) =>
               OrganizationService(), // Provide OrganizationService instance
         ),
-
+        // Department service depends on OrganizationService
+        ChangeNotifierProvider(
+          create: (context) => DepartmentService(
+            context.read<
+                OrganizationService>(), // Provide DepartmentService instance with OrganizationService dependency
+          ),
+        ),
+        // Add this after the DepartmentService provider
+        ChangeNotifierProvider(
+          create: (context) => DepartmentProvider(
+            context.read<DepartmentService>(), // Pass DepartmentService
+          ),
+        ),
         // Staff service depends on OrganizationService
         ChangeNotifierProvider(
           create: (context) => StaffService(
@@ -89,23 +104,23 @@ class MyApp extends StatelessWidget {
             
           ),
         ),
-        Provider(
-      create: (context) => TaskAutomationService( // Provide TaskAutomationService instance
-        context.read<TaskService>(), // Provide TaskService dependency
-      ),
-    ),
 
         /// Event service depends on OrganizationService
         ChangeNotifierProvider(
           create: (context) => EventService(
             // Provide EventService instance with OrganizationService dependency
             context.read<OrganizationService>(),
-                    context.read<TaskAutomationService>(), // Provide TaskAutomationService dependency
           ),
         ),
         /// Menu item service depends on OrganizationService
         ChangeNotifierProvider( // Provide MenuItemService instance
           create: (context) => MenuItemService( // Create MenuItemService instance
+            context.read<OrganizationService>(), // Provide OrganizationService dependency
+          ),
+        ),
+        /// Menu item prototype service depends on OrganizationService
+        ChangeNotifierProvider( // Provide MenuItemService instance
+          create: (context) => MenuItemPrototypeService( // Create MenuItemPrototypeService instance
             context.read<OrganizationService>(), // Provide OrganizationService dependency
           ),
         ),

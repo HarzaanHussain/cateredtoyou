@@ -1,90 +1,109 @@
-import 'package:cateredtoyou/models/event_model.dart';
-import 'package:cateredtoyou/models/menu_item_model.dart';
-import 'package:cateredtoyou/services/menu_item_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/menu_item_prototype.dart';
+import '../services/menu_item_prototype_service.dart';
+import '../models/menu_item_model.dart';
 
-/// A widget that allows users to select menu items for an event.
-///
-/// This widget displays a list of available menu items and allows users to add them to their selection.
-/// It also shows the currently selected items with options to remove them.
-///
-/// The [EventMenuSelection] widget is a stateful widget that takes two required parameters:
-/// - [selectedItems]: A list of currently selected [EventMenuItem]s.
-/// - [onItemsChanged]: A callback function that is called when the selected items change.
 class EventMenuSelection extends StatefulWidget {
-  final List<EventMenuItem> selectedItems; // List of currently selected menu items.
-  final Function(List<EventMenuItem>) onItemsChanged; // Callback when the selected items change.
+  final List<SelectedMenuItem> selectedItems;
+  final Function(List<SelectedMenuItem>) onItemsChanged;
 
   const EventMenuSelection({
     super.key,
-    required this.selectedItems, // Required parameter for selected items.
-    required this.onItemsChanged, // Required parameter for the callback function.
+    required this.selectedItems,
+    required this.onItemsChanged,
   });
 
   @override
-  State<EventMenuSelection> createState() => _EventMenuSelectionState(); // Creates the mutable state for this widget.
+  State<EventMenuSelection> createState() => _EventMenuSelectionState();
+}
+
+// Helper class to track selected items with quantity and special instructions
+class SelectedMenuItem {
+  final MenuItemPrototype prototype;
+  final int quantity;
+  final String specialInstructions;
+
+  const SelectedMenuItem({
+    required this.prototype,
+    required this.quantity,
+    this.specialInstructions = '',
+  });
+
+  double get totalPrice => prototype.price * quantity;
+
+  MenuItem toMenuItem() {
+    return MenuItem(
+      id: '',
+      name: prototype.name,
+      description: prototype.description,
+      plated: prototype.plated,
+      price: prototype.price,
+      quantity: quantity,
+      organizationId: prototype.organizationId,
+      menuItemType: prototype.menuItemType,
+      inventoryRequirements: prototype.inventoryRequirements,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      createdBy: '',
+      prototypeId: prototype.menuItemPrototypeId,
+    );
+  }
 }
 
 class _EventMenuSelectionState extends State<EventMenuSelection> {
-  /// Shows a dialog to add a menu item with quantity and special instructions.
-  ///
-  /// This method displays a dialog where the user can specify the quantity and special instructions
-  /// for the selected menu item. If the quantity is valid, the item is added to the selected items list.
-  void _showMenuItemDialog(MenuItem item) {
-    final quantityController = TextEditingController(text: '1'); // Controller for quantity input.
-    final specialInstructionsController = TextEditingController(); // Controller for special instructions input.
+  void _showMenuItemDialog(MenuItemPrototype prototype) {
+    final quantityController = TextEditingController(text: '1');
+    final specialInstructionsController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Add ${item.name}'), // Dialog title with the item name.
+        title: Text('Add ${prototype.name}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextFormField(
-              controller: quantityController, // Controller for quantity input field.
+              controller: quantityController,
               decoration: const InputDecoration(
-                labelText: 'Quantity', // Label for quantity input field.
-                border: OutlineInputBorder(), // Border style for input field.
+                labelText: 'Quantity',
+                border: OutlineInputBorder(),
               ),
-              keyboardType: TextInputType.number, // Keyboard type for numeric input.
+              keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 16), // Spacing between input fields.
+            const SizedBox(height: 16),
             TextFormField(
-              controller: specialInstructionsController, // Controller for special instructions input field.
+              controller: specialInstructionsController,
               decoration: const InputDecoration(
-                labelText: 'Special Instructions', // Label for special instructions input field.
-                border: OutlineInputBorder(), // Border style for input field.
+                labelText: 'Special Instructions',
+                border: OutlineInputBorder(),
               ),
-              maxLines: 3, // Maximum lines for special instructions input field.
+              maxLines: 3,
             ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context), // Closes the dialog without any action.
-            child: const Text('Cancel'), // Cancel button text.
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
-              final quantity = int.tryParse(quantityController.text) ?? 0; // Parses the quantity input.
+              final quantity = int.tryParse(quantityController.text) ?? 0;
               if (quantity > 0) {
-                final eventMenuItem = EventMenuItem(
-                  menuItemId: item.id, // ID of the menu item.
-                  name: item.name, // Name of the menu item.
-                  price: item.price, // Price of the menu item.
-                  quantity: quantity, // Quantity specified by the user.
-                  specialInstructions: specialInstructionsController.text.trim(), // Special instructions specified by the user.
+                final selectedItem = SelectedMenuItem(
+                  prototype: prototype,
+                  quantity: quantity,
+                  specialInstructions: specialInstructionsController.text.trim(),
                 );
 
-                final updatedItems = List<EventMenuItem>.from(widget.selectedItems); // Creates a copy of the selected items list.
-                updatedItems.add(eventMenuItem); // Adds the new item to the list.
-                widget.onItemsChanged(updatedItems); // Calls the callback with the updated list.
-                Navigator.pop(context); // Closes the dialog.
+                final updatedItems = List<SelectedMenuItem>.from(widget.selectedItems);
+                updatedItems.add(selectedItem);
+                widget.onItemsChanged(updatedItems);
+                Navigator.pop(context);
               }
             },
-            child: const Text('Add'), // Add button text.
+            child: const Text('Add'),
           ),
         ],
       ),
@@ -94,78 +113,90 @@ class _EventMenuSelectionState extends State<EventMenuSelection> {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Menu Items', // Title text for the menu items section.
-          style: Theme.of(context).textTheme.titleLarge, // Applies large title text style.
+          'Menu Items',
+          style: Theme.of(context).textTheme.titleLarge,
         ),
-        const SizedBox(height: 8), // Spacing below the title.
-        StreamBuilder<List<MenuItem>>(
-          stream: context.read<MenuItemService>().getMenuItems(), // Stream of menu items from the service.
+        const SizedBox(height: 8),
+        StreamBuilder<List<MenuItemPrototype>>(
+          stream: context.read<MenuItemPrototypeService>().getMenuItemPrototypes(),
           builder: (context, snapshot) {
             if (snapshot.hasError) {
-              return const Text('Error loading menu items'); // Error message if the stream has an error.
+              debugPrint('Error loading menu items: ${snapshot.error}');
+              return const Text('Error loading menu items');
             }
 
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const CircularProgressIndicator(); // Loading indicator while waiting for data.
+              return const CircularProgressIndicator();
             }
 
-            final menuItems = snapshot.data ?? []; // List of menu items from the stream.
+            final menuItemPrototypes = snapshot.data ?? [];
 
             return Column(
               children: [
-                // Displays the selected items if any.
                 if (widget.selectedItems.isNotEmpty) ...[
                   Card(
                     child: Column(
                       children: widget.selectedItems.map((item) {
                         return ListTile(
-                          title: Text(item.name), // Name of the selected item.
-                          subtitle: Text(
-                            'Quantity: ${item.quantity} - \$${(item.price * item.quantity).toStringAsFixed(2)}', // Quantity and total price of the selected item.
+                          title: Text(item.prototype.name),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Quantity: ${item.quantity} - \$${item.totalPrice.toStringAsFixed(2)}',
+                              ),
+                              if (item.specialInstructions.isNotEmpty)
+                                Text(
+                                  'Notes: ${item.specialInstructions}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                            ],
                           ),
                           trailing: IconButton(
-                            icon: const Icon(Icons.delete), // Delete icon button.
+                            icon: const Icon(Icons.delete),
                             onPressed: () {
-                              final updatedItems = List<EventMenuItem>.from(widget.selectedItems)
-                                ..removeWhere((i) => i.menuItemId == item.menuItemId); // Removes the item from the list.
-                              widget.onItemsChanged(updatedItems); // Calls the callback with the updated list.
+                              final updatedItems = List<SelectedMenuItem>.from(widget.selectedItems)
+                                ..removeWhere((i) => i.prototype.menuItemPrototypeId == item.prototype.menuItemPrototypeId);
+                              widget.onItemsChanged(updatedItems);
                             },
                           ),
                         );
                       }).toList(),
                     ),
                   ),
-                  const SizedBox(height: 16), // Spacing below the selected items card.
+                  const SizedBox(height: 16),
                 ],
 
-                // Displays available menu items grouped by type.
                 ...MenuItemType.values.map((type) {
-                  final typeItems = menuItems.where((item) => item.type == type).toList(); // Filters items by type.
-                  if (typeItems.isEmpty) return const SizedBox(); // Returns an empty widget if no items of this type.
+                  final typePrototypes = menuItemPrototypes
+                      .where((prototype) => prototype.menuItemType == type)
+                      .toList();
+
+                  if (typePrototypes.isEmpty) return const SizedBox();
 
                   return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        type.toString().split('.').last, // Displays the type name.
-                        style: Theme.of(context).textTheme.titleMedium, // Applies medium title text style.
+                        type.toString().split('.').last,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      const SizedBox(height: 8), // Spacing below the type name.
+                      const SizedBox(height: 8),
                       Wrap(
-                        spacing: 8, // Spacing between chips.
-                        runSpacing: 8, // Spacing between rows of chips.
-                        children: typeItems.map((item) {
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: typePrototypes.map((prototype) {
                           return ActionChip(
-                            avatar: const Icon(Icons.add), // Add icon on the chip.
-                            label: Text(item.name), // Name of the menu item.
-                            onPressed: () => _showMenuItemDialog(item), // Shows the dialog to add the item.
+                            avatar: const Icon(Icons.add),
+                            label: Text(prototype.name),
+                            onPressed: () => _showMenuItemDialog(prototype),
                           );
                         }).toList(),
                       ),
-                      const SizedBox(height: 16), // Spacing below the chips.
+                      const SizedBox(height: 16),
                     ],
                   );
                 }),

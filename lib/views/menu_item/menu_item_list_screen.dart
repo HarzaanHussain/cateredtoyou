@@ -1,13 +1,14 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:cateredtoyou/models/menu_item_prototype.dart';
+import 'package:cateredtoyou/models/menu_item_model.dart';
+import 'package:cateredtoyou/services/menu_item_prototype_service.dart';
 
-import 'package:flutter/material.dart'; // Import Flutter material design package.
-import 'package:provider/provider.dart'; // Import provider package for state management.
-import 'package:go_router/go_router.dart'; // Import go_router package for navigation.
-import 'package:cateredtoyou/models/menu_item_model.dart'; // Import menu item model.
-import 'package:cateredtoyou/services/menu_item_service.dart'; // Import menu item service.
-/// This file defines the `MenuItemListScreen` widget, which displays a list of menu items.
-/// It includes functionality for searching and filtering menu items, as well as adding, editing, and deleting them.
+/// This file defines the `MenuItemListScreen` widget, which displays a list of standard menu items.
+/// It includes functionality for searching and filtering standard menu items, as well as adding, editing, and deleting them.
 
-/// A stateful widget that displays a list of menu items.
+/// A stateful widget that displays a list of standard menu items.
 class MenuItemListScreen extends StatefulWidget {
   const MenuItemListScreen({super.key}); // Constructor with a key parameter.
 
@@ -27,10 +28,10 @@ class _MenuItemListScreenState extends State<MenuItemListScreen> {
     super.dispose();
   }
 
-  /// Filters the list of menu items based on the search query and filter type.
-  List<MenuItem> _filterMenuItems(List<MenuItem> items) {
+  /// Filters the list of standard menu items based on the search query and filter type.
+  List<MenuItemPrototype> _filterMenuItems(List<MenuItemPrototype> items) {
     return items.where((item) {
-      if (_filterType != null && item.type != _filterType) { // Filter by type if a filter type is selected.
+      if (_filterType != null && item.menuItemType != _filterType) { // Filter by type if a filter type is selected.
         return false;
       }
       if (_searchQuery.isEmpty) return true; // If search query is empty, return all items.
@@ -48,12 +49,12 @@ class _MenuItemListScreenState extends State<MenuItemListScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back), // Back button icon.
           onPressed: () => context.push('/home'), // Navigate to home screen when pressed.
-        ),  
-        title: const Text('Menu Items'), // App bar title.
+        ),
+        title: const Text('Standard Menu Items'), // App bar title updated.
         actions: [
           IconButton(
             icon: const Icon(Icons.add), // Add button icon.
-            onPressed: () => context.push('/add-menu-item'), // Navigate to add menu item screen when pressed.
+            onPressed: () => context.push('/add-standard-menu-item'), // Navigate to add standard menu item screen when pressed.
           ),
         ],
       ),
@@ -66,21 +67,21 @@ class _MenuItemListScreenState extends State<MenuItemListScreen> {
                 TextField(
                   controller: _searchController, // Controller for the search text field.
                   decoration: InputDecoration(
-                    hintText: 'Search menu items...', // Placeholder text for the search field.
+                    hintText: 'Search standard menu items...', // Placeholder text updated.
                     prefixIcon: const Icon(Icons.search), // Search icon.
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10), // Rounded border for the search field.
                     ),
                     suffixIcon: _searchQuery.isNotEmpty // Clear button if search query is not empty.
                         ? IconButton(
-                            icon: const Icon(Icons.clear), // Clear icon.
-                            onPressed: () {
-                              setState(() {
-                                _searchQuery = ''; // Clear the search query.
-                                _searchController.clear(); // Clear the search field.
-                              });
-                            },
-                          )
+                      icon: const Icon(Icons.clear), // Clear icon.
+                      onPressed: () {
+                        setState(() {
+                          _searchQuery = ''; // Clear the search query.
+                          _searchController.clear(); // Clear the search field.
+                        });
+                      },
+                    )
                         : null,
                   ),
                   onChanged: (value) {
@@ -125,8 +126,8 @@ class _MenuItemListScreenState extends State<MenuItemListScreen> {
             ),
           ),
           Expanded(
-            child: StreamBuilder<List<MenuItem>>(
-              stream: context.read<MenuItemService>().getMenuItems(), // Stream of menu items from the service.
+            child: StreamBuilder<List<MenuItemPrototype>>(
+              stream: context.read<MenuItemPrototypeService>().getMenuItemPrototypes(), // Stream of menu item prototypes from the service.
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
@@ -140,8 +141,8 @@ class _MenuItemListScreenState extends State<MenuItemListScreen> {
                   );
                 }
 
-                final menuItems = snapshot.data ?? []; // Get the list of menu items from the snapshot.
-                final filteredItems = _filterMenuItems(menuItems); // Filter the menu items based on search and filter.
+                final menuItems = snapshot.data ?? []; // Get the list of standard menu items from the snapshot.
+                final filteredItems = _filterMenuItems(menuItems); // Filter the standard menu items based on search and filter.
 
                 if (menuItems.isEmpty) {
                   return Center(
@@ -149,14 +150,14 @@ class _MenuItemListScreenState extends State<MenuItemListScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
-                          'No menu items found', // Message when no menu items are found.
+                          'No standard menu items found', // Message updated.
                           style: TextStyle(fontSize: 18),
                         ),
                         const SizedBox(height: 16), // Space between message and button.
                         ElevatedButton.icon(
-                          onPressed: () => context.push('/add-menu-item'), // Navigate to add menu item screen.
+                          onPressed: () => context.push('/add-standard-menu-item'), // Navigate to add standard menu item screen.
                           icon: const Icon(Icons.add), // Add icon.
-                          label: const Text('Add Menu Item'), // Button label.
+                          label: const Text('Add Standard Menu Item'), // Button label updated.
                         ),
                       ],
                     ),
@@ -165,7 +166,7 @@ class _MenuItemListScreenState extends State<MenuItemListScreen> {
 
                 if (filteredItems.isEmpty) {
                   return const Center(
-                    child: Text('No menu items match your search'), // Message when no items match the search.
+                    child: Text('No standard menu items match your search'), // Message updated.
                   );
                 }
 
@@ -173,8 +174,8 @@ class _MenuItemListScreenState extends State<MenuItemListScreen> {
                   padding: const EdgeInsets.all(16), // Padding around the list.
                   itemCount: filteredItems.length, // Number of items in the list.
                   itemBuilder: (context, index) {
-                    return MenuItemCard(
-                      menuItem: filteredItems[index], // Build a card for each filtered menu item.
+                    return StandardMenuItemCard(
+                      menuItemPrototype: filteredItems[index], // Build a card for each filtered standard menu item.
                     );
                   },
                 );
@@ -187,13 +188,13 @@ class _MenuItemListScreenState extends State<MenuItemListScreen> {
   }
 }
 
-/// A stateless widget that displays a card for a menu item.
-class MenuItemCard extends StatelessWidget {
-  final MenuItem menuItem; // The menu item to display.
+/// A stateless widget that displays a card for a standard menu item.
+class StandardMenuItemCard extends StatelessWidget {
+  final MenuItemPrototype menuItemPrototype; // The standard menu item to display.
 
-  const MenuItemCard({
+  const StandardMenuItemCard({
     super.key,
-    required this.menuItem, // Constructor with a required menu item parameter.
+    required this.menuItemPrototype, // Constructor with a required standard menu item parameter.
   });
 
   @override
@@ -203,12 +204,12 @@ class MenuItemCard extends StatelessWidget {
     return Card(
       child: ListTile(
         contentPadding: const EdgeInsets.all(16), // Padding inside the card.
-        onTap: () => context.push('/edit-menu-item', extra: menuItem), // Navigate to edit menu item screen when tapped.
+        onTap: () => context.push('/edit-standard-menu-item', extra: menuItemPrototype), // Navigate to edit standard menu item screen when tapped.
         title: Row(
           children: [
             Expanded(
               child: Text(
-                menuItem.name, // Display the menu item name.
+                menuItemPrototype.name, // Display the standard menu item name.
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold, // Bold text for the item name.
                 ),
@@ -224,7 +225,7 @@ class MenuItemCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4), // Rounded corners for the price container.
               ),
               child: Text(
-                '\$${menuItem.price.toStringAsFixed(2)}', // Display the menu item price.
+                '\$${menuItemPrototype.price.toStringAsFixed(2)}', // Display the standard menu item price.
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.primary, // Text color for the price.
                   fontWeight: FontWeight.bold, // Bold text for the price.
@@ -237,26 +238,40 @@ class MenuItemCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 8), // Space between title and description.
-            Text(menuItem.description), // Display the menu item description.
+            Text(menuItemPrototype.description), // Display the standard menu item description.
             const SizedBox(height: 8), // Space between description and icons.
             Row(
               children: [
                 Icon(
-                  _getIconForType(menuItem.type), // Get the icon for the menu item type.
+                  _getIconForType(menuItemPrototype.menuItemType), // Get the icon for the standard menu item type.
                   size: 16,
                   color: theme.textTheme.bodySmall?.color, // Icon color.
                 ),
                 const SizedBox(width: 4), // Space between icon and type text.
                 Text(
-                  menuItem.type.toString().split('.').last, // Display the menu item type.
+                  menuItemPrototype.menuItemType.toString().split('.').last, // Display the standard menu item type.
                   style: theme.textTheme.bodySmall,
                 ),
                 const SizedBox(width: 16), // Space between type text and inventory icon.
-                if (menuItem.inventoryRequirements.isNotEmpty)
+                if (menuItemPrototype.inventoryRequirements.isNotEmpty)
                   Icon(
                     Icons.inventory, // Inventory icon if there are inventory requirements.
                     size: 16,
                     color: theme.textTheme.bodySmall?.color, // Icon color.
+                  ),
+                const SizedBox(width: 16), // Space between inventory icon and plated icon.
+                if (menuItemPrototype.plated)
+                  Icon(
+                    Icons.radio_button_checked, // Plated icon if the item is plated.
+                    size: 16,
+                    color: theme.textTheme.bodySmall?.color, // Icon color.
+                  ),
+                if (menuItemPrototype.plated)
+                  const SizedBox(width: 4), // Space between plated icon and text.
+                if (menuItemPrototype.plated)
+                  Text(
+                    'Plated', // Display if the item is plated.
+                    style: theme.textTheme.bodySmall,
                   ),
               ],
             ),
@@ -266,7 +281,7 @@ class MenuItemCard extends StatelessWidget {
           onSelected: (value) {
             switch (value) {
               case 'edit':
-                context.push('/edit-menu-item', extra: menuItem); // Navigate to edit menu item screen.
+                context.push('/edit-standard-menu-item', extra: menuItemPrototype); // Navigate to edit standard menu item screen.
                 break;
               case 'delete':
                 _showDeleteConfirmation(context); // Show delete confirmation dialog.
@@ -276,12 +291,12 @@ class MenuItemCard extends StatelessWidget {
           itemBuilder: (context) => [
             const PopupMenuItem(
               value: 'edit',
-              child: Text('Edit'), // Edit menu item.
+              child: Text('Edit'), // Edit standard menu item.
             ),
             const PopupMenuItem(
               value: 'delete',
               textStyle: TextStyle(color: Colors.red), // Red text for delete menu item.
-              child: Text('Delete'), // Delete menu item.
+              child: Text('Delete'), // Delete standard menu item.
             ),
           ],
         ),
@@ -297,7 +312,7 @@ class MenuItemCard extends StatelessWidget {
       case MenuItemType.mainCourse:
         return Icons.restaurant; // Icon for main course.
       case MenuItemType.sideDish:
-        return Icons.dinner_dining; // Icon for side dish.
+        return Icons.scatter_plot; // Icon for side dish.
       case MenuItemType.dessert:
         return Icons.cake; // Icon for dessert.
       case MenuItemType.beverage:
@@ -307,15 +322,15 @@ class MenuItemCard extends StatelessWidget {
     }
   }
 
-  /// Shows a confirmation dialog to delete the menu item.
+  /// Shows a confirmation dialog to delete the standard menu item.
   void _showDeleteConfirmation(BuildContext context) {
-    final menuItemService = context.read<MenuItemService>(); // Get the menu item service.
+    final menuItemPrototypeService = context.read<MenuItemPrototypeService>(); // Get the standard menu item service.
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete Menu Item'), // Dialog title.
-        content: Text('Are you sure you want to delete "${menuItem.name}"?'), // Dialog content.
+        title: const Text('Delete Standard Menu Item'), // Dialog title updated.
+        content: Text('Are you sure you want to delete "${menuItemPrototype.name}"?'), // Dialog content.
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext), // Close the dialog when cancel is pressed.
@@ -325,11 +340,11 @@ class MenuItemCard extends StatelessWidget {
             onPressed: () async {
               try {
                 Navigator.pop(dialogContext); // Close the dialog.
-                await menuItemService.deleteMenuItem(menuItem.id); // Delete the menu item.
+                await menuItemPrototypeService.deleteMenuItemPrototype(menuItemPrototype.menuItemPrototypeId); // Delete the standard menu item.
 
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Menu item deleted successfully')), // Show success message.
+                    const SnackBar(content: Text('Standard menu item deleted successfully')), // Show success message updated.
                   );
                 }
               } catch (e) {

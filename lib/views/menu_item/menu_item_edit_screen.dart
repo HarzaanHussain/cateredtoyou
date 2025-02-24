@@ -1,21 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
+import 'package:cateredtoyou/models/menu_item_prototype.dart';
+import 'package:cateredtoyou/services/menu_item_prototype_service.dart';
+import 'package:cateredtoyou/services/department_service.dart';
+import 'package:cateredtoyou/models/task/menu_item_task_prototype.dart';
 import 'package:cateredtoyou/models/menu_item_model.dart';
-import 'package:cateredtoyou/models/inventory_item_model.dart';
-import 'package:cateredtoyou/models/task_model.dart';
-import 'package:cateredtoyou/services/menu_item_service.dart';
-import 'package:cateredtoyou/services/inventory_service.dart';
-import 'package:cateredtoyou/widgets/custom_button.dart';
-import 'package:cateredtoyou/widgets/custom_text_field.dart';
+import 'package:cateredtoyou/models/task/task_model.dart';
+import 'package:cateredtoyou/services/department_provider.dart';
 
 class MenuItemEditScreen extends StatefulWidget {
-  final MenuItem? menuItem;
+  final String? menuItemPrototypeId;
 
-  const MenuItemEditScreen({
-    super.key,
-    this.menuItem,
-  });
+  const MenuItemEditScreen({super.key, this.menuItemPrototypeId});
 
   @override
   State<MenuItemEditScreen> createState() => _MenuItemEditScreenState();
@@ -23,445 +19,550 @@ class MenuItemEditScreen extends StatefulWidget {
 
 class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _priceController = TextEditingController();
-  late MenuItemType _selectedType;
-  late bool _isPlated;
+  late TextEditingController _nameController;
+  late TextEditingController _descriptionController;
+  late TextEditingController _priceController;
+  bool _isPlated = false;
+  MenuItemType _selectedType = MenuItemType.other;
   final Map<String, double> _inventoryRequirements = {};
-  final List<TaskField> _taskFields = [];
+  final List<String> _recipe = [];
+  final List<MenuItemTaskPrototype> _taskPrototypes = [];
   bool _isLoading = false;
-  String? _error;
+  bool _isNewItem = true;
+
+  // Controllers for recipe steps
+  final List<TextEditingController> _recipeControllers = [];
+
+  // Controllers and data for task prototypes
+  final List<TextEditingController> _taskDescriptionControllers = [];
+  final List<TaskPriority> _taskPriorities = [];
+  final List<String> _taskDepartments = [];
 
   @override
   void initState() {
     super.initState();
-    final menuItem = widget.menuItem;
-    if (menuItem != null) {
-      _nameController.text = menuItem.name;
-      _descriptionController.text = menuItem.description;
-      _priceController.text = menuItem.price.toString();
-      _selectedType = menuItem.type;
-      _isPlated = menuItem.plated;
-      _inventoryRequirements.addAll(menuItem.inventoryRequirements);
-      // Initialize tasks if they exist
-      if (menuItem.tasks != null) {
-        for (var task in menuItem.tasks!) {
-          _addTaskField(task);
-        }
+    _nameController = TextEditingController();
+    _descriptionController = TextEditingController();
+    _priceController = TextEditingController();
+
+    // Load departments properly
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final departmentProvider = context.read<DepartmentProvider>();
+      final departmentService = context.read<DepartmentService>();
+
+      if (departmentProvider.departments.isEmpty && !departmentProvider.isLoading) {
+        debugPrint('Loading departments...');
+        departmentProvider.loadDepartments();
+      } else {
+        debugPrint('Departments already loaded or still loading');
       }
-    } else {
-      _selectedType = MenuItemType.mainCourse;
-      _isPlated = false;
-      // Add initial empty task field
-      _addTaskField(null);
-    }
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    _priceController.dispose();
-    // Dispose all task field controllers
-    for (var field in _taskFields) {
-      field.nameController.dispose();
-      field.descriptionController.dispose();
-    }
-    super.dispose();
-  }
-
-  void _addTaskField(Task? task) {
-    setState(() {
-      // Create a reference to hold our taskField
-      late final TaskField taskField;
-
-      // Initialize the removal function first
-      VoidCallback? onRemoveFunction;
-      if (_taskFields.isNotEmpty) {
-        onRemoveFunction = () {
-          _removeTaskField(taskField);
-        };
-      }
-
-      // Now create the taskField
-      taskField = TaskField(
-        key: UniqueKey(),
-        task: task,
-        onRemove: onRemoveFunction,
-        onChanged: _onTaskFieldChanged,
-      );
-
-      _taskFields.add(taskField);
     });
+
+    _loadMenuItem();
   }
 
-  void _removeTaskField(TaskField field) {
-    setState(() {
-      _taskFields.remove(field);
-    });
-  }
 
-  void _onTaskFieldChanged(TaskField field) {
-    // If this is the last field and it's not empty, add a new empty field
-    if (_taskFields.last == field &&
-        (field.nameController.text.isNotEmpty ||
-            field.descriptionController.text.isNotEmpty)) {
-      _addTaskField(null);
-    }
-  }
-
-  void _addInventoryItem(InventoryItem item) { // Function to add inventory item.
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Add ${item.name}'), // Dialog title.
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              decoration: const InputDecoration(
-                labelText: 'Quantity Required', // Label for quantity input.
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true), // Input type for quantity.
-              validator: (value) { // Validator for quantity input.
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a quantity'; // Error if empty.
-                }
-                final number = double.tryParse(value);
-                if (number == null) {
-                  return 'Please enter a valid number'; // Error if not a number.
-                }
-                if (number <= 0) {
-                  return 'Quantity must be greater than 0'; // Error if not positive.
-                }
-                return null;
-              },
-              onChanged: (value) { // On change handler for quantity input.
-                final quantity = double.tryParse(value);
-                if (quantity != null && quantity > 0) {
-                  setState(() {
-                    _inventoryRequirements[item.id] = quantity; // Update inventory requirements.
-                  });
-                }
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context), // Close dialog on cancel.
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context), // Close dialog on add.
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _removeInventoryItem(String itemId) { // Function to remove inventory item.
-    setState(() {
-      _inventoryRequirements.remove(itemId); // Remove item from requirements.
-    });
-  }
-
-  Future<void> _handleSubmit() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    // Validate that at least one task is entered
-    bool hasTask = _taskFields.any((field) =>
-    field.nameController.text.isNotEmpty &&
-        field.descriptionController.text.isNotEmpty);
-
-    if (!hasTask) {
-      setState(() {
-        _error = 'At least one task is required';
-      });
+  // Load menu item data if editing an existing item
+  Future<void> _loadMenuItem() async {
+    if (widget.menuItemPrototypeId == null) {
+      // Add initial empty recipe step and task for new items
+      _addEmptyRecipeStep();
+      _addEmptyTask();
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
+    setState(() => _isLoading = true);
     try {
-      final menuItemService = context.read<MenuItemService>();
-      final price = double.parse(_priceController.text);
+      final service = context.read<MenuItemPrototypeService>();
+      final menuItem = await service.getMenuItemPrototype(widget.menuItemPrototypeId!);
 
-      // Convert task fields to Task objects
-      final tasks = _taskFields
-          .where((field) =>
-      field.nameController.text.isNotEmpty &&
-          field.descriptionController.text.isNotEmpty)
-          .map((field) => Task(
-        id: field.task?.id ?? DateTime.now().toString(),
-        eventId: 'default',  // You might want to modify this
-        name: field.nameController.text.trim(),
-        description: field.descriptionController.text.trim(),
-        dueDate: DateTime.now().add(const Duration(days: 7)),  // Default due date
-        status: TaskStatus.pending,
-        priority: TaskPriority.medium,
-        assignedTo: '',  // You might want to modify this
-        departmentId: '',  // You might want to modify this
-        organizationId: '',  // You might want to modify this
-        createdBy: '',  // You might want to modify this
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ))
-          .toList();
-
-      if (widget.menuItem == null) {
-        await menuItemService.createMenuItem(
-          name: _nameController.text.trim(),
-          description: _descriptionController.text.trim(),
-          type: _selectedType,
-          plated: _isPlated,
-          price: price,
-          inventoryRequirements: _inventoryRequirements,
-          tasks: tasks,  // Add tasks here
-        );
-      } else {
-        final updatedMenuItem = widget.menuItem!.copyWith(
-          name: _nameController.text.trim(),
-          description: _descriptionController.text.trim(),
-          type: _selectedType,
-          plated: _isPlated,
-          price: price,
-          inventoryRequirements: _inventoryRequirements,
-          tasks: tasks,  // Add tasks here
-        );
-
-        await menuItemService.updateMenuItem(updatedMenuItem);
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.menuItem == null
-                  ? 'Menu item created successfully'
-                  : 'Menu item updated successfully',
-            ),
-          ),
-        );
-        context.go('/menu-items');
-      }
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-      });
-    } finally {
-      if (mounted) {
+      if (menuItem != null) {
+        _isNewItem = false;
+        _nameController.text = menuItem.name;
+        _descriptionController.text = menuItem.description;
+        _priceController.text = menuItem.price.toString();
         setState(() {
-          _isLoading = false;
+          _isPlated = menuItem.plated;
+          _selectedType = menuItem.menuItemType;
+          _inventoryRequirements.clear();
+          _inventoryRequirements.addAll(menuItem.inventoryRequirements);
+
+          // Load recipe steps
+          _recipe.clear();
+          _recipe.addAll(menuItem.recipe);
+          _recipeControllers.clear();
+          if (_recipe.isEmpty) {
+            _addEmptyRecipeStep();
+          } else {
+            for (String step in _recipe) {
+              final controller = TextEditingController(text: step);
+              _recipeControllers.add(controller);
+            }
+            // Add one empty step at the end
+            _addEmptyRecipeStep();
+          }
+
+          // Load task prototypes
+          _taskPrototypes.clear();
+          _taskPrototypes.addAll(menuItem.taskPrototypes);
+          _taskDescriptionControllers.clear();
+          _taskPriorities.clear();
+          _taskDepartments.clear();
+
+          if (_taskPrototypes.isEmpty) {
+            _addEmptyTask();
+          } else {
+            for (MenuItemTaskPrototype task in _taskPrototypes) {
+              final descController = TextEditingController(text: task.description);
+              _taskDescriptionControllers.add(descController);
+              _taskPriorities.add(task.defaultPriority);
+              _taskDepartments.add(task.departmentId);
+            }
+            // Add one empty task at the end
+            _addEmptyTask();
+          }
         });
       }
+    } catch (e) {
+      debugPrint('Error loading menu item: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading menu item: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // Add an empty recipe step to the list
+  void _addEmptyRecipeStep() {
+    setState(() {
+      _recipeControllers.add(TextEditingController());
+    });
+  }
+
+  // Add an empty task to the list, auto-filling department and priority if there are existing tasks
+  void _addEmptyTask() {
+    setState(() {
+      _taskDescriptionControllers.add(TextEditingController());
+
+      // Auto-fill department and priority from first task if available
+      if (_taskPriorities.isNotEmpty) {
+        _taskPriorities.add(_taskPriorities[0]); // Copy priority from first task
+        _taskDepartments.add(_taskDepartments[0]); // Copy department from first task
+        debugPrint('Auto-filled task with department: ${_taskDepartments[0]} and priority: ${_taskPriorities[0]}');
+      } else {
+        _taskPriorities.add(TaskPriority.medium);
+        _taskDepartments.add('');
+      }
+    });
+  }
+
+  // Remove a recipe step at the specified index
+  void _removeRecipeStep(int index) {
+    setState(() {
+      _recipeControllers[index].dispose();
+      _recipeControllers.removeAt(index);
+    });
+  }
+
+  // Remove a task at the specified index
+  void _removeTask(int index) {
+    setState(() {
+      _taskDescriptionControllers[index].dispose();
+      _taskDescriptionControllers.removeAt(index);
+      _taskPriorities.removeAt(index);
+      _taskDepartments.removeAt(index);
+    });
+  }
+
+  // Save the menu item
+  Future<void> _saveMenuItem() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+    try {
+      debugPrint('Saving menu item: ${_nameController.text}');
+
+      // Process recipe steps (remove empty steps)
+      _recipe.clear();
+      for (var controller in _recipeControllers) {
+        if (controller.text.trim().isNotEmpty) {
+          _recipe.add(controller.text.trim());
+        }
+      }
+      debugPrint('Recipe steps saved: ${_recipe.length}');
+
+      // Process tasks (remove empty tasks)
+      _taskPrototypes.clear();
+      for (int i = 0; i < _taskDescriptionControllers.length; i++) {
+        if (_taskDescriptionControllers[i].text.trim().isNotEmpty) {
+          _taskPrototypes.add(
+            MenuItemTaskPrototype(
+              description: _taskDescriptionControllers[i].text.trim(),
+              defaultPriority: _taskPriorities[i],
+              departmentId: _taskDepartments[i],
+            ),
+          );
+        }
+      }
+      debugPrint('Task prototypes saved: ${_taskPrototypes.length}');
+
+      final service = context.read<MenuItemPrototypeService>();
+
+      if (_isNewItem) {
+        await service.createMenuItemPrototype(
+          name: _nameController.text,
+          description: _descriptionController.text,
+          plated: _isPlated,
+          price: double.parse(_priceController.text),
+          menuItemType: _selectedType,
+          inventoryRequirements: _inventoryRequirements,
+          recipe: _recipe,
+          taskPrototypes: _taskPrototypes,
+        );
+        debugPrint('Created new menu item: ${_nameController.text}');
+      } else {
+        final updatedPrototype = MenuItemPrototype(
+          menuItemPrototypeId: widget.menuItemPrototypeId!,
+          name: _nameController.text,
+          description: _descriptionController.text,
+          plated: _isPlated,
+          price: double.parse(_priceController.text),
+          organizationId: '', // Will be validated by service
+          menuItemType: _selectedType,
+          inventoryRequirements: _inventoryRequirements,
+          recipe: _recipe,
+          createdAt: DateTime.now(), // Will be preserved by service
+          updatedAt: DateTime.now(),
+          createdBy: '', // Will be preserved by service
+          taskPrototypes: _taskPrototypes,
+        );
+        await service.updateMenuItemPrototype(updatedPrototype);
+        debugPrint('Updated menu item: ${_nameController.text}');
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      debugPrint('Error saving menu item: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving menu item: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isEditing = widget.menuItem != null;
+    // Show loading indicator while data is being fetched
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isEditing ? 'Edit Menu Item' : 'Create Menu Item'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              CustomTextField(
-                controller: _nameController,
-                label: 'Item Name',
-                prefixIcon: Icons.restaurant_menu,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter an item name';
-                  }
-                  return null;
-                },
+    // Use the department provider to access departments
+    return Consumer<DepartmentProvider>(
+      builder: (context, departmentProvider, _) {
+        final List<String> departments = departmentProvider.departments;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(_isNewItem ? 'Create Menu Item' : 'Edit Menu Item'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.save),
+                onPressed: _saveMenuItem,
               ),
-              const SizedBox(height: 16),
-              CustomTextField(
-                controller: _descriptionController,
-                label: 'Description',
-                prefixIcon: Icons.description,
-                maxLines: 3,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a description';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<MenuItemType>(
-                value: _selectedType,
-                decoration: const InputDecoration(
-                  labelText: 'Type',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.category),
+            ],
+          ),
+          body: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(16.0),
+              children: [
+                // Basic information section
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                  validator: (value) => value?.isEmpty ?? true ? 'Name is required' : null,
                 ),
-                items: MenuItemType.values.map((type) {
-                  return DropdownMenuItem(
-                    value: type,
-                    child: Text(type.toString().split('.').last),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _selectedType = value;
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text('Plated'),
-                value: _isPlated,
-                onChanged: (bool value) {
-                  setState(() {
-                    _isPlated = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-              CustomTextField(
-                controller: _priceController,
-                label: 'Price',
-                prefixIcon: Icons.attach_money,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a price';
-                  }
-                  final price = double.tryParse(value);
-                  if (price == null) {
-                    return 'Please enter a valid number';
-                  }
-                  if (price <= 0) {
-                    return 'Price must be greater than 0';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-              // ... Inventory Requirements section unchanged ...
-              const SizedBox(height: 24),
-              Text(
-                'Tasks',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(labelText: 'Description'),
+                  maxLines: 3,
                 ),
-              ),
-              const SizedBox(height: 8),
-              ..._taskFields,
-              const SizedBox(height: 24),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(
-                      color: Colors.red,
-                      fontSize: 14,
-                    ),
-                    textAlign: TextAlign.center,
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _priceController,
+                  decoration: const InputDecoration(labelText: 'Price'),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value?.isEmpty ?? true) return 'Price is required';
+                    if (double.tryParse(value!) == null) return 'Invalid price';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<MenuItemType>(
+                  value: _selectedType,
+                  decoration: const InputDecoration(labelText: 'Type'),
+                  items: MenuItemType.values.map((type) {
+                    return DropdownMenuItem(
+                      value: type,
+                      child: Text(type.name),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedType = value);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('Plated'),
+                  value: _isPlated,
+                  onChanged: (value) => setState(() => _isPlated = value),
+                ),
+
+                // Recipe Section
+                const SizedBox(height: 24),
+                const Text(
+                  'Recipe Steps',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              CustomButton(
-                label: isEditing ? 'Update Menu Item' : 'Create Menu Item',
-                onPressed: _isLoading ? null : _handleSubmit,
-                isLoading: _isLoading,
+                const SizedBox(height: 8),
+                ..._buildRecipeSteps(),
+
+                // Task Section
+                const SizedBox(height: 24),
+                const Text(
+                  'Tasks',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ..._buildTasks(departments),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Build the recipe steps section
+  List<Widget> _buildRecipeSteps() {
+    final List<Widget> recipeWidgets = [];
+
+    for (int i = 0; i < _recipeControllers.length; i++) {
+      recipeWidgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Step number
+              SizedBox(
+                width: 40,
+                child: Center(child: Text('${i + 1}.')),
+              ),
+              // Step text field
+              Expanded(
+                child: TextFormField(
+                  controller: _recipeControllers[i],
+                  decoration: const InputDecoration(
+                    hintText: 'Enter recipe step',
+                    border: OutlineInputBorder(),
+                  ),
+                  minLines: 1,
+                  maxLines: 3,
+                  onChanged: (_) {
+                    // If this is the last field and it has content, add a new empty field
+                    if (i == _recipeControllers.length - 1 &&
+                        _recipeControllers[i].text.trim().isNotEmpty) {
+                      _addEmptyRecipeStep();
+                    }
+                  },
+                ),
+              ),
+              // Remove button (except for the last empty item)
+              IconButton(
+                icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                onPressed: (_recipeControllers.length > 1 &&
+                    (i < _recipeControllers.length - 1 ||
+                        _recipeControllers[i].text.trim().isNotEmpty))
+                    ? () => _removeRecipeStep(i)
+                    : null,
               ),
             ],
           ),
         ),
-      ),
-    );
+      );
+    }
+
+    return recipeWidgets;
   }
-}
 
-// New TaskField widget for managing individual task inputs
-class TaskField extends StatelessWidget {
-  final TextEditingController nameController;
-  final TextEditingController descriptionController;
-  final VoidCallback? onRemove;
-  final Function(TaskField) onChanged;
-  final Task? task;
+  List<Widget> _buildTasks(List<String> departments) {
+    final List<Widget> taskWidgets = [];
 
-  TaskField({
-    required Key key,
-    this.task,
-    this.onRemove,
-    required this.onChanged,
-  }) : nameController = TextEditingController(text: task?.name ?? ''),
-        descriptionController = TextEditingController(text: task?.description ?? ''),
-        super(key: key) {
-    // Rest of the constructor remains the same
-    nameController.addListener(() => onChanged(this));
-    descriptionController.addListener(() => onChanged(this));
+    for (int i = 0; i < _taskDescriptionControllers.length; i++) {
+      taskWidgets.add(
+        Card(
+          margin: const EdgeInsets.only(bottom: 16.0),
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Task ${i + 1}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    // Remove button (except for the last empty item)
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: (_taskDescriptionControllers.length > 1 &&
+                          (i < _taskDescriptionControllers.length - 1 ||
+                              _taskDescriptionControllers[i].text.trim().isNotEmpty))
+                          ? () => _removeTask(i)
+                          : null,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _taskDescriptionControllers[i],
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    border: OutlineInputBorder(),
+                  ),
+                  minLines: 2,
+                  maxLines: 4,
+                  onChanged: (value) {
+                    // If this is the last field and it has content, add a new empty task
+                    if (i == _taskDescriptionControllers.length - 1 &&
+                        value.trim().isNotEmpty) {
+                      _addEmptyTask();
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                // Priority and Department in the same row
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Priority dropdown
+                    Expanded(
+                      child: DropdownButtonFormField<TaskPriority>(
+                        decoration: const InputDecoration(
+                          labelText: 'Priority',
+                          border: OutlineInputBorder(),
+                        ),
+                        value: _taskPriorities[i],
+                        items: TaskPriority.values.map((priority) {
+                          return DropdownMenuItem<TaskPriority>(
+                            value: priority,
+                            child: Text(priority.toString().split('.').last),
+                          );
+                        }).toList(),
+                        onChanged: (TaskPriority? value) {
+                          if (value != null) {
+                            setState(() {
+                              _taskPriorities[i] = value;
+
+                              // Update all subsequent tasks with this priority if this is the first task
+                              if (i == 0) {
+                                for (int j = 1; j < _taskPriorities.length; j++) {
+                                  _taskPriorities[j] = value;
+                                }
+                                debugPrint('Updated all task priorities to: $value');
+                              }
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Department dropdown
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        decoration: const InputDecoration(
+                          labelText: 'Department',
+                          border: OutlineInputBorder(),
+                        ),
+                        value: _taskDepartments[i].isNotEmpty && departments.contains(_taskDepartments[i])
+                            ? _taskDepartments[i]
+                            : null,
+                        hint: const Text('Select department'),
+                        items: departments.map((dept) {
+                          return DropdownMenuItem<String>(
+                            value: dept,
+                            child: Text(dept),
+                          );
+                        }).toList(),
+                        onChanged: (String? value) {
+                          if (value != null) {
+                            setState(() {
+                              _taskDepartments[i] = value;
+
+                              // Update all subsequent tasks with this department if this is the first task
+                              if (i == 0) {
+                                for (int j = 1; j < _taskDepartments.length; j++) {
+                                  _taskDepartments[j] = value;
+                                }
+                                debugPrint('Updated all task departments to: $value');
+                              }
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return taskWidgets;
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: CustomTextField(
-                    controller: nameController,
-                    label: 'Task Name',
-                    prefixIcon: Icons.task_alt,
-                    validator: (value) {
-                      if (value?.isNotEmpty ?? false) {
-                        if (descriptionController.text.isEmpty) {
-                          return 'Please enter a task description';
-                        }
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                if (onRemove != null)
-                  IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: onRemove,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            CustomTextField(
-              controller: descriptionController,
-              label: 'Task Description',
-              prefixIcon: Icons.description,
-              maxLines: 2,
-              validator: (value) {
-                if (value?.isNotEmpty ?? false) {
-                  if (nameController.text.isEmpty) {
-                    return 'Please enter a task name';
-                  }
-                }
-                return null;
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+  void dispose() {
+    // Clean up controllers
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _priceController.dispose();
+
+    // Dispose all recipe controllers
+    for (var controller in _recipeControllers) {
+      controller.dispose();
+    }
+
+    // Dispose all task controllers
+    for (var controller in _taskDescriptionControllers) {
+      controller.dispose();
+    }
+
+    super.dispose();
   }
 }

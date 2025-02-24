@@ -1,329 +1,298 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'menu_item_model.dart';
+import 'package:flutter/foundation.dart'; // Import for debugPrint
 
-import 'package:cloud_firestore/cloud_firestore.dart'; // Importing Firestore package for database operations
-
-// Enum representing the various statuses an event can have
 enum EventStatus {
-  draft, // Event is in draft state
-  pending, // Event is pending approval or confirmation
-  confirmed, // Event is confirmed
-  inProgress, // Event is currently in progress
-  completed, // Event has been completed
-  cancelled, // Event has been cancelled
-  archived // Event has been archived
+  draft,
+  pending,
+  confirmed,
+  inProgress,
+  completed,
+  cancelled,
+  archived
 }
 
-// Class representing a menu item in an event
-class EventMenuItem {
-  final String menuItemId; // Unique identifier for the menu item
-  final String name; // Name of the menu item
-  final double price; // Price of the menu item
-  final int quantity; // Quantity of the menu item
-  final String? specialInstructions; // Special instructions for the menu item
-
-  const EventMenuItem({
-    required this.menuItemId, // Constructor parameter for menuItemId
-    required this.name, // Constructor parameter for name
-    required this.price, // Constructor parameter for price
-    required this.quantity, // Constructor parameter for quantity
-    this.specialInstructions, // Constructor parameter for special instructions
-  });
-
-  // Converts the EventMenuItem instance to a map
-  Map<String, dynamic> toMap() {
-    return {
-      'menuItemId': menuItemId, // Map entry for menuItemId
-      'name': name, // Map entry for name
-      'price': price, // Map entry for price
-      'quantity': quantity, // Map entry for quantity
-      'specialInstructions': specialInstructions, // Map entry for special instructions
-    };
-  }
-
-  // Factory constructor to create an EventMenuItem instance from a map
-  factory EventMenuItem.fromMap(Map<String, dynamic> map) {
-    return EventMenuItem(
-      menuItemId: map['menuItemId'] ?? '', // Extracts menuItemId from map
-      name: map['name'] ?? '', // Extracts name from map
-      price: (map['price'] ?? 0).toDouble(), // Extracts and converts price from map
-      quantity: map['quantity'] ?? 0, // Extracts quantity from map
-      specialInstructions: map['specialInstructions'], // Extracts special instructions from map
-    );
-  }
-}
-
-// Class representing a supply item in an event
 class EventSupply {
-  final String inventoryId; // Unique identifier for the supply item
-  final String name; // Name of the supply item
-  final double quantity; // Quantity of the supply item
-  final String unit; // Unit of measurement for the supply item
+  final String inventoryId;
+  final String name;
+  final double quantity;
+  final String unit;
 
   const EventSupply({
-    required this.inventoryId, // Constructor parameter for inventoryId
-    required this.name, // Constructor parameter for name
-    required this.quantity, // Constructor parameter for quantity
-    required this.unit, // Constructor parameter for unit
+    required this.inventoryId,
+    required this.name,
+    required this.quantity,
+    required this.unit,
   });
 
-  // Converts the EventSupply instance to a map
   Map<String, dynamic> toMap() {
     return {
-      'inventoryId': inventoryId, // Map entry for inventoryId
-      'name': name, // Map entry for name
-      'quantity': quantity, // Map entry for quantity
-      'unit': unit, // Map entry for unit
+      'inventoryId': inventoryId,
+      'name': name,
+      'quantity': quantity,
+      'unit': unit,
     };
   }
 
-  // Factory constructor to create an EventSupply instance from a map
   factory EventSupply.fromMap(Map<String, dynamic> map) {
     return EventSupply(
-      inventoryId: map['inventoryId'] ?? '', // Extracts inventoryId from map
-      name: map['name'] ?? '', // Extracts name from map
-      quantity: (map['quantity'] ?? 0).toDouble(), // Extracts and converts quantity from map
-      unit: map['unit'] ?? '', // Extracts unit from map
+      inventoryId: map['inventoryId'] ?? '',
+      name: map['name'] ?? '',
+      quantity: (map['quantity'] ?? 0).toDouble(),
+      unit: map['unit'] ?? '',
     );
   }
 }
 
-// Class representing an assigned staff member for an event
 class AssignedStaff {
-  final String userId; // Unique identifier for the staff member
-  final String name; // Name of the staff member
-  final String role; // Role of the staff member
-  final DateTime assignedAt; // Date and time when the staff member was assigned
+  final String userId;
+  final String name;
+  final String role;
+  final DateTime assignedAt;
 
   const AssignedStaff({
-    required this.userId, // Constructor parameter for userId
-    required this.name, // Constructor parameter for name
-    required this.role, // Constructor parameter for role
-    required this.assignedAt, // Constructor parameter for assignedAt
+    required this.userId,
+    required this.name,
+    required this.role,
+    required this.assignedAt,
   });
 
-  // Converts the AssignedStaff instance to a map
   Map<String, dynamic> toMap() {
     return {
-      'userId': userId, // Map entry for userId
-      'name': name, // Map entry for name
-      'role': role, // Map entry for role
-      'assignedAt': Timestamp.fromDate(assignedAt), // Map entry for assignedAt
+      'userId': userId,
+      'name': name,
+      'role': role,
+      'assignedAt': Timestamp.fromDate(assignedAt),
     };
   }
 
-  // Factory constructor to create an AssignedStaff instance from a map
   factory AssignedStaff.fromMap(Map<String, dynamic> map) {
     return AssignedStaff(
-      userId: map['userId'] ?? '', // Extracts userId from map
-      name: map['name'] ?? '', // Extracts name from map
-      role: map['role'] ?? '', // Extracts role from map
-      assignedAt: (map['assignedAt'] as Timestamp).toDate(), // Extracts and converts assignedAt from map
+      userId: map['userId'] ?? '',
+      name: map['name'] ?? '',
+      role: map['role'] ?? '',
+      assignedAt: (map['assignedAt'] as Timestamp).toDate(),
     );
   }
 }
 
-// Class representing an event
 class Event {
-  final String id; // Unique identifier for the event
-  final String name; // Name of the event
-  final String description; // Description of the event
-  final DateTime startDate; // Start date of the event
-  final DateTime endDate; // End date of the event
-  final String location; // Location of the event
-  final String customerId; // Customer ID associated with the event
-  final String organizationId; // Organization ID associated with the event
-  final int guestCount; // Number of guests expected at the event
-  final int minStaff; // Minimum number of staff required for the event
-  final String notes; // Additional notes for the event
-  final EventStatus status; // Status of the event
-  final DateTime startTime; // Start time of the event
-  final DateTime endTime; // End time of the event
-  final String createdBy; // User ID of the creator of the event
-  final DateTime createdAt; // Date and time when the event was created
-  final DateTime updatedAt; // Date and time when the event was last updated
-  final List<EventMenuItem> menuItems; // List of menu items for the event
-  final List<EventSupply> supplies; // List of supplies for the event
-  final double totalPrice; // Total price of the event
-  final List<AssignedStaff> assignedStaff; // List of assigned staff for the event
-  final Map<String, dynamic>? metadata; // Additional metadata for the event
+  final String id;
+  final String name;
+  final String description;
+  final DateTime startDate;
+  final DateTime endDate;
+  final String location;
+  final String customerId;
+  final String organizationId;
+  final int guestCount;
+  final int minStaff;
+  final String notes;
+  final EventStatus status;
+  final DateTime startTime;
+  final DateTime endTime;
+  final String createdBy;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final List<MenuItem> menuItems;
+  final List<EventSupply> supplies;
+  final double totalPrice;
+  final List<AssignedStaff> assignedStaff;
+  final Map<String, dynamic>? metadata;
 
   const Event({
-    required this.id, // Constructor parameter for id
-    required this.name, // Constructor parameter for name
-    required this.description, // Constructor parameter for description
-    required this.startDate, // Constructor parameter for startDate
-    required this.endDate, // Constructor parameter for endDate
-    required this.location, // Constructor parameter for location
-    required this.customerId, // Constructor parameter for customerId
-    required this.organizationId, // Constructor parameter for organizationId
-    required this.guestCount, // Constructor parameter for guestCount
-    required this.minStaff, // Constructor parameter for minStaff
-    this.notes = '', // Constructor parameter for notes with default value
-    required this.status, // Constructor parameter for status
-    required this.startTime, // Constructor parameter for startTime
-    required this.endTime, // Constructor parameter for endTime
-    required this.createdBy, // Constructor parameter for createdBy
-    required this.createdAt, // Constructor parameter for createdAt
-    required this.updatedAt, // Constructor parameter for updatedAt
-    this.menuItems = const [], // Constructor parameter for menuItems with default value
-    this.supplies = const [], // Constructor parameter for supplies with default value
-    required this.totalPrice, // Constructor parameter for totalPrice
-    this.assignedStaff = const [], // Constructor parameter for assignedStaff with default value
-    this.metadata, // Constructor parameter for metadata
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.startDate,
+    required this.endDate,
+    required this.location,
+    required this.customerId,
+    required this.organizationId,
+    required this.guestCount,
+    required this.minStaff,
+    this.notes = '',
+    required this.status,
+    required this.startTime,
+    required this.endTime,
+    required this.createdBy,
+    required this.createdAt,
+    required this.updatedAt,
+    this.menuItems = const [],
+    this.supplies = const [],
+    required this.totalPrice,
+    this.assignedStaff = const [],
+    this.metadata,
   });
 
-  // Converts the Event instance to a map
   Map<String, dynamic> toMap() {
     return {
-      'name': name, // Map entry for name
-      'description': description, // Map entry for description
-      'startDate': Timestamp.fromDate(startDate), // Map entry for startDate
-      'endDate': Timestamp.fromDate(endDate), // Map entry for endDate
-      'location': location, // Map entry for location
-      'customerId': customerId, // Map entry for customerId
-      'organizationId': organizationId, // Map entry for organizationId
-      'guestCount': guestCount, // Map entry for guestCount
-      'minStaff': minStaff, // Map entry for minStaff
-      'notes': notes, // Map entry for notes
-      'status': status.toString().split('.').last, // Map entry for status
-      'startTime': Timestamp.fromDate(startTime), // Map entry for startTime
-      'endTime': Timestamp.fromDate(endTime), // Map entry for endTime
-      'createdBy': createdBy, // Map entry for createdBy
-      'createdAt': Timestamp.fromDate(createdAt), // Map entry for createdAt
-      'updatedAt': Timestamp.fromDate(updatedAt), // Map entry for updatedAt
-      'menuItems': menuItems.map((item) => item.toMap()).toList(), // Map entry for menuItems
-      'supplies': supplies.map((supply) => supply.toMap()).toList(), // Map entry for supplies
-      'totalPrice': totalPrice, // Map entry for totalPrice
-      'assignedStaff': assignedStaff.map((staff) => staff.toMap()).toList(), // Map entry for assignedStaff
-      'metadata': metadata, // Map entry for metadata
+      'name': name,
+      'description': description,
+      'startDate': Timestamp.fromDate(startDate),
+      'endDate': Timestamp.fromDate(endDate),
+      'location': location,
+      'customerId': customerId,
+      'organizationId': organizationId,
+      'guestCount': guestCount,
+      'minStaff': minStaff,
+      'notes': notes,
+      'status': status.toString().split('.').last,
+      'startTime': Timestamp.fromDate(startTime),
+      'endTime': Timestamp.fromDate(endTime),
+      'createdBy': createdBy,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
+      'menuItems': menuItems.map((item) => item.toMap()).toList(),
+      'supplies': supplies.map((supply) => supply.toMap()).toList(),
+      'totalPrice': totalPrice,
+      'assignedStaff': assignedStaff.map((staff) => staff.toMap()).toList(),
+      'metadata': metadata,
     };
   }
 
-  // Factory constructor to create an Event instance from a map
   factory Event.fromMap(Map<String, dynamic> map, String docId) {
+
+    try {
+      debugPrint('id: $docId (${docId.runtimeType})');
+      debugPrint('name: ${map['name']} (${map['name']?.runtimeType})');
+      debugPrint('description: ${map['description']} (${map['description']?.runtimeType})');
+      debugPrint('startDate: ${map['startDate']} (${map['startDate']?.runtimeType})');
+      debugPrint('endDate: ${map['endDate']} (${map['endDate']?.runtimeType})');
+      debugPrint('location: ${map['location']} (${map['location']?.runtimeType})');
+      debugPrint('customerId: ${map['customerId']} (${map['customerId']?.runtimeType})');
+      debugPrint('organizationId: ${map['organizationId']} (${map['organizationId']?.runtimeType})');
+      debugPrint('guestCount: ${map['guestCount']} (${map['guestCount']?.runtimeType})');
+      debugPrint('minStaff: ${map['minStaff']} (${map['minStaff']?.runtimeType})');
+      debugPrint('notes: ${map['notes']} (${map['notes']?.runtimeType})');
+      debugPrint('status: ${map['status']} (${map['status']?.runtimeType})');
+      debugPrint('startTime: ${map['startTime']} (${map['startTime']?.runtimeType})');
+      debugPrint('endTime: ${map['endTime']} (${map['endTime']?.runtimeType})');
+      debugPrint('createdBy: ${map['createdBy']} (${map['createdBy']?.runtimeType})');
+      debugPrint('createdAt: ${map['createdAt']} (${map['createdAt']?.runtimeType})');
+      debugPrint('updatedAt: ${map['updatedAt']} (${map['updatedAt']?.runtimeType})');
+      debugPrint('menuItems: ${map['menuItems']} (${map['menuItems']?.runtimeType})');
+      debugPrint('supplies: ${map['supplies']} (${map['supplies']?.runtimeType})');
+      debugPrint('totalPrice: ${map['totalPrice']} (${map['totalPrice']?.runtimeType})');
+      debugPrint('assignedStaff: ${map['assignedStaff']} (${map['assignedStaff']?.runtimeType})');
+      debugPrint('metadata: ${map['metadata']} (${map['metadata']?.runtimeType})');
+    } catch (e, stackTrace) {
+      debugPrint('Error in Event.fromMap: $e\n$stackTrace');
+    }
+
+   List<MenuItem> menuItems = [];
+   try {
+     debugPrint("Running MenuItem.fromMap()\nprojectid: ${FirebaseFirestore.instance.app.options.projectId}\nDoc id: ${docId}\n");
+     menuItems = (map['menuItems'] as List<dynamic>?)
+         ?.map((item) {
+           debugPrint('Processing MenuItem: $item with id ${item['id']}');
+           return MenuItem.fromMap(item, item['id']);
+         })
+         .toList() ?? [];
+   } catch (e) {
+     debugPrint('Error in MenuItem.fromMap: $e');
+   }
+
+    List<EventSupply> supplies = [];
+    try {
+      supplies = (map['supplies'] as List<dynamic>?)
+          ?.map((supply) => EventSupply.fromMap(supply))
+          .toList() ?? [];
+    } catch (e, stackTrace) {
+      debugPrint('Error in EventSupply.fromMap: $e\n$stackTrace');
+    }
+
+    List<AssignedStaff> assignedStaff = [];
+    try {
+      assignedStaff = (map['assignedStaff'] as List<dynamic>?)
+          ?.map((staff) => AssignedStaff.fromMap(staff))
+          .toList() ?? [];
+    } catch (e, stackTrace) {
+      debugPrint('Error in AssignedStaff.fromMap: $e\n$stackTrace');
+    }
+
+
     return Event(
-      id: docId, // Extracts id from map
-      name: map['name'] ?? '', // Extracts name from map
-      description: map['description'] ?? '', // Extracts description from map
-      startDate: (map['startDate'] as Timestamp).toDate(), // Extracts and converts startDate from map
-      endDate: (map['endDate'] as Timestamp).toDate(), // Extracts and converts endDate from map
-      location: map['location'] ?? '', // Extracts location from map
-      customerId: map['customerId'] ?? '', // Extracts customerId from map
-      organizationId: map['organizationId'] ?? '', // Extracts organizationId from map
-      guestCount: map['guestCount'] ?? 0, // Extracts guestCount from map
-      minStaff: map['minStaff'] ?? 0, // Extracts minStaff from map
-      notes: map['notes'] ?? '', // Extracts notes from map
+      id: docId,
+      name: map['name'] ?? '',
+      description: map['description'] ?? '',
+      startDate: (map['startDate'] as Timestamp).toDate(),
+      endDate: (map['endDate'] as Timestamp).toDate(),
+      location: map['location'] ?? '',
+      customerId: map['customerId'] ?? '',
+      organizationId: map['organizationId'] ?? '',
+      guestCount: map['guestCount'] ?? 0,
+      minStaff: map['minStaff'] ?? 0,
+      notes: map['notes'] ?? '',
       status: EventStatus.values.firstWhere(
-        (status) => status.toString().split('.').last == map['status'], // Extracts and converts status from map
-        orElse: () => EventStatus.draft, // Default value for status
+            (status) => status.toString().split('.').last == map['status'],
+        orElse: () => EventStatus.draft,
       ),
-      startTime: (map['startTime'] as Timestamp).toDate(), // Extracts and converts startTime from map
-      endTime: (map['endTime'] as Timestamp).toDate(), // Extracts and converts endTime from map
-      createdBy: map['createdBy'] ?? '', // Extracts createdBy from map
-      createdAt: (map['createdAt'] as Timestamp).toDate(), // Extracts and converts createdAt from map
-      updatedAt: (map['updatedAt'] as Timestamp).toDate(), // Extracts and converts updatedAt from map
+      startTime: (map['startTime'] as Timestamp).toDate(),
+      endTime: (map['endTime'] as Timestamp).toDate(),
+      createdBy: map['createdBy'] ?? '',
+      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      updatedAt: (map['updatedAt'] as Timestamp).toDate(),
       menuItems: (map['menuItems'] as List<dynamic>?)
-              ?.map((item) => EventMenuItem.fromMap(item))
-              .toList() ??
-          [], // Extracts and converts menuItems from map
+          ?.map((item) => MenuItem.fromMap(item, item['id']))
+          .toList() ??
+          [],
       supplies: (map['supplies'] as List<dynamic>?)
-              ?.map((supply) => EventSupply.fromMap(supply))
-              .toList() ??
-          [], // Extracts and converts supplies from map
-      totalPrice: (map['totalPrice'] ?? 0).toDouble(), // Extracts and converts totalPrice from map
+          ?.map((supply) => EventSupply.fromMap(supply))
+          .toList() ??
+          [],
+      totalPrice: (map['totalPrice'] ?? 0).toDouble(),
       assignedStaff: (map['assignedStaff'] as List<dynamic>?)
-              ?.map((staff) => AssignedStaff.fromMap(staff))
-              .toList() ??
-          [], // Extracts and converts assignedStaff from map
-      metadata: map['metadata'], // Extracts metadata from map
+          ?.map((staff) => AssignedStaff.fromMap(staff))
+          .toList() ??
+          [],
+      metadata: map['metadata'],
     );
   }
 
-  // Creates a copy of the Event instance with updated values
+
   Event copyWith({
-    String? name, // Optional parameter for name
-    String? description, // Optional parameter for description
-    DateTime? startDate, // Optional parameter for startDate
-    DateTime? endDate, // Optional parameter for endDate
-    String? location, // Optional parameter for location
-    String? customerId, // Optional parameter for customerId
-    int? guestCount, // Optional parameter for guestCount
-    int? minStaff, // Optional parameter for minStaff
-    String? notes, // Optional parameter for notes
-    EventStatus? status, // Optional parameter for status
-    DateTime? startTime, // Optional parameter for startTime
-    DateTime? endTime, // Optional parameter for endTime
-    List<EventMenuItem>? menuItems, // Optional parameter for menuItems
-    List<EventSupply>? supplies, // Optional parameter for supplies
-    double? totalPrice, // Optional parameter for totalPrice
-    List<AssignedStaff>? assignedStaff, // Optional parameter for assignedStaff
-    Map<String, dynamic>? metadata, // Optional parameter for metadata
+    String? name,
+    String? description,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? location,
+    String? customerId,
+    int? guestCount,
+    int? minStaff,
+    String? notes,
+    EventStatus? status,
+    DateTime? startTime,
+    DateTime? endTime,
+    List<MenuItem>? menuItems,
+    List<EventSupply>? supplies,
+    double? totalPrice,
+    List<AssignedStaff>? assignedStaff,
+    Map<String, dynamic>? metadata,
   }) {
     return Event(
-      id: id, // Keeps the original id
-      name: name ?? this.name, // Uses the new name if provided, otherwise keeps the original name
-      description: description ?? this.description, // Uses the new description if provided, otherwise keeps the original description
-      startDate: startDate ?? this.startDate, // Uses the new startDate if provided, otherwise keeps the original startDate
-      endDate: endDate ?? this.endDate, // Uses the new endDate if provided, otherwise keeps the original endDate
-      location: location ?? this.location, // Uses the new location if provided, otherwise keeps the original location
-      customerId: customerId ?? this.customerId, // Uses the new customerId if provided, otherwise keeps the original customerId
-      organizationId: organizationId, // Keeps the original organizationId
-      guestCount: guestCount ?? this.guestCount, // Uses the new guestCount if provided, otherwise keeps the original guestCount
-      minStaff: minStaff ?? this.minStaff, // Uses the new minStaff if provided, otherwise keeps the original minStaff
-      notes: notes ?? this.notes, // Uses the new notes if provided, otherwise keeps the original notes
-      status: status ?? this.status, // Uses the new status if provided, otherwise keeps the original status
-      startTime: startTime ?? this.startTime, // Uses the new startTime if provided, otherwise keeps the original startTime
-      endTime: endTime ?? this.endTime, // Uses the new endTime if provided, otherwise keeps the original endTime
-      createdBy: createdBy, // Keeps the original createdBy
-      createdAt: createdAt, // Keeps the original createdAt
-      updatedAt: DateTime.now(), // Updates the updatedAt to the current date and time
-      menuItems: menuItems ?? this.menuItems, // Uses the new menuItems if provided, otherwise keeps the original menuItems
-      supplies: supplies ?? this.supplies, // Uses the new supplies if provided, otherwise keeps the original supplies
-      totalPrice: totalPrice ?? this.totalPrice, // Uses the new totalPrice if provided, otherwise keeps the original totalPrice
-      assignedStaff: assignedStaff ?? this.assignedStaff, // Uses the new assignedStaff if provided, otherwise keeps the original assignedStaff
-      metadata: metadata ?? this.metadata, // Uses the new metadata if provided, otherwise keeps the original metadata
-    );
-  }
-}
-class EventMetadata {
-  final bool hasDietaryRequirements;
-  final bool hasSpecialEquipment;
-  final bool hasBarService;
-  final List<String> dietaryRestrictions;
-  final List<String> specialEquipmentNeeded;
-  final String? barServiceType;
-  final Map<String, dynamic>? additionalData;
-
-  EventMetadata({
-    this.hasDietaryRequirements = false,
-    this.hasSpecialEquipment = false,
-    this.hasBarService = false,
-    this.dietaryRestrictions = const [],
-    this.specialEquipmentNeeded = const [],
-    this.barServiceType,
-    this.additionalData,
-  });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'has_dietary_requirements': hasDietaryRequirements,
-      'has_special_equipment': hasSpecialEquipment,
-      'has_bar_service': hasBarService,
-      'dietary_restrictions': dietaryRestrictions,
-      'special_equipment_needed': specialEquipmentNeeded,
-      'bar_service_type': barServiceType,
-      'additional_data': additionalData,
-    };
-  }
-
-  factory EventMetadata.fromMap(Map<String, dynamic> map) {
-    return EventMetadata(
-      hasDietaryRequirements: map['has_dietary_requirements'] ?? false,
-      hasSpecialEquipment: map['has_special_equipment'] ?? false,
-      hasBarService: map['has_bar_service'] ?? false,
-      dietaryRestrictions: List<String>.from(map['dietary_restrictions'] ?? []),
-      specialEquipmentNeeded: List<String>.from(map['special_equipment_needed'] ?? []),
-      barServiceType: map['bar_service_type'],
-      additionalData: map['additional_data'],
+      id: id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      location: location ?? this.location,
+      customerId: customerId ?? this.customerId,
+      organizationId: organizationId,
+      guestCount: guestCount ?? this.guestCount,
+      minStaff: minStaff ?? this.minStaff,
+      notes: notes ?? this.notes,
+      status: status ?? this.status,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      createdBy: createdBy,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
+      menuItems: menuItems ?? this.menuItems,
+      supplies: supplies ?? this.supplies,
+      totalPrice: totalPrice ?? this.totalPrice,
+      assignedStaff: assignedStaff ?? this.assignedStaff,
+      metadata: metadata ?? this.metadata,
     );
   }
 }

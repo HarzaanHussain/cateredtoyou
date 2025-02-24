@@ -1,115 +1,146 @@
+// lib/models/menu_item_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'task_model.dart'; // Importing the Task model
 import 'package:flutter/foundation.dart';
+import 'task/menu_item_task.dart';
 
-
-// Enum representing different types of menu items
+// Enum representing the type of menu item.
 enum MenuItemType {
-  appetizer, // Appetizer type
-  mainCourse, // Main course type
-  sideDish, // Side dish type
-  dessert, // Dessert type
-  beverage, // Beverage type
-  other // Other type for unspecified categories
+  appetizer,
+  mainCourse,
+  sideDish,
+  dessert,
+  beverage,
+  other,
 }
 
-// Class representing a menu item
+// Class representing an individual instance of a menu item in an event.
 class MenuItem {
-  final String id; // Unique identifier for the menu item
-  final String name; // Name of the menu item
-  final String description; // Description of the menu item
-  final MenuItemType type; // Type of the menu item
-  final bool plated; // Indicates if the menu item is plated or not
-  final double price; // Price of the menu item
-  final String organizationId; // ID of the organization that owns the menu item
-  final Map<String, double> inventoryRequirements; // Inventory requirements for the menu item
-  final DateTime createdAt; // Timestamp when the menu item was created
-  final DateTime updatedAt; // Timestamp when the menu item was last updated
-  final String createdBy; // ID of the user who created the menu item
-  final List<Task> tasks; // List of tasks associated with the menu item
+  final String id; // Unique identifier for this menu item instance.
+  final String name; // Name of the menu item.
+  final String description; // Description of the menu item.
+  final bool plated; // Indicates if this menu item is plated or buffet-style.
+  final double price; // Price for this menu item.
+  final int quantity; // Number of servings ordered for this event.
+  final String organizationId; // ID of the organization that owns the menu item.
+  final MenuItemType menuItemType; // Type of menu item (appetizer, main course, etc.).
+  final Map<String, double> inventoryRequirements; // Ingredients and their required quantities.
+  final DateTime createdAt; // Timestamp for when this instance was created.
+  final DateTime updatedAt; // Last updated timestamp.
+  final String createdBy; // ID of the user who created this menu item.
+  final String prototypeId; // ID of the original MenuItemPrototype this was created from.
+  final List<MenuItemTask> tasks; // Full list of tasks for preparing this menu item.
+  final String specialInstructions; // Special instructions for this menu item.
 
-  // Constructor for creating a MenuItem instance
+  // Constructor for creating a MenuItem instance.
   const MenuItem({
-    required this.id, // Required parameter for unique identifier
-    required this.name, // Required parameter for name
-    required this.description, // Required parameter for description
-    required this.type, // Required parameter for type
-    required this.plated, // Required parameter for plated status
-    required this.price, // Required parameter for price
-    required this.organizationId, // Required parameter for organization ID
-    required this.inventoryRequirements, // Required parameter for inventory requirements
-    required this.createdAt, // Required parameter for creation timestamp
-    required this.updatedAt, // Required parameter for update timestamp
-    required this.createdBy, // Required parameter for creator ID
-    this.tasks = const [], // Optional parameter for tasks, default is an empty list
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.plated,
+    required this.price,
+    required this.quantity,
+    required this.organizationId,
+    required this.menuItemType,
+    required this.inventoryRequirements,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.createdBy,
+    required this.prototypeId,
+    this.tasks = const [],
+    this.specialInstructions = '', // Default empty string for special instructions.
   });
 
-  // Method to convert MenuItem instance to a map for Firestore
-  Map<String, dynamic> toMap() {
-    return {
-      'name': name, // Name of the menu item
-      'description': description, // Description of the menu item
-      'type': type.toString().split('.').last, // Type of the menu item as a string
-      'plated': plated, // Add plated status to map
-      'price': price, // Price of the menu item
-      'organizationId': organizationId, // Organization ID
-      'inventoryRequirements': inventoryRequirements, // Inventory requirements
-      'createdAt': Timestamp.fromDate(createdAt), // Creation timestamp as Firestore Timestamp
-      'updatedAt': Timestamp.fromDate(updatedAt), // Update timestamp as Firestore Timestamp
-      'createdBy': createdBy, // Creator ID
-      'tasks': tasks.map((task) => task.toMap()).toList(), // Convert tasks to a list of maps
-    };
+  // Converts the MenuItem instance into a map for Firestore storage.
+  Map<String, dynamic>? toMap() {
+    try {
+      return {
+        'name': name,
+        'description': description,
+        'plated': plated,
+        'price': price,
+        'quantity': quantity,
+        'organizationId': organizationId,
+        'menuItemType': menuItemType.name, // Store as a string.
+        'inventoryRequirements': inventoryRequirements,
+        'createdAt': Timestamp.fromDate(createdAt),
+        'updatedAt': Timestamp.fromDate(updatedAt),
+        'createdBy': createdBy,
+        'prototypeId': prototypeId,
+        'tasks': tasks.map((task) => task.toMap()).toList(),
+        'specialInstructions': specialInstructions, // Include special instructions in the map.
+      };
+    } catch (e) {
+      debugPrint('Error converting MenuItem to map: $e');
+      rethrow;
+    }
   }
 
-  // Factory constructor to create a MenuItem instance from a map
   factory MenuItem.fromMap(Map<String, dynamic> map, String docId) {
-    map.forEach((key, value) {
-      debugPrint('$key: ${value ?? "null"}'); // Print each key with value or "null" if value is null
-    });
-    return MenuItem(
-      id: docId, // Document ID from Firestore
-      name: map['name'] ?? '', // Name from map or empty string if null
-      description: map['description'] ?? '', // Description from map or empty string if null
-      type: MenuItemType.values.firstWhere(
-            (type) => type.toString().split('.').last == map['type'], // Type from map or default to 'other'
-        orElse: () => MenuItemType.other,
-      ),
-      plated: map['plated'] ?? false, // Read plated status from map
-      price: (map['price'] ?? 0).toDouble(), // Price from map or 0 if null
-      organizationId: map['organizationId'] ?? '', // Organization ID from map or empty string if null
-      inventoryRequirements: Map<String, double>.from(map['inventoryRequirements'] ?? {}), // Inventory requirements
-      createdAt: (map['createdAt'] as Timestamp).toDate(), // Convert Firestore Timestamp to DateTime
-      updatedAt: (map['updatedAt'] as Timestamp).toDate(), // Convert Firestore Timestamp to DateTime
-      createdBy: map['createdBy'] ?? '', // Creator ID from map or empty string if null
-      tasks: (map['tasks'] as List<dynamic>? ?? []) // Parse tasks list
-          .map((taskMap) => Task.fromMap(taskMap as Map<String, dynamic>, taskMap['id']))
-          .toList(),
-    );
+    try {
+      debugPrint('Creating MenuItem from map: $map');
+      return MenuItem(
+        id: docId,
+        name: map['name'] ?? '',
+        description: map['description'] ?? '',
+        plated: map['plated'] ?? false,
+        price: (map['price'] ?? 0).toDouble(),
+        quantity: map['quantity'] ?? 0,
+        organizationId: map['organizationId'] ?? '',
+        menuItemType: MenuItemType.values.firstWhere(
+              (e) => e.name == (map['menuItemType'] ?? 'other'),
+          orElse: () => MenuItemType.other,
+        ),
+        inventoryRequirements: Map<String, double>.from(map['inventoryRequirements'] ?? {}),
+        createdAt: (map['createdAt'] as Timestamp).toDate(),
+        updatedAt: (map['updatedAt'] as Timestamp).toDate(),
+        createdBy: map['createdBy'] ?? '',
+        prototypeId: map['prototypeId'] ?? '',
+        tasks: (map['tasks'] as List<dynamic>? ?? [])
+            .map((taskMap) => MenuItemTask.fromMap(taskMap as Map<String, dynamic>, taskMap['id']))
+            .toList(),
+        specialInstructions: map['specialInstructions'] ?? '', // Set special instructions.
+      );
+    } catch (e) {
+      debugPrint('Error creating MenuItem from map: $e');
+      rethrow;
+    }
   }
 
-  // Method to create a copy of MenuItem instance with updated fields
+  get type => menuItemType;
+
   MenuItem copyWith({
+    String? id,
     String? name,
     String? description,
-    MenuItemType? type,
     bool? plated,
     double? price,
+    int? quantity,
+    String? organizationId,
+    MenuItemType? menuItemType,
     Map<String, double>? inventoryRequirements,
-    List<Task>? tasks,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? createdBy,
+    String? prototypeId,
+    List<MenuItemTask>? tasks,
+    String? specialInstructions, // Allow overriding specialInstructions
   }) {
     return MenuItem(
-      id: id,
+      id: id ?? this.id,
       name: name ?? this.name,
       description: description ?? this.description,
-      type: type ?? this.type,
-      plated: plated ?? this.plated, // Use new plated status if provided, otherwise retain existing
+      plated: plated ?? this.plated,
       price: price ?? this.price,
-      organizationId: organizationId,
-      inventoryRequirements: inventoryRequirements ?? this.inventoryRequirements,
-      createdAt: createdAt,
-      updatedAt: DateTime.now(),
-      createdBy: createdBy,
-      tasks: tasks ?? this.tasks, // Use new tasks if provided, otherwise retain existing
+      quantity: quantity ?? this.quantity,
+      organizationId: organizationId ?? this.organizationId,
+      menuItemType: menuItemType ?? this.menuItemType,
+      inventoryRequirements: inventoryRequirements ?? Map.from(this.inventoryRequirements),
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      createdBy: createdBy ?? this.createdBy,
+      prototypeId: prototypeId ?? this.prototypeId,
+      tasks: tasks ?? List.from(this.tasks),
+      specialInstructions: specialInstructions ?? this.specialInstructions, // Default if not provided.
     );
   }
 }

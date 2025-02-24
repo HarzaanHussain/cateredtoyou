@@ -1,4 +1,4 @@
-import 'package:cateredtoyou/models/task_model.dart'; // Importing the Task model
+import 'package:cateredtoyou/models/task/task_model.dart'; // Importing the Task model
 import 'package:cateredtoyou/models/user_model.dart'; // Importing the User model
 import 'package:cateredtoyou/services/task_service.dart'; // Importing the TaskService
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components

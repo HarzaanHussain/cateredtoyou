@@ -1,6 +1,6 @@
 import 'package:cateredtoyou/models/event_model.dart';
 import 'package:cateredtoyou/models/inventory_item_model.dart'; // Importing InventoryItem model
-import 'package:cateredtoyou/models/menu_item_model.dart'; // Importing MenuItem model
+import 'package:cateredtoyou/models/menu_item_prototype.dart'; // Importing MenuItem model
 import 'package:cateredtoyou/models/user_model.dart'; // Importing User model
 import 'package:cateredtoyou/views/events/event_details_screen.dart'; // Importing EventDetailsScreen widget
 import 'package:cateredtoyou/views/events/event_edit_screen.dart'; // Importing EventEditScreen widget
@@ -175,13 +175,12 @@ class AppRouter {
             const MenuItemEditScreen(), // Building MenuItemEditScreen widget
       ),
       GoRoute(
-        path: '/edit-menu-item', // Path for edit menu item route
+        path: '/edit-menu-item',
         builder: (context, state) {
-          final menuItem =
-              state.extra as MenuItem; // Extracting MenuItem from state
+          final menuItemPrototype = state.extra as MenuItemPrototype; // Extracting MenuItemPrototype from state
           return MenuItemEditScreen(
-              menuItem:
-                  menuItem); // Building MenuItemEditScreen widget with menuItem data
+            menuItemPrototypeId: menuItemPrototype.menuItemPrototypeId, // Building MenuItemEditScreen widget with menuItemPrototype data
+          );
         },
       ),
       GoRoute( // Route for tasks list

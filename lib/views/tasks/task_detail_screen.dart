@@ -1,10 +1,12 @@
-import 'package:cateredtoyou/views/tasks/task_staff_assignment_widget.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// lib/views/tasks/task_detail_screen.dart
+
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:cateredtoyou/models/task_model.dart';
+import 'package:cateredtoyou/models/task/task_model.dart';
 import 'package:cateredtoyou/services/task_service.dart';
+import 'package:cateredtoyou/views/tasks/task_staff_assignment_widget.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   final Task task;
@@ -16,29 +18,13 @@ class TaskDetailScreen extends StatefulWidget {
 }
 
 class _TaskDetailScreenState extends State<TaskDetailScreen> {
-  late List<String> _checklist; // Declare a list to hold the checklist items
-  final TextEditingController _commentController =
-      TextEditingController(); // Controller for the comment input field
-  final FocusNode _commentFocus =
-      FocusNode(); // Focus node for the comment input field
-
-  @override
-  void initState() {
-    super.initState();
-    _checklist = widget.task.checklist.map((item) {
-      if (!item.startsWith('[')) {
-        return '[ ] $item'; // Ensure each checklist item starts with a checkbox
-      }
-      return item;
-    }).toList();
-    debugPrint(
-        'Initial checklist: $_checklist'); // Debug print to check the initial checklist
-  }
+  final TextEditingController _commentController = TextEditingController();
+  final FocusNode _commentFocus = FocusNode();
 
   @override
   void dispose() {
-    _commentController.dispose(); // Dispose the comment controller
-    _commentFocus.dispose(); // Dispose the focus node
+    _commentController.dispose();
+    _commentFocus.dispose();
     super.dispose();
   }
 
@@ -49,24 +35,20 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
     try {
       await context.read<TaskService>().updateTaskAssignee(
-            widget.task.id,
-            newAssigneeId,
-          );
-
-      if (!mounted) return;
+        widget.task.id,
+        newAssigneeId,
+      );
 
       scaffoldMessenger.showSnackBar(
         const SnackBar(
-          content: Text('Staff assigned successfully'), // Show success message
+          content: Text('Staff assigned successfully'),
           backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
-      if (!mounted) return;
-
       scaffoldMessenger.showSnackBar(
         SnackBar(
-          content: Text('Error assigning staff: $e'), // Show error message
+          content: Text('Error assigning staff: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -74,30 +56,27 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _updateTaskStatus(TaskStatus newStatus) async {
+    if (!mounted) return;
+
     try {
       await context.read<TaskService>().updateTaskStatus(
-            widget.task.id,
-            newStatus,
-          );
-      if (mounted) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Task status updated to ${newStatus.toString().split('.').last}'), // Show status update message
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+        widget.task.id,
+        newStatus,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Task status updated to ${newStatus.toString().split('.').last}'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'), // Show error message
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -109,76 +88,140 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           stream: FirebaseFirestore.instance
               .collection('events')
               .doc(widget.task.eventId)
-              .snapshots(), // Stream to listen for changes in the event document
+              .snapshots(),
           builder: (context, snapshot) {
             if (snapshot.hasData && snapshot.data!.exists) {
               final eventData = snapshot.data!.data() as Map<String, dynamic>?;
-              return Text(eventData?['name'] ?? 'Task Details'); // Display event name or default text
+              return Text(eventData?['name'] ?? 'Task Details');
             }
-            return const Text('Task Details'); // Default text if no data
+            return const Text('Task Details');
           },
         ),
-        actions: [
-          _buildStatusButton(), // Button to change task status
-        ],
+        // actions: [
+        //   _buildStatusButton(),
+        // ],
       ),
-      body: StreamBuilder<List<Task>>(
-        stream: context.read<TaskService>().getTasks(
-              assignedTo: widget.task.assignedTo,
-            ), // Stream to listen for changes in tasks assigned to the user
+      body: StreamBuilder<Task>(
+        stream: null,//context.read<TaskService>().getTaskById(widget.task.id),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}')); // Display error message
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
 
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator()); // Show loading indicator
+            return const Center(child: CircularProgressIndicator());
           }
 
-          final currentTask = snapshot.data!.firstWhere(
-            (t) => t.id == widget.task.id,
-            orElse: () => widget.task,
-          ); // Find the current task in the list
+          final currentTask = snapshot.data!;
 
           return Column(
             children: [
               Expanded(
                 child: RefreshIndicator(
                   onRefresh: () async {
-                    setState(() {}); // Refresh the UI
+                    setState(() {});
                   },
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildHeader(currentTask), // Build the task header
-                        const SizedBox(height: 16),
-                        _buildMetadataCard(currentTask), // Build the metadata card
+                        _buildHeader(currentTask),
+                        // const SizedBox(height: 16),
+                        // _buildMetadataCard(currentTask),
                         const SizedBox(height: 16),
                         StaffAssignmentSection(
                           task: currentTask,
                           onAssigneeChanged: (String? newAssigneeId) {
                             if (newAssigneeId != null) {
-                              _handleStaffAssignment(newAssigneeId); // Handle staff assignment
+                              _handleStaffAssignment(newAssigneeId);
                             }
                           },
                         ),
                         const SizedBox(height: 16),
-                        _buildChecklist(), // Build the checklist
-                        if (currentTask.checklist.isNotEmpty)
-                          _buildProgressBar(currentTask.checklist), // Build the progress bar if checklist is not empty
+                        _buildTaskSpecificDetails(currentTask),
                         const SizedBox(height: 16),
-                        _buildCommentsList(), // Build the comments list
+                        _buildCommentsList(currentTask),
                       ],
                     ),
                   ),
                 ),
               ),
-              _buildCommentInput(), // Build the comment input field
+              _buildCommentInput(),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildTaskSpecificDetails(Task task) {
+    // Handle different task types
+    switch (task.getTaskType()) {
+      case 'EventTask':
+        return _buildEventTaskDetails(task);
+      case 'MenuItemTask':
+        return _buildMenuItemTaskDetails(task);
+      case 'DeliveryTask':
+        return _buildDeliveryTaskDetails(task);
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildEventTaskDetails(Task task) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Event Details',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            // Add event-specific fields here
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuItemTaskDetails(Task task) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Menu Item Details',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            // Add menu item-specific fields here
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeliveryTaskDetails(Task task) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Delivery Details',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            // Add delivery-specific fields here
+          ],
+        ),
       ),
     );
   }
@@ -196,19 +239,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    task.name,
+                    task.description,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ), // Display task name in bold
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                _buildStatusChip(task.status), // Display task status chip
+                _buildStatusChip(task.status),
               ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              task.description,
-              style: Theme.of(context).textTheme.bodyLarge, // Display task description
             ),
             const SizedBox(height: 16),
             Row(
@@ -221,20 +259,20 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       size: 16,
                       color: task.dueDate.isBefore(DateTime.now())
                           ? Colors.red
-                          : Colors.grey[600], // Change color based on due date
+                          : Colors.grey[600],
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      DateFormat('MMM dd, yyyy').format(task.dueDate), // Display formatted due date
+                      DateFormat('MMM dd, yyyy').format(task.dueDate),
                       style: TextStyle(
                         color: task.dueDate.isBefore(DateTime.now())
                             ? Colors.red
-                            : Colors.grey[600], // Change color based on due date
+                            : Colors.grey[600],
                       ),
                     ),
                   ],
                 ),
-                _buildPriorityChip(task.priority), // Display task priority chip
+                _buildPriorityChip(task.priority),
               ],
             ),
           ],
@@ -243,213 +281,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 
-  Widget _buildStatusButton() {
-    return PopupMenuButton<TaskStatus>(
-      icon: const Icon(Icons.more_vert),
-      onSelected: _updateTaskStatus, // Handle status update
-      itemBuilder: (context) {
-        return [
-          const PopupMenuItem(
-            value: TaskStatus.inProgress,
-            child: Row(
-              children: [
-                Icon(Icons.play_arrow, color: Colors.blue),
-                SizedBox(width: 8),
-                Text('Start Progress'), // Option to start progress
-              ],
-            ),
-          ),
-          const PopupMenuItem(
-            value: TaskStatus.completed,
-            child: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green),
-                SizedBox(width: 8),
-                Text('Complete'), // Option to mark as complete
-              ],
-            ),
-          ),
-          const PopupMenuItem(
-            value: TaskStatus.blocked,
-            child: Row(
-              children: [
-                Icon(Icons.block, color: Colors.red),
-                SizedBox(width: 8),
-                Text('Block'), // Option to block the task
-              ],
-            ),
-          ),
-        ];
-      },
-    );
-  }
 
-  Widget _buildMetadataCard(Task task) {
-    if (task.eventId.isEmpty) return const SizedBox.shrink();
+  Widget _buildCommentsList(Task task) {
+    final comments = task.comments;
 
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('events')
-          .doc(task.eventId)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox.shrink();
-
-        final eventData = snapshot.data?.data() as Map<String, dynamic>?;
-        if (eventData == null) return const SizedBox.shrink();
-
-        final metadata = eventData['metadata'] as Map<String, dynamic>?;
-        if (metadata == null) return const SizedBox.shrink();
-
-        return Card(
-          elevation: 2,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Event: ${eventData['name'] ?? 'Unknown Event'}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 16),
-                if (metadata['has_dietary_requirements'] == true) ...[
-                  _buildRequirementRow(
-                    Icons.restaurant_menu,
-                    'Dietary Requirements',
-                    Colors.orange,
-                    (metadata['dietary_restrictions'] as List<dynamic>?)
-                            ?.join(', ') ??
-                        'Not specified',
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                if (metadata['has_special_equipment'] == true) ...[
-                  _buildRequirementRow(
-                    Icons.build,
-                    'Special Equipment',
-                    Colors.blue,
-                    (metadata['special_equipment_needed'] as List<dynamic>?)
-                            ?.join(', ') ??
-                        'Not specified',
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                if (metadata['has_bar_service'] == true) ...[
-                  _buildRequirementRow(
-                    Icons.local_bar,
-                    'Bar Service',
-                    Colors.purple,
-                    metadata['bar_service_type']?.toString() ??
-                        'Standard Service',
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildRequirementRow(
-    IconData icon,
-    String title,
-    Color color,
-    String content,
-  ) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: color),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-              if (content.isNotEmpty)
-                Text(
-                  content,
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildChecklist() {
-    return Card(
-      elevation: 2,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              'Checklist',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ),
-          if (_checklist.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                  'No checklist items'), // Display message if no checklist items
-            )
-          else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _checklist.length,
-              itemBuilder: _buildChecklistItem, // Build each checklist item
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChecklistItem(BuildContext context, int index) {
-    final item = _checklist[index];
-    // Debug print to see the item format
-    debugPrint('Building checklist item: $item');
-
-    // Make the check state detection more robust
-    final isChecked = item.trim().startsWith('[x]');
-    final label = item.replaceAll(RegExp(r'\[[\sx]\]'), '').trim();
-
-    return CheckboxListTile(
-      value: isChecked,
-      onChanged: (_) {
-        // Debug print when checkbox is clicked
-        debugPrint('Checkbox clicked for item: $item');
-        _toggleChecklistItem(index); // Toggle the checklist item
-      },
-      title: Text(
-        label,
-        style: TextStyle(
-          decoration: isChecked
-              ? TextDecoration.lineThrough
-              : null, // Strike-through if checked
-        ),
-      ),
-      activeColor: Theme.of(context).primaryColor,
-    );
-  }
-
-  // Update the _buildCommentsList method in TaskDetailScreen
-  Widget _buildCommentsList() {
     return Card(
       elevation: 2,
       child: Column(
@@ -462,100 +297,45 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
           ),
-          StreamBuilder<List<Task>>(
-            stream: context.read<TaskService>().getTasks(
-                  assignedTo: widget.task.assignedTo,
-                ),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                        'Error loading comments: ${snapshot.error}'), // Display error message
-                  ),
-                );
-              }
-
-              if (!snapshot.hasData) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child:
-                        CircularProgressIndicator(), // Show loading indicator
-                  ),
-                );
-              }
-
-              final task = snapshot.data!.firstWhere(
-                (t) => t.id == widget.task.id,
-                orElse: () => widget.task,
-              );
-
-              final comments =
-                  context.read<TaskService>().parseComments(task.comments);
-
-              if (comments.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child:
-                      Text('No comments yet'), // Display message if no comments
-                );
-              }
-
-              comments.sort((a, b) =>
-                  b.createdAt.compareTo(a.createdAt)); // Sort comments by date
-
-              return ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: comments.length,
-                separatorBuilder: (context, index) => const Divider(height: 1),
-                itemBuilder: (context, index) => _buildCommentItem(
-                    comments[index]), // Build each comment item
-              );
-            },
-          ),
+          if (comments.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('No comments yet'),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: comments.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (_, index) => _buildCommentItem(comments[index]),
+            ),
         ],
       ),
     );
   }
 
-  /// Builds a widget to display a single comment item.
-  ///
-  /// The comment item includes the user's name, the comment's creation date,
-  /// and the comment content.
-  ///
-  /// [comment] The TaskComment object containing the comment details.
   Widget _buildCommentItem(TaskComment comment) {
     return Padding(
-      padding:
-          const EdgeInsets.all(16), // Adds padding around the comment item.
+      padding: const EdgeInsets.all(16),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start, // Aligns children to the start.
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceBetween, // Spaces out the children.
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                comment.userName, // Displays the commenter's username.
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold, // Makes the username bold.
-                ),
+                comment.userId,
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               Text(
-                DateFormat('MMM dd, yyyy HH:mm').format(comment
-                    .createdAt), // Formats and displays the comment's creation date.
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall, // Applies the theme's bodySmall text style.
+                DateFormat('MMM dd, yyyy HH:mm').format(comment.createdAt),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
           ),
-          const SizedBox(height: 4), // Adds vertical spacing between elements.
-          Text(comment.content), // Displays the comment content.
+          const SizedBox(height: 4),
+          Text(comment.content),
         ],
       ),
     );
@@ -626,8 +406,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
     try {
       await context.read<TaskService>().addTaskComment(
-            widget.task.id, // The ID of the task to which the comment is added.
-            _commentController.text, // The content of the comment.
+            taskId: widget.task.id, // The ID of the task to which the comment is added.
+            content: _commentController.text, // The content of the comment.
           );
       _commentController.clear(); // Clears the input field.
       _commentFocus.unfocus(); // Unfocuses the input field.
@@ -642,56 +422,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         );
       }
     }
-  }
-
-  /// Builds a progress bar to show the completion status of the checklist.
-  ///
-  /// The progress bar visually represents the number of completed items in the checklist.
-  ///
-  /// [checklist] The list of checklist items.
-  Widget _buildProgressBar(List<String> checklist) {
-    // Calculate the number of completed items in the checklist.
-    final completedCount = checklist.where((item) => item.startsWith('[x]')).length;
-    // Calculate the progress as a fraction of completed items.
-    final progress = checklist.isEmpty ? 0.0 : completedCount / checklist.length;
-
-    return Padding(
-      padding: const EdgeInsets.all(16), // Adds padding around the progress bar.
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start.
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween, // Spaces out the children.
-            children: [
-              Text(
-                '$completedCount/${checklist.length} completed', // Displays the number of completed items.
-                style: TextStyle(
-                  color: Colors.grey[600], // Sets the text color to grey.
-                  fontWeight: FontWeight.bold, // Makes the text bold.
-                ),
-              ),
-              Text(
-                '${(progress * 100).toInt()}%', // Displays the progress percentage.
-                style: TextStyle(
-                  color: _getProgressColor(progress), // Sets the text color based on progress.
-                  fontWeight: FontWeight.bold, // Makes the text bold.
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8), // Adds vertical spacing between elements.
-          LinearProgressIndicator(
-            value: progress, // Sets the progress value.
-            backgroundColor: Colors.grey[200], // Sets the background color of the progress bar.
-            valueColor: AlwaysStoppedAnimation<Color>(
-              _getProgressColor(progress), // Sets the progress color based on progress.
-            ),
-            minHeight: 8, // Sets the minimum height of the progress bar.
-            borderRadius: BorderRadius.circular(4), // Rounds the corners of the progress bar.
-          ),
-        ],
-      ),
-    );
   }
 
   /// Builds a widget to display the task's priority as a chip.
@@ -833,61 +563,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         return Icons.block; // Returns a block icon for blocked status.
       case TaskStatus.cancelled:
         return Icons.cancel; // Returns a cancel icon for cancelled status.
-    }
-  }
-
-  /// Toggles the completion status of a checklist item.
-  ///
-  /// This method updates the checklist item in the UI and sends the updated
-  /// checklist to the server.
-  ///
-  /// [index] The index of the checklist item to toggle.
-  Future<void> _toggleChecklistItem(int index) async {
-    // Add debug print
-    debugPrint(
-        'Current checklist item: ${_checklist[index]}'); // Prints the current checklist item.
-
-    final oldChecklist = List<String>.from(
-        _checklist); // Creates a copy of the current checklist.
-    setState(() {
-      final item = _checklist[index];
-      // Add debug print
-      debugPrint(
-          'Is checked: ${item.contains('[x]')}'); // Prints whether the item is checked.
-
-      if (item.startsWith('[ ]')) {
-        _checklist[index] =
-            item.replaceFirst('[ ]', '[x]'); // Marks the item as checked.
-      } else {
-        _checklist[index] =
-            item.replaceFirst('[x]', '[ ]'); // Marks the item as unchecked.
-      }
-      // Add debug print
-      debugPrint(
-          'Updated checklist item: ${_checklist[index]}'); // Prints the updated checklist item.
-    });
-
-    try {
-      await context.read<TaskService>().updateTaskChecklist(
-            widget.task.id, // The ID of the task to update.
-            _checklist, // The updated checklist.
-          );
-    } catch (e) {
-      debugPrint(
-          'Error in _toggleChecklistItem: $e'); // Prints an error message.
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Error updating checklist: $e'), // Displays an error message.
-            backgroundColor: Colors.red, // Sets the background color to red.
-          ),
-        );
-        setState(() {
-          _checklist =
-              oldChecklist; // Reverts the checklist to its previous state.
-        });
-      }
     }
   }
 

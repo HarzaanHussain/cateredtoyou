@@ -1,244 +1,193 @@
-import 'package:flutter/foundation.dart'; // Importing foundation package for ChangeNotifier.
-import 'package:cloud_firestore/cloud_firestore.dart'; // Importing Firestore package for database operations.
-import 'package:firebase_auth/firebase_auth.dart'; // Importing FirebaseAuth package for authentication.
-import 'package:cateredtoyou/services/organization_service.dart'; // Importing OrganizationService for organization-related operations.
-import 'package:cateredtoyou/models/event_model.dart'; // Importing Event model.
-import 'package:cateredtoyou/models/inventory_item_model.dart'; // Importing InventoryItem model.
-import 'package:cateredtoyou/services/task_automation_service.dart'; // Importing TaskAutomation model.
+import 'package:cateredtoyou/models/organization_model.dart';
+import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cateredtoyou/services/organization_service.dart';
+import 'package:cateredtoyou/models/event_model.dart';
+import 'package:cateredtoyou/models/inventory_item_model.dart';
+import 'package:cateredtoyou/models/menu_item_model.dart';
+import 'package:cateredtoyou/services/task_generator.dart';
 
 class EventService extends ChangeNotifier {
-  // EventService class extending ChangeNotifier for state management.
-  final FirebaseFirestore _firestore =
-      FirebaseFirestore.instance; // Firestore instance for database operations.
-  final FirebaseAuth _auth =
-      FirebaseAuth.instance; // FirebaseAuth instance for authentication.
-  final OrganizationService
-      _organizationService; // OrganizationService instance for organization-related operations.
-  final TaskAutomationService _taskAutomationService;
-  EventService(
-    this._organizationService,
-    this._taskAutomationService,
-  ); // Constructor initializing OrganizationService.
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final OrganizationService _organizationService;
+
+  EventService(this._organizationService);
 
   Stream<List<Event>> getEvents() async* {
-    // Method to get a stream of events.
     try {
-      final currentUser =
-          _auth.currentUser; // Getting the current authenticated user.
+      final currentUser = _auth.currentUser;
       if (currentUser == null) {
-        // If no user is authenticated, return an empty list.
         yield [];
         return;
       }
 
-      final organization = await _organizationService
-          .getCurrentUserOrganization(); // Getting the organization of the current user.
+      final organization = await _organizationService.getCurrentUserOrganization();
       if (organization == null) {
-        // If no organization is found, return an empty list.
         yield [];
         return;
       }
 
-      final query =
-          _firestore // Querying Firestore for events belonging to the user's organization.
-              .collection('events')
-              .where('organizationId', isEqualTo: organization.id);
+      final query = _firestore
+          .collection('events')
+          .where('organizationId', isEqualTo: organization.id);
 
       yield* query.snapshots().map((snapshot) {
-        // Mapping Firestore snapshots to a list of Event objects.
         try {
           final events = snapshot.docs
-              .map((doc) => Event.fromMap(doc.data(),
-                  doc.id)) // Converting Firestore documents to Event objects.
+              .map((doc) => Event.fromMap(doc.data(), doc.id))
               .toList();
-          events.sort((a, b) => b.startDate.compareTo(a
-              .startDate)); // Sorting events by start date in descending order.
+          events.sort((a, b) => b.startDate.compareTo(a.startDate));
           return events;
         } catch (e) {
-          debugPrint(
-              'Error mapping events: $e'); // Printing error if mapping fails.
+          debugPrint('Error mapping events: $e');
           return [];
         }
       });
     } catch (e) {
-      debugPrint(
-          'Error in getEvents: $e'); // Printing error if fetching events fails.
+      debugPrint('Error in getEvents: $e');
       yield [];
     }
   }
 
   Future<void> _verifyInventoryAvailability(List<EventSupply> supplies) async {
-  for (final supply in supplies) {
-    final doc = await _firestore.collection('inventory').doc(supply.inventoryId).get();
-    if (!doc.exists) {
-      throw 'Supply item ${supply.name} not found';
-    }
-    final item = InventoryItem.fromMap(doc.data()!, doc.id);
-    if (item.quantity < supply.quantity) {
-      throw 'Insufficient quantity available for ${supply.name}. Available: ${item.quantity} ${item.unit}';
+    for (final supply in supplies) {
+      final doc = await _firestore.collection('inventory').doc(supply.inventoryId).get();
+      if (!doc.exists) {
+        throw 'Supply item ${supply.name} not found';
+      }
+      final item = InventoryItem.fromMap(doc.data()!, doc.id);
+      if (item.quantity < supply.quantity) {
+        throw 'Insufficient quantity available for ${supply.name}. Available: ${item.quantity} ${item.unit}';
+      }
     }
   }
-}
 
   Future<void> _verifyStaffAssignment(
       String organizationId, List<AssignedStaff> staff) async {
-    // Method to verify staff assignment.
-    if (staff.isEmpty) return; // If staff list is empty, no need to verify.
+    if (staff.isEmpty) return;
 
-    final currentUser =
-        _auth.currentUser; // Getting the current authenticated user.
+    final currentUser = _auth.currentUser;
     if (currentUser == null) {
-      throw 'Not authenticated'; // If no user is authenticated, throw an error.
+      throw 'Not authenticated';
     }
 
-    final userDoc = await _firestore
-        .collection('users')
-        .doc(currentUser.uid)
-        .get(); // Getting the user document from Firestore.
-    final userRole = userDoc.data()?['role']; // Getting the user's role.
+    final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+    final userRole = userDoc.data()?['role'];
 
     if (!['client', 'manager', 'admin'].contains(userRole)) {
-      // If the user does not have permission, throw an error.
       throw 'Insufficient permissions to assign staff';
     }
 
     for (final member in staff) {
-      // Iterating through each staff member.
-      final staffDoc = await _firestore
-          .collection('users')
-          .doc(member.userId)
-          .get(); // Getting the staff member document from Firestore.
+      final staffDoc = await _firestore.collection('users').doc(member.userId).get();
 
       if (!staffDoc.exists) {
-        // If the staff member does not exist, throw an error.
         throw 'Staff member ${member.name} not found';
       }
 
       if (staffDoc.data()?['organizationId'] != organizationId) {
-        // If the staff member belongs to a different organization, throw an error.
         throw 'Staff member ${member.name} belongs to a different organization';
       }
 
       if (staffDoc.data()?['employmentStatus'] != 'active') {
-        // If the staff member is not active, throw an error.
         throw 'Staff member ${member.name} is not active';
       }
 
-      final rolePermission =
-          staffDoc.data()?['role']; // Getting the staff member's role.
+      final rolePermission = staffDoc.data()?['role'];
       if (!['staff', 'server', 'chef', 'driver'].contains(rolePermission)) {
-        // If the staff member has an invalid role, throw an error.
         throw 'Invalid staff role for ${member.name}';
       }
     }
   }
 
   Future<Event> createEvent({
-    // Method to create a new event.
-    required String name, // Event name.
-    required String description, // Event description.
-    required DateTime startDate, // Event start date.
-    required DateTime endDate, // Event end date.
-    required String location, // Event location.
-    required String customerId, // Customer ID.
-    required int guestCount, // Number of guests.
-    required int minStaff, // Minimum number of staff required.
-    String notes = '', // Additional notes.
-    required DateTime startTime, // Event start time.
-    required DateTime endTime, // Event end time.
-    List<EventMenuItem> menuItems = const [], // List of menu items.
-    List<EventSupply> supplies = const [], // List of supplies.
-    List<AssignedStaff> assignedStaff = const [], // List of assigned staff.
-    EventMetadata? metadata, // Additional metadata.
+    required String name,
+    required String description,
+    required DateTime startDate,
+    required DateTime endDate,
+    required String location,
+    required String customerId,
+    required int guestCount,
+    required int minStaff,
+    String notes = '',
+    required DateTime startTime,
+    required DateTime endTime,
+    List<MenuItem> menuItems = const [],
+    List<EventSupply> supplies = const [],
+    List<AssignedStaff> assignedStaff = const [],
+    Map<String, dynamic>? metadata,
   }) async {
     try {
-      debugPrint('Starting event creation'); // Printing debug message.
-      debugPrint(
-          'Starting event creation with task automation'); // Printing debug message.
-      final currentUser =
-          _auth.currentUser; // Getting the current authenticated user.
+      debugPrint('Starting event creation');
+      final currentUser = _auth.currentUser;
       if (currentUser == null) {
-        throw 'Not authenticated'; // If no user is authenticated, throw an error.
+        throw 'Not authenticated';
       }
 
-      final userRef = _firestore
-          .collection('users')
-          .doc(currentUser.uid); // Getting the user document reference.
-      final userDoc = await userRef.get(); // Getting the user document.
+      final userRef = _firestore.collection('users').doc(currentUser.uid);
+      final userDoc = await userRef.get();
 
       if (!userDoc.exists) {
-        throw 'User not found'; // If the user does not exist, throw an error.
+        throw 'User not found';
       }
 
-      final userRole = userDoc.data()?['role']; // Getting the user's role.
+      final userRole = userDoc.data()?['role'];
       if (!['admin', 'client', 'manager'].contains(userRole)) {
-        throw 'Insufficient permissions to create events'; // If the user does not have permission, throw an error.
+        throw 'Insufficient permissions to create events';
       }
 
-      final organization = await _organizationService
-          .getCurrentUserOrganization(); // Getting the organization of the current user.
+      final organization = await _organizationService.getCurrentUserOrganization();
       if (organization == null) {
-        throw 'Organization not found'; // If no organization is found, throw an error.
+        throw 'Organization not found';
       }
 
       if (endDate.isBefore(startDate)) {
-        throw 'End date must be after start date'; // If the end date is before the start date, throw an error.
+        throw 'End date must be after start date';
       }
 
       if (startTime.isAfter(endTime)) {
-        throw 'End time must be after start time'; // If the start time is after the end time, throw an error.
+        throw 'End time must be after start time';
       }
 
       if (assignedStaff.isNotEmpty) {
-        // If there are assigned staff, verify their assignments.
         await _verifyStaffAssignment(organization.id, assignedStaff);
-        debugPrint(
-            'Staff assignments verified successfully'); // Printing debug message.
+        debugPrint('Staff assignments verified successfully');
       }
 
       final staffData = assignedStaff
           .map((staff) => {
-                // Formatting staff data with proper types.
-                'userId': staff.userId,
-                'name': staff.name,
-                'role': staff.role,
-                'assignedAt': Timestamp.fromDate(staff.assignedAt),
-              })
+        'userId': staff.userId,
+        'name': staff.name,
+        'role': staff.role,
+        'assignedAt': Timestamp.fromDate(staff.assignedAt),
+      })
           .toList();
 
-      debugPrint('Staff data prepared: $staffData'); // Printing debug message.
+      debugPrint('Staff data prepared: $staffData');
 
       final totalPrice = menuItems.fold<double>(
-        // Calculating the total price of menu items.
         0,
-        (total, item) => total + (item.price * item.quantity),
+            (total, item) => total + (item.price * item.quantity),
       );
 
       return await _firestore.runTransaction<Event>((transaction) async {
-        // Running a Firestore transaction to create the event.
-        final customerRef = _firestore
-            .collection('customers')
-            .doc(customerId); // Getting the customer document reference.
-        final customerDoc = await transaction
-            .get(customerRef); // Getting the customer document.
+        final customerRef = _firestore.collection('customers').doc(customerId);
+        final customerDoc = await transaction.get(customerRef);
 
         if (!customerDoc.exists ||
             customerDoc.data()?['organizationId'] != organization.id) {
-          throw 'Invalid customer selected'; // If the customer does not exist or belongs to a different organization, throw an error.
+          throw 'Invalid customer selected';
         }
 
-        await _verifyInventoryAvailability(
-            supplies); // Verifying inventory availability.
-        debugPrint(
-            'Inventory availability verified'); // Printing debug message.
+        await _verifyInventoryAvailability(supplies);
+        debugPrint('Inventory availability verified');
 
-        final docRef = _firestore
-            .collection('events')
-            .doc(); // Creating a new event document reference.
-        final now = DateTime.now(); // Getting the current date and time.
+        final docRef = _firestore.collection('events').doc();
+        final now = DateTime.now();
 
         final docData = {
-          // Creating event data with proper Timestamps.
           'name': name.trim(),
           'description': description.trim(),
           'startDate': Timestamp.fromDate(startDate),
@@ -259,19 +208,13 @@ class EventService extends ChangeNotifier {
           'supplies': supplies.map((supply) => supply.toMap()).toList(),
           'assignedStaff': staffData,
           'totalPrice': totalPrice,
-          'metadata': metadata?.toMap(),
+          'metadata': metadata,
         };
 
-        transaction.set(
-            docRef, docData); // Setting the event document data in Firestore.
-        debugPrint('Event document created'); // Printing debug message.
-       
+        transaction.set(docRef, docData);
+        debugPrint('Event document created');
 
-        debugPrint(
-            'Event creation completed successfully'); // Printing debug message.
-
-      final eventObj = Event(
-          // Returning the created Event object.
+        return Event(
           id: docRef.id,
           name: name.trim(),
           description: description.trim(),
@@ -293,21 +236,15 @@ class EventService extends ChangeNotifier {
           supplies: supplies,
           assignedStaff: assignedStaff,
           totalPrice: totalPrice,
-          metadata: metadata?.toMap(),
+          metadata: metadata,
         );
-        await _taskAutomationService.generateTasksForEvent(eventObj);
-        return eventObj;
-        
       });
-      
     } catch (e) {
-      debugPrint(
-          'Error creating event: $e'); // Printing error if event creation fails.
-      debugPrint(
-          'Stack trace: ${StackTrace.current}'); // Printing stack trace for debugging.
-      rethrow; // Rethrowing the error.
+      debugPrint('Error creating event: $e');
+      debugPrint('Stack trace: ${StackTrace.current}');
+      rethrow;
     } finally {
-      notifyListeners(); // Notifying listeners about the state change.
+      notifyListeners();
     }
   }
 
@@ -389,23 +326,19 @@ class EventService extends ChangeNotifier {
         'assignedStaff': staffData,
         'totalPrice': updatedEvent.totalPrice,
         'metadata': updatedEvent.metadata != null
-            ? (updatedEvent.metadata is EventMetadata
-                ? (updatedEvent.metadata as EventMetadata).toMap()
-                : updatedEvent.metadata)
+            ? updatedEvent.metadata
             : null,
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       }; // Prepare update data.
 
       await _firestore.collection('events').doc(updatedEvent.id).update(
             updateData);
+      //todo: implement event and menuitem task updates
 
       debugPrint(
           'Event update completed successfully'); // Log the successful completion of the update.
           // Generate new tasks based on updated event data
-      await _taskAutomationService.generateTasksForEvent(
-      updatedEvent,
-      originalEvent: originalEvent
-    );
+
       notifyListeners(); // Notify listeners about the update.
     } catch (e) {
       debugPrint('Error updating event: $e'); // Log the error.
@@ -492,4 +425,10 @@ Future<void> changeEventStatus(String eventId, EventStatus newStatus) async {
     rethrow;
   }
 }
+
+/// Placeholder for getting event by ID
+  getEvent(String eventId) { debugPrint('getEvent not yet implemented'); return null;}
+
+/// Placeholder for getting event task prototypes
+  getEventTaskPrototypes(Future<Organization?> currentUserOrganization) { debugPrint('getEventTaskPrototypes not yet implemented'); return null;}
 }

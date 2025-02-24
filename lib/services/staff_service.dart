@@ -134,7 +134,7 @@ class StaffService extends ChangeNotifier {
 
       final userRole = userDoc.get('role');
       debugPrint('Current user role: $userRole');
-
+      
       if (!['admin', 'client', 'manager'].contains(userRole)) {
         debugPrint('Error: Insufficient permissions for role - $userRole');
         throw 'Insufficient permissions to create staff members'; // Throw error if user does not have permission

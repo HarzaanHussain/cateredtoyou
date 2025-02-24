@@ -1,3 +1,4 @@
+//lib/views/tasks/task_list_screen.dart
 import 'package:cateredtoyou/views/tasks/manage_task_screen.dart';
 import 'package:cateredtoyou/views/tasks/task_detail_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -5,7 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:cateredtoyou/models/task_model.dart';
+import 'package:cateredtoyou/models/task/task_model.dart';
+import 'package:cateredtoyou/models/task/event_task.dart.';
 import 'package:cateredtoyou/services/task_service.dart';
 
 /// The `TaskListScreen` class represents a screen that displays a list of tasks.
@@ -274,48 +276,43 @@ class _TaskListState extends State<_TaskList> {
     );
   }
 
-  /// Returns a stream of tasks filtered by the selected priority and search query.
   Stream<List<Task>> _getFilteredTaskStream(TaskService taskService) {
     Stream<List<Task>> baseStream;
-    
+
     switch (widget.listType) {
       case TaskListType.assigned:
         baseStream = taskService.getAssignedTasks(
-          FirebaseAuth.instance.currentUser!.uid, // Gets tasks assigned to the current user.
+          FirebaseAuth.instance.currentUser!.uid,
         );
         break;
       case TaskListType.department:
-        baseStream = taskService.getTasksByDepartment(
-          'currentDepartmentId', // Replace with actual department ID.
-        );
+        baseStream = taskService.getTasksByDepartment('1'); // todo: Replace '1' with the actual department ID.
         break;
       case TaskListType.completed:
-        baseStream = taskService.getTasks(status: TaskStatus.completed); // Gets completed tasks.
+        baseStream = taskService.getTasks(status: TaskStatus.completed);
         break;
       case TaskListType.all:
       default:
-        baseStream = taskService.getTasks(); // Gets all tasks.
+        baseStream = taskService.getTasks();
         break;
     }
 
     return baseStream.map((tasks) {
       return tasks.where((task) {
-        // Apply priority filter if selected.
         if (_selectedPriority != null && task.priority != _selectedPriority) {
           return false;
         }
 
-        // Apply search filter if query exists.
         if (_searchQuery != null && _searchQuery!.isNotEmpty) {
           final query = _searchQuery!.toLowerCase();
-          return task.name.toLowerCase().contains(query) ||
-              task.description.toLowerCase().contains(query);
+          return task.description.toLowerCase().contains(query);
         }
 
         return true;
       }).toList();
     });
   }
+
 
   /// Returns the color associated with the given priority.
   Color _getPriorityColor(TaskPriority priority) {
@@ -332,11 +329,6 @@ class _TaskListState extends State<_TaskList> {
   }
 }
 
-/// A widget that displays a card for a task with various details and actions.
-/// 
-/// The [TaskCard] widget shows the task's name, description, priority, due date,
-/// status, and progress if the task has a checklist. It also navigates to the
-/// task detail screen when tapped.
 class TaskCard extends StatelessWidget {
   final Task task;
 
@@ -344,96 +336,119 @@ class TaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card( // Creates a card widget to display the task.
-      elevation: 2, // Sets the elevation of the card to give it a shadow effect.
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8), // Sets the margin around the card.
-      child: InkWell( // Makes the card tappable.
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      child: InkWell(
         onTap: () {
-          Navigator.push( // Navigates to the TaskDetailScreen when the card is tapped.
+          Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => TaskDetailScreen(task: task), // Passes the task to the TaskDetailScreen.
+              builder: (context) => TaskDetailScreen(task: task),
             ),
           );
         },
-        child: Padding( // Adds padding inside the card.
+        child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column( // Arranges the child widgets in a column.
-            crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row( // Arranges the child widgets in a row.
-                crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the row.
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded( // Expands the child widget to fill the available space.
-                    child: Column( // Arranges the child widgets in a column.
-                      crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row( // Arranges the child widgets in a row.
+                        Row(
                           children: [
-                            Flexible( // Makes the child widget flexible to avoid overflow.
+                            Flexible(
                               child: Text(
-                                task.name, // Displays the task name.
+                                task.description,
                                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold, // Sets the text style to bold.
+                                  fontWeight: FontWeight.bold,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
+
                             ),
-                            if (task.eventId.isNotEmpty) ...[ // Checks if the task is associated with an event.
-                              const SizedBox(width: 8), // Adds space between the task name and event name.
+                            if (task.eventId.isNotEmpty) ...[
+                              const SizedBox(width: 8),
                               FutureBuilder<DocumentSnapshot>(
                                 future: FirebaseFirestore.instance
                                     .collection('events')
                                     .doc(task.eventId)
-                                    .get(), // Fetches the event details from Firestore.
+                                    .get(),
                                 builder: (context, snapshot) {
                                   if (snapshot.hasData && snapshot.data!.exists) {
                                     final eventData = snapshot.data!.data() as Map<String, dynamic>;
                                     return Text(
-                                      '[${eventData['name'] + '\'s Event'?? 'Unknown Event'}]', // Displays the event name.
+                                      '[${eventData['name'] ?? 'Unknown Event'}]',
                                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        color: Colors.blue[700], // Sets the text color to blue.
-                                        fontWeight: FontWeight.w700, // Sets the text style to bold.
+                                        color: Colors.blue[700],
+                                        fontWeight: FontWeight.w700,
                                       ),
                                     );
                                   }
-                                  return const SizedBox.shrink(); // Returns an empty widget if the event does not exist.
+                                  return const SizedBox.shrink();
                                 },
                               ),
                             ],
                           ],
                         ),
-                        const SizedBox(height: 4), // Adds space between the task name and description.
+                        const SizedBox(height: 4),
                         Text(
-                          task.description, // Displays the task description.
-                          maxLines: 2, // Limits the description to 2 lines.
-                          overflow: TextOverflow.ellipsis, // Adds ellipsis if the description overflows.
+                          task.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600], // Sets the text color to grey.
+                            color: Colors.grey[600],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8), // Adds space between the description and priority indicator.
-                  _buildPriorityIndicator(), // Builds the priority indicator widget.
+                  const SizedBox(width: 8),
+                  _buildPriorityIndicator(),
                 ],
               ),
-              const SizedBox(height: 12), // Adds space between the priority indicator and due date/status row.
+              const SizedBox(height: 12),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween, // Spaces the due date and status chip evenly.
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildDueDate(), // Builds the due date widget.
-                  _buildStatusChip(), // Builds the status chip widget.
+                  _buildDueDate(),
+                  _buildStatusChip(),
                 ],
               ),
-              if (task.checklist.isNotEmpty) ...[ // Checks if the task has a checklist.
-                const SizedBox(height: 12), // Adds space between the status chip and progress indicator.
-                _buildProgressIndicator(), // Builds the progress indicator widget.
+              if (task is EventTask) ...[
+                const SizedBox(height: 12),
+                _buildEventTaskInfo(task as EventTask),
               ],
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildEventTaskInfo(EventTask eventTask) {
+    return Row(
+      children: [
+        Icon(
+          Icons.schedule,
+          size: 16,
+          color: Colors.grey[600],
+        ),
+        const SizedBox(width: 4),
+        Text(
+          'Lead Time: ${eventTask.leadTime.inHours}h',
+          style: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 12,
+          ),
+        ),
+      ],
     );
   }
   
@@ -524,50 +539,6 @@ class TaskCard extends StatelessWidget {
     );
   }
 
-  /// Builds the progress indicator widget.
-  Widget _buildProgressIndicator() {
-    final completedItems = task.checklist
-        .where((item) => item.contains('[x]'))
-        .length; // Count completed checklist items.
-    final progress = task.checklist.isEmpty 
-        ? 0.0 
-        : completedItems / task.checklist.length; // Calculate progress.
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween, // Space between progress text and percentage.
-          children: [
-            Text(
-              'Progress', // Display "Progress" text.
-              style: TextStyle(
-                color: Colors.grey[600], // Text color.
-                fontSize: 12, // Text size.
-              ),
-            ),
-            Text(
-              '${(progress * 100).toInt()}%', // Display progress percentage.
-              style: TextStyle(
-                color: Colors.grey[600], // Text color.
-                fontSize: 12, // Text size.
-                fontWeight: FontWeight.bold, // Bold text.
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4), // Space between progress text and progress bar.
-        LinearProgressIndicator(
-          value: progress, // Progress value.
-          backgroundColor: Colors.grey[200], // Background color of the progress bar.
-          valueColor: AlwaysStoppedAnimation<Color>(
-            _getProgressColor(progress), // Progress bar color based on progress.
-          ),
-        ),
-      ],
-    );
-  }
-
   /// Returns the color based on the task's priority.
   Color _getPriorityColor() {
     switch (task.priority) {
@@ -628,10 +599,4 @@ class TaskCard extends StatelessWidget {
     }
   }
 
-  /// Returns the color based on the progress value.
-  Color _getProgressColor(double progress) {
-    if (progress >= 0.8) return Colors.green; // Green color for progress >= 80%.
-    if (progress >= 0.5) return Colors.orange; // Orange color for progress >= 50%.
-    return Colors.red; // Red color for progress < 50%.
-  }
 }

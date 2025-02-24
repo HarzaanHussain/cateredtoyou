@@ -1,173 +1,103 @@
-import 'package:flutter/foundation.dart'; // Importing foundation package for ChangeNotifier
-import 'package:cloud_firestore/cloud_firestore.dart'; // Importing Firestore package for database operations
-import 'package:firebase_auth/firebase_auth.dart'; // Importing Firebase Auth package for authentication
-import 'package:cateredtoyou/models/menu_item_model.dart'; // Importing MenuItem model
-import 'package:cateredtoyou/models/task_model.dart'; // Importing Task model
-import 'package:cateredtoyou/services/organization_service.dart'; // Importing OrganizationService for organization-related operations
+// lib/services/menu_item_service.dart
 
-// MenuItemService class extends ChangeNotifier to provide state management
+import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/menu_item_model.dart';
+import './organization_service.dart';
+
 class MenuItemService extends ChangeNotifier {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance; // Firestore instance for database operations
-  final FirebaseAuth _auth = FirebaseAuth.instance; // FirebaseAuth instance for authentication
-  final OrganizationService _organizationService; // OrganizationService instance for organization-related operations
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final OrganizationService _organizationService;
 
-  // Constructor to initialize OrganizationService
   MenuItemService(this._organizationService);
 
-  // Stream to get menu items from Firestore
   Stream<List<MenuItem>> getMenuItems() async* {
     try {
-      final currentUser = _auth.currentUser; // Get the current authenticated user
+      final currentUser = _auth.currentUser;
       if (currentUser == null) {
-        yield []; // If no user is authenticated, yield an empty list
+        yield [];
         return;
       }
 
-      final userDoc = await _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .get(); // Get the user document from Firestore
-
-      if (!userDoc.exists) {
-        yield []; // If user document does not exist, yield an empty list
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) {
+        yield [];
         return;
       }
 
-      final organizationId = userDoc.data()?['organizationId']; // Get the organization ID from user document
-
-      // Query to get menu items for the organization
       final query = _firestore
           .collection('menu_items')
-          .where('organizationId', isEqualTo: organizationId);
+          .where('organizationId', isEqualTo: organization.id);
 
-      // Map the query snapshots to a list of MenuItem objects
       yield* query.snapshots().map((snapshot) {
         try {
           final items = snapshot.docs
               .map((doc) => MenuItem.fromMap(doc.data(), doc.id))
               .toList();
-
-          // Sort the menu items by name
           items.sort((a, b) => a.name.compareTo(b.name));
-
           return items;
         } catch (e) {
-          debugPrint('Error mapping menu items: $e'); // Print error if mapping fails
+          debugPrint('Error mapping menu items: $e');
           return [];
         }
       });
     } catch (e) {
-      debugPrint('Error in getMenuItems: $e'); // Print error if any exception occurs
+      debugPrint('Error in getMenuItems: $e');
       yield [];
     }
   }
 
-  // Method to create a new menu item
   Future<MenuItem> createMenuItem({
-    required String name, // Name of the menu item
-    required String description, // Description of the menu item
-    required MenuItemType type, // Type of the menu item
-    required bool plated, // If the menu item is plated
-    required double price, // Price of the menu item
-    required Map<String, double> inventoryRequirements, // Inventory requirements for the menu item
-    List<Task>? tasks, // Optional tasks associated with the menu item
+    required String name,
+    required String description,
+    required bool plated,
+    required double price,
+    required int quantity,
+    required MenuItemType menuItemType,
+    required Map<String, double> inventoryRequirements,
+    required String prototypeId,
+    required String specialInstructions,  // Added specialInstructions
   }) async {
-    final currentUser = _auth.currentUser; // Get the current authenticated user
-    if (currentUser == null) throw 'Not authenticated'; // Throw error if no user is authenticated
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) throw 'Not authenticated';
 
-    final organization = await _organizationService.getCurrentUserOrganization(); // Get the current user's organization
-    if (organization == null) {
-      throw 'Organization not found'; // Throw error if organization is not found
-    }
-
-    final userDoc = await _firestore
-        .collection('users')
-        .doc(currentUser.uid)
-        .get(); // Get the user document from Firestore
-
-    if (!userDoc.exists) throw 'User data not found'; // Throw error if user document does not exist
-    final userRole = userDoc.get('role'); // Get the user role from user document
-
-    // Check if user has sufficient permissions to create menu items
-    if (!['admin', 'client', 'manager', 'chef'].contains(userRole)) {
-      throw 'Insufficient permissions to create menu items';
-    }
+    final organization = await _organizationService.getCurrentUserOrganization();
+    if (organization == null) throw 'Organization not found';
 
     try {
-      final now = DateTime.now(); // Get the current date and time
-      final docRef = _firestore.collection('menu_items').doc(); // Create a new document reference for the menu item
+      debugPrint('Creating menu item for organization: ${organization.id}');
+      final now = DateTime.now();
+      final docRef = _firestore.collection('menu_items').doc();
 
-      // Create a new MenuItem object
       final menuItem = MenuItem(
         id: docRef.id,
         name: name,
         description: description,
-        type: type,
         plated: plated,
         price: price,
+        quantity: quantity,
         organizationId: organization.id,
+        menuItemType: menuItemType,
         inventoryRequirements: inventoryRequirements,
         createdAt: now,
         updatedAt: now,
         createdBy: currentUser.uid,
-        tasks: tasks ?? [], // Add tasks, default to empty list if not provided
+        prototypeId: prototypeId,
+        specialInstructions: specialInstructions, // Added specialInstructions
       );
 
-      await docRef.set(menuItem.toMap()); // Save the menu item to Firestore
-
-      notifyListeners(); // Notify listeners about the change
-      return menuItem; // Return the created menu item
+      await docRef.set(menuItem.toMap()!);
+      notifyListeners();
+      return menuItem;
     } catch (e) {
-      debugPrint('Error creating menu item: $e'); // Print error if any exception occurs
-      rethrow; // Rethrow the exception
+      debugPrint('Error creating menu item: $e');
+      rethrow;
     }
   }
 
-  // Method to update an existing menu item, including tasks
-  Future<void> updateMenuItem(MenuItem item) async {
-    try {
-      final currentUser = _auth.currentUser; // Get the current authenticated user
-      if (currentUser == null) throw 'Not authenticated'; // Throw error if no user is authenticated
-
-      final organization = await _organizationService.getCurrentUserOrganization(); // Get the current user's organization
-      if (organization == null) {
-        throw 'Organization not found'; // Throw error if organization is not found
-      }
-
-      if (item.organizationId != organization.id) {
-        throw 'Menu item belongs to a different organization'; // Throw error if menu item belongs to a different organization
-      }
-
-      final userDoc = await _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .get(); // Get the user document from Firestore
-
-      if (!userDoc.exists) throw 'User data not found'; // Throw error if user document does not exist
-      final userRole = userDoc.get('role'); // Get the user role from user document
-
-      // Check if user has sufficient permissions to update menu items
-      if (!['admin', 'client', 'manager', 'chef'].contains(userRole)) {
-        throw 'Insufficient permissions to update menu items';
-      }
-
-      await _firestore
-          .collection('menu_items')
-          .doc(item.id)
-          .update({
-        ...item.toMap(),
-        'updatedAt': FieldValue.serverTimestamp(), // Update the updatedAt field with server timestamp
-      });
-
-      notifyListeners(); // Notify listeners about the change
-    } catch (e) {
-      debugPrint('Error updating menu item: $e'); // Print error if any exception occurs
-      rethrow; // Rethrow the exception
-    }
-  }
-
-  // Method to add a task to a menu item
-  Future<void> addTaskToMenuItem(String menuItemId, Task task) async {
+  Future<void> updateMenuItem(MenuItem menuItem) async {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) throw 'Not authenticated';
@@ -175,41 +105,26 @@ class MenuItemService extends ChangeNotifier {
       final organization = await _organizationService.getCurrentUserOrganization();
       if (organization == null) throw 'Organization not found';
 
-      final menuItemDoc = await _firestore
-          .collection('menu_items')
-          .doc(menuItemId)
-          .get();
-
-      if (!menuItemDoc.exists) throw 'Menu item not found';
-
-      // Ensure the menu item belongs to the current organization
-      if (menuItemDoc.data()?['organizationId'] != organization.id) {
-        throw 'Menu item does not belong to your organization';
+      if (menuItem.organizationId != organization.id) {
+        throw 'Menu item belongs to a different organization';
       }
 
-      // Get current tasks and add the new task
-      final currentTasks = List<Map<String, dynamic>>.from(
-          menuItemDoc.data()?['tasks'] ?? []);
-      currentTasks.add(task.toMap());
-
-      // Update the menu item with the new tasks list
       await _firestore
           .collection('menu_items')
-          .doc(menuItemId)
+          .doc(menuItem.id)
           .update({
-        'tasks': currentTasks,
+        ...menuItem.toMap()!,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
       notifyListeners();
     } catch (e) {
-      debugPrint('Error adding task to menu item: $e');
+      debugPrint('Error updating menu item: $e');
       rethrow;
     }
   }
 
-  // Method to remove a task from a menu item
-  Future<void> removeTaskFromMenuItem(String menuItemId, String taskId) async {
+  Future<void> batchUpdateMenuItems(List<MenuItem> menuItems) async {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) throw 'Not authenticated';
@@ -217,123 +132,133 @@ class MenuItemService extends ChangeNotifier {
       final organization = await _organizationService.getCurrentUserOrganization();
       if (organization == null) throw 'Organization not found';
 
-      final menuItemDoc = await _firestore
-          .collection('menu_items')
-          .doc(menuItemId)
-          .get();
+      final batch = _firestore.batch();
+      final now = FieldValue.serverTimestamp();
 
-      if (!menuItemDoc.exists) throw 'Menu item not found';
+      for (var menuItem in menuItems) {
+        if (menuItem.organizationId != organization.id) {
+          throw 'One or more menu items belong to a different organization';
+        }
 
-      // Ensure the menu item belongs to the current organization
-      if (menuItemDoc.data()?['organizationId'] != organization.id) {
-        throw 'Menu item does not belong to your organization';
+        final docRef = _firestore.collection('menu_items').doc(menuItem.id);
+        batch.update(docRef, {
+          ...menuItem.toMap()!,
+          'updatedAt': now,
+        });
       }
 
-      // Get current tasks and remove the specified task
-      final currentTasks = List<Map<String, dynamic>>.from(
-          menuItemDoc.data()?['tasks'] ?? []);
-
-      currentTasks.removeWhere((taskMap) => taskMap['id'] == taskId);
-
-      // Update the menu item with the updated tasks list
-      await _firestore
-          .collection('menu_items')
-          .doc(menuItemId)
-          .update({
-        'tasks': currentTasks,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
+      await batch.commit();
       notifyListeners();
     } catch (e) {
-      debugPrint('Error removing task from menu item: $e');
+      debugPrint('Error in batch update menu items: $e');
       rethrow;
     }
   }
 
-  // Method to delete a menu item
+  Future<void> batchUpdateQuantities(Map<String, int> quantityUpdates) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
+
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) throw 'Organization not found';
+
+      final batch = _firestore.batch();
+      final now = FieldValue.serverTimestamp();
+
+      for (var entry in quantityUpdates.entries) {
+        final docRef = _firestore.collection('menu_items').doc(entry.key);
+        batch.update(docRef, {
+          'quantity': entry.value,
+          'updatedAt': now,
+        });
+      }
+
+      await batch.commit();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error in batch update quantities: $e');
+      rethrow;
+    }
+  }
+
   Future<void> deleteMenuItem(String menuItemId) async {
     try {
-      final currentUser = _auth.currentUser; // Get the current authenticated user
-      if (currentUser == null) throw 'Not authenticated'; // Throw error if no user is authenticated
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
 
-      final organization = await _organizationService.getCurrentUserOrganization(); // Get the current user's organization
-      if (organization == null) {
-        throw 'Organization not found'; // Throw error if organization is not found
-      }
-
-      final userDoc = await _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .get(); // Get the user document from Firestore
-
-      if (!userDoc.exists) throw 'User data not found'; // Throw error if user document does not exist
-      final userRole = userDoc.get('role'); // Get the user role from user document
-
-      // Check if user has sufficient permissions to delete menu items
-      if (!['admin', 'client', 'manager', 'chef'].contains(userRole)) {
-        throw 'Insufficient permissions to delete menu items';
-      }
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) throw 'Organization not found';
 
       final menuItemDoc = await _firestore
           .collection('menu_items')
           .doc(menuItemId)
-          .get(); // Get the menu item document from Firestore
+          .get();
 
-      // Check if menu item exists and belongs to the user's organization
       if (!menuItemDoc.exists || menuItemDoc.data()?['organizationId'] != organization.id) {
         throw 'Menu item not found in your organization';
       }
 
-      // Check if menu item is used in any events before deleting
-      final eventsWithItem = await _firestore
-          .collection('events')
-          .where('organizationId', isEqualTo: organization.id)
-          .get();
-
-      for (var eventDoc in eventsWithItem.docs) {
-        final menuItems = List<Map<String, dynamic>>.from(eventDoc.data()['menuItems'] ?? []);
-        if (menuItems.any((item) => item['menuItemId'] == menuItemId)) {
-          throw 'Cannot delete menu item as it is used in one or more events';
-        }
-      }
-
-      await _firestore.collection('menu_items').doc(menuItemId).delete(); // Delete the menu item from Firestore
-
-      notifyListeners(); // Notify listeners about the change
+      await _firestore.collection('menu_items').doc(menuItemId).delete();
+      notifyListeners();
     } catch (e) {
-      debugPrint('Error deleting menu item: $e'); // Print error if any exception occurs
-      rethrow; // Rethrow the exception
+      debugPrint('Error deleting menu item: $e');
+      rethrow;
     }
   }
 
-  // Method to get menu items by type
+  Future<void> batchDeleteMenuItems(List<String> menuItemIds) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
+
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) throw 'Organization not found';
+
+      final batch = _firestore.batch();
+
+      for (var id in menuItemIds) {
+        final docRef = _firestore.collection('menu_items').doc(id);
+        final doc = await docRef.get();
+
+        if (!doc.exists || doc.data()?['organizationId'] != organization.id) {
+          throw 'One or more menu items not found in your organization';
+        }
+
+        batch.delete(docRef);
+      }
+
+      await batch.commit();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error in batch delete menu items: $e');
+      rethrow;
+    }
+  }
+
   Future<List<MenuItem>> getMenuItemsByType(MenuItemType type) async {
     try {
-      final currentUser = _auth.currentUser; // Get the current authenticated user
-      if (currentUser == null) throw 'Not authenticated'; // Throw error if no user is authenticated
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
 
-      final organization = await _organizationService.getCurrentUserOrganization(); // Get the current user's organization
-      if (organization == null) {
-        throw 'Organization not found'; // Throw error if organization is not found
-      }
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) throw 'Organization not found';
 
       final snapshot = await _firestore
           .collection('menu_items')
           .where('organizationId', isEqualTo: organization.id)
-          .get(); // Get the menu items for the organization from Firestore
+          .where('menuItemType', isEqualTo: type.name)
+          .get();
 
-      // Map the query snapshots to a list of MenuItem objects and filter by type
       final items = snapshot.docs
           .map((doc) => MenuItem.fromMap(doc.data(), doc.id))
-          .where((item) => item.type == type)
           .toList();
 
-      items.sort((a, b) => a.name.compareTo(b.name)); // Sort the menu items by name
-      return items; // Return the list of menu items
+      items.sort((a, b) => a.name.compareTo(b.name));
+      return items;
     } catch (e) {
-      debugPrint('Error getting menu items by type: $e'); // Print error if any exception occurs
-      rethrow; // Rethrow the exception
+      debugPrint('Error getting menu items by type: $e');
+      rethrow;
     }
   }
 }

@@ -19,29 +19,31 @@ class DefaultFirebaseOptions { // Defining a class to hold default Firebase opti
   }
   }
 
-  static const FirebaseOptions web = FirebaseOptions( // Define Firebase options for web
-  apiKey: 'AIzaSyCRhKTJdSDL9uuaP9uvtnQYPtMA2HXDly8', // API key for web
-  appId: '1:328369352197:web:e6b756d4ee8bccd318f66c', // App ID for web
-  messagingSenderId: '328369352197', // Messaging sender ID for web
-  projectId: 'cateredtoyou-7eeed', // Project ID for web
-  authDomain: 'cateredtoyou-7eeed.firebaseapp.com', // Auth domain for web
-  storageBucket: 'cateredtoyou-7eeed.appspot.com', // Storage bucket for web
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyAPRNiq7ySYwSvSQFes8h1M5fL1PJVQdKA',
+    appId: '1:416890687838:web:8bad42f3883df5b0067fcf',
+    messagingSenderId: '416890687838',
+    projectId: 'cateredtoyoutest',
+    authDomain: 'cateredtoyoutest.firebaseapp.com',
+    storageBucket: 'cateredtoyoutest.firebasestorage.app',
+    measurementId: 'G-FJ10PZJ19J',
   );
 
-  static const FirebaseOptions android = FirebaseOptions( // Define Firebase options for Android
-  apiKey: 'AIzaSyCRhKTJdSDL9uuaP9uvtnQYPtMA2HXDly8', // API key for Android
-  appId: '1:328369352197:android:b4117760c126493f18f66c', // App ID for Android
-  messagingSenderId: '328369352197', // Messaging sender ID for Android
-  projectId: 'cateredtoyou-7eeed', // Project ID for Android
-  storageBucket: 'cateredtoyou-7eeed.appspot.com', // Storage bucket for Android
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyDK8ffkKGv8be38yeC1ehxxHjzSoRVtR8w',
+    appId: '1:416890687838:android:7c8c80a8146d6dbf067fcf',
+    messagingSenderId: '416890687838',
+    projectId: 'cateredtoyoutest',
+    storageBucket: 'cateredtoyoutest.firebasestorage.app',
   );
 
-  static const FirebaseOptions ios = FirebaseOptions( // Define Firebase options for iOS
-  apiKey: 'AIzaSyCRhKTJdSDL9uuaP9uvtnQYPtMA2HXDly8', // API key for iOS
-  appId: '1:328369352197:ios:36fe039818df4c1b18f66c', // App ID for iOS
-  messagingSenderId: '328369352197', // Messaging sender ID for iOS
-  projectId: 'cateredtoyou-7eeed', // Project ID for iOS
-  storageBucket: 'cateredtoyou-7eeed.appspot.com', // Storage bucket for iOS
-  iosClientId: 'your_ios_client_id.apps.googleusercontent.com', // iOS client ID
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyDx9LrlGXN8u6d1dbx2Lyo1wMVbEQHmFlY',
+    appId: '1:416890687838:ios:4c5d279a881bf088067fcf',
+    messagingSenderId: '416890687838',
+    projectId: 'cateredtoyoutest',
+    storageBucket: 'cateredtoyoutest.firebasestorage.app',
+    iosBundleId: 'com.example.cateredtoyou',
   );
+
 }

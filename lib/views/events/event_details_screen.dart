@@ -1,3 +1,5 @@
+// lib/views/events/event_details_screen.dart
+
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components
 import 'package:provider/provider.dart'; // Importing provider package for state management
 import 'package:go_router/go_router.dart'; // Importing go_router package for navigation
@@ -502,12 +504,6 @@ class EventDetailsScreen extends StatelessWidget {
                                               contentPadding: EdgeInsets.zero,
                                               title: Text(item
                                                   .name), // Displays the menu item name
-                                              subtitle: item.specialInstructions
-                                                          ?.isNotEmpty ==
-                                                      true
-                                                  ? Text(
-                                                      item.specialInstructions!)
-                                                  : null, // Displays special instructions if any
                                               trailing: Text(
                                                 '${item.quantity}x \$${item.price.toStringAsFixed(2)}',
                                                 style:

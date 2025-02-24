@@ -2,8 +2,8 @@ import 'package:flutter/material.dart'; // Importing Flutter material package fo
 import 'package:cateredtoyou/models/event_model.dart'; // Importing the EventMetadata model
 
 class EventMetadataSection extends StatefulWidget {
-  final EventMetadata? initialMetadata; // Initial metadata for the event
-  final ValueChanged<EventMetadata> onMetadataChanged; // Callback when metadata changes
+  final Map<String, dynamic>? initialMetadata; // Initial metadata for the event
+  final ValueChanged<Map<String, dynamic>> onMetadataChanged; // Callback when metadata changes
 
   const EventMetadataSection({
     super.key, // Key for the widget
@@ -33,24 +33,24 @@ class _EventMetadataSectionState extends State<EventMetadataSection> {
 
   void _initializeValues() {
     final metadata = widget.initialMetadata; // Get initial metadata
-    _hasDietaryRequirements = metadata?.hasDietaryRequirements ?? false; // Set dietary requirements flag
-    _hasSpecialEquipment = metadata?.hasSpecialEquipment ?? false; // Set special equipment flag
-    _hasBarService = metadata?.hasBarService ?? false; // Set bar service flag
-    _dietaryRestrictions = List.from(metadata?.dietaryRestrictions ?? []); // Initialize dietary restrictions list
-    _specialEquipmentNeeded = List.from(metadata?.specialEquipmentNeeded ?? []); // Initialize special equipment list
-    _barServiceType = metadata?.barServiceType; // Set bar service type
+    // _hasDietaryRequirements = metadata?.hasDietaryRequirements ?? false; // Set dietary requirements flag
+    // _hasSpecialEquipment = metadata?.hasSpecialEquipment ?? false; // Set special equipment flag
+    // _hasBarService = metadata?.hasBarService ?? false; // Set bar service flag
+    // _dietaryRestrictions = List.from(metadata?.dietaryRestrictions ?? []); // Initialize dietary restrictions list
+    // _specialEquipmentNeeded = List.from(metadata?.specialEquipmentNeeded ?? []); // Initialize special equipment list
+    // _barServiceType = metadata?.barServiceType; // Set bar service type
   }
 
   void _updateMetadata() {
-    final metadata = EventMetadata(
-      hasDietaryRequirements: _hasDietaryRequirements, // Update dietary requirements flag
-      hasSpecialEquipment: _hasSpecialEquipment, // Update special equipment flag
-      hasBarService: _hasBarService, // Update bar service flag
-      dietaryRestrictions: _dietaryRestrictions, // Update dietary restrictions list
-      specialEquipmentNeeded: _specialEquipmentNeeded, // Update special equipment list
-      barServiceType: _barServiceType, // Update bar service type
-    );
-    widget.onMetadataChanged(metadata); // Call the callback with updated metadata
+    // final metadata = EventMetadata(
+    //   hasDietaryRequirements: _hasDietaryRequirements, // Update dietary requirements flag
+    //   hasSpecialEquipment: _hasSpecialEquipment, // Update special equipment flag
+    //   hasBarService: _hasBarService, // Update bar service flag
+    //   dietaryRestrictions: _dietaryRestrictions, // Update dietary restrictions list
+    //   specialEquipmentNeeded: _specialEquipmentNeeded, // Update special equipment list
+    //   barServiceType: _barServiceType, // Update bar service type
+    // );
+    // widget.onMetadataChanged(metadata); // Call the callback with updated metadata
   }
 
   void _addDietaryRestriction(String restriction) {
