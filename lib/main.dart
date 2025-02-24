@@ -144,10 +144,12 @@ class MyApp extends StatelessWidget {
             title: 'CateredToYou', // Set the title of the app
             debugShowCheckedModeBanner: false, // Disable debug banner
             theme: ThemeData(
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: Colors.blue, // Set primary color to blue
-                brightness: Brightness.light, // Set brightness to light mode
-              ),
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: Colors.blue, // Set primary color to blue
+                  brightness: Brightness.light, // Set brightness to light mode
+                ),
+              primaryColor: const Color(0xFFFBC72B),
+
               useMaterial3: true, // Use Material 3 design
               inputDecorationTheme: InputDecorationTheme(
                 border: OutlineInputBorder(
@@ -161,6 +163,8 @@ class MyApp extends StatelessWidget {
               ),
               elevatedButtonTheme: ElevatedButtonThemeData(
                 style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFFFFC533), //Button BG color to orange
+                  foregroundColor: Colors.black, // Button text color to black
                   minimumSize: const Size.fromHeight(
                       48), // Set minimum height for buttons
                   shape: RoundedRectangleBorder(
