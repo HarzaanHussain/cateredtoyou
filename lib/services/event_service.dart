@@ -51,6 +51,35 @@ class EventService extends ChangeNotifier {
     }
   }
 
+  Future<Event?> getEventById(String eventId) async {
+    try {
+      final currentUser = _auth.currentUser; // Getting the current authenticated user.
+      if (currentUser == null) {
+        return null; // Return null if no user is authenticated.
+      }
+
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) {
+        return null; // Return null if no organization is found.
+      }
+
+      final docSnapshot = await _firestore
+          .collection('events')
+          .doc(eventId)
+          .get(); // Getting the document snapshot for the event by its ID.
+
+      if (docSnapshot.exists) {
+        return Event.fromMap(docSnapshot.data()!, docSnapshot.id);
+      } else {
+        return null; // Return null if the document doesn't exist.
+      }
+    } catch (e) {
+      debugPrint('Error getting event by ID: $e'); // Printing error if fetching event fails.
+      return null; // Return null in case of any error.
+    }
+  }
+
+
   Future<void> _verifyInventoryAvailability(List<EventSupply> supplies) async {
     for (final supply in supplies) {
       final doc = await _firestore.collection('inventory').doc(supply.inventoryId).get();
