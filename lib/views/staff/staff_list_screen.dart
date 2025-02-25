@@ -5,6 +5,7 @@ import 'package:provider/provider.dart'; // Importing Provider package for state
 import 'package:go_router/go_router.dart'; // Importing GoRouter package for navigation.
 import 'package:cateredtoyou/models/user_model.dart'; // Importing UserModel class from models.
 import 'package:cateredtoyou/services/staff_service.dart'; // Importing StaffService class for staff-related operations.
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 
 /// A screen that displays a list of staff members and allows searching, adding, and editing staff.
 class StaffListScreen extends StatefulWidget {
@@ -50,6 +51,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back), // Back button icon.
