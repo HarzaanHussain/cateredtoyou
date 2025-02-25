@@ -4,6 +4,7 @@ import 'package:provider/provider.dart'; // Import provider package for state ma
 import 'package:go_router/go_router.dart'; // Import go_router package for navigation.
 import 'package:cateredtoyou/models/menu_item_model.dart'; // Import menu item model.
 import 'package:cateredtoyou/services/menu_item_service.dart'; // Import menu item service.
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart'; // Imports bottom toolbar class
 /// This file defines the `MenuItemListScreen` widget, which displays a list of menu items.
 /// It includes functionality for searching and filtering menu items, as well as adding, editing, and deleting them.
 
@@ -44,6 +45,7 @@ class _MenuItemListScreenState extends State<MenuItemListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back), // Back button icon.
