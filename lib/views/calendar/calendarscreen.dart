@@ -15,7 +15,10 @@ class CalendarScreen extends StatefulWidget {
 class _CalendarScreenState extends State<CalendarScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
+  // New state variable for calendar format
+  CalendarFormat _calendarFormat = CalendarFormat.month;
 
+  // Groups events by day
   Map<DateTime, List<Event>> _groupEvents(List<Event> events) {
     final Map<DateTime, List<Event>> grouped = {};
     for (final event in events) {
@@ -25,6 +28,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return grouped;
   }
 
+  // Retrieves events for a specific day
   List<Event> _getEventsForDay(DateTime day, Map<DateTime, List<Event>> grouped) {
     return grouped[DateTime(day.year, day.month, day.day)] ?? [];
   }
@@ -50,6 +54,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 firstDay: DateTime.utc(2020, 1, 1),
                 lastDay: DateTime.utc(2030, 12, 31),
                 focusedDay: _focusedDay,
+                calendarFormat: _calendarFormat, // Use current calendar format
+                availableCalendarFormats: const {
+                  CalendarFormat.month: 'Month',
+                  CalendarFormat.twoWeeks: '2 Weeks',
+                  CalendarFormat.week: 'Week',
+                },
+                // Update the calendar format when the user taps a format button
+                onFormatChanged: (format) {
+                  setState(() {
+                    _calendarFormat = format;
+                  });
+                },
                 selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
                 eventLoader: (day) => _getEventsForDay(day, groupedEvents),
                 onDaySelected: (selected, focused) {
