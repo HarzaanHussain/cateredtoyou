@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:cateredtoyou/models/task/task_model.dart';
 import 'package:cateredtoyou/models/task/event_task.dart.';
 import 'package:cateredtoyou/services/task_service.dart';
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart'; // Imports bottom toolbar class
 
 /// The `TaskListScreen` class represents a screen that displays a list of tasks.
 /// It uses a `DefaultTabController` to manage four tabs: My Tasks, Department, All Tasks, and Completed.
@@ -20,6 +21,7 @@ class TaskListScreen extends StatelessWidget {
     return DefaultTabController(
       length: 4,
       child: Scaffold(
+        bottomNavigationBar: const BottomToolbar(),
         appBar: AppBar(
           title: const Text('Tasks'),
           bottom: const TabBar(
