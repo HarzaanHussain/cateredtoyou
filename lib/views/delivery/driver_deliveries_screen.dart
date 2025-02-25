@@ -5,6 +5,8 @@ import 'package:provider/provider.dart'; // Importing Provider package for state
 import 'package:cateredtoyou/models/delivery_route_model.dart'; // Importing the delivery route model
 import 'package:cateredtoyou/services/delivery_route_service.dart'; // Importing the delivery route service
 import 'package:firebase_auth/firebase_auth.dart'; // Importing Firebase authentication package
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart'; // Imports bottom toolbar class
+
 
 // Stateless widget for the Driver Deliveries Screen
 class DriverDeliveriesScreen extends StatelessWidget {
@@ -28,6 +30,7 @@ class DriverDeliveriesScreen extends StatelessWidget {
     return DefaultTabController(
       length: 3, // Number of tabs
       child: Scaffold(
+        bottomNavigationBar: const BottomToolbar(),
         appBar: AppBar(
           title: const Text('My Deliveries'), // App bar title
           bottom: const TabBar(
