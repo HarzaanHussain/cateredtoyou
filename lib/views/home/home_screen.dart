@@ -113,14 +113,6 @@ class HomeScreen extends StatelessWidget {
                 },
               ),
 
-              // Operations Section
-              const SizedBox(height: 24),
-              Text(
-                'Operations',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
               const SizedBox(height: 16),
 
               // Vehicle and Delivery Section
