@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:cateredtoyou/models/event_model.dart';
 import 'package:cateredtoyou/services/event_service.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart'; // Imports bottom toolbar class
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({Key? key}) : super(key: key);
@@ -36,6 +37,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(title: const Text('Calendar')),
       body: StreamBuilder<List<Event>>(
         stream: context.read<EventService>().getEvents(),
