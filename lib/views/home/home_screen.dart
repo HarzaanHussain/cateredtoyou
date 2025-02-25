@@ -86,6 +86,7 @@ class HomeScreen extends StatelessWidget {
                                 onTap: () => context.push('/staff'),
                               ),
                             ),
+                            const Divider(),
                             PermissionWidget(
                               permissionId: 'view_customers',
                               child: ListTile(
@@ -161,6 +162,7 @@ class HomeScreen extends StatelessWidget {
                                 onTap: () => context.push('/vehicles'),
                               ),
                             ),
+                            const Divider(),
                             PermissionWidget(
                               permissionId: 'view_deliveries',
                               child: ListTile(
@@ -171,6 +173,7 @@ class HomeScreen extends StatelessWidget {
                                 onTap: () => context.push('/driver-deliveries'),
                               ),
                             ),
+                            const Divider(),
                             PermissionWidget(
                               permissionId: 'manage_deliveries',
                               child: ListTile(
