@@ -7,16 +7,25 @@ class CustomDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
+      child: Column(
         children: [
-          DrawerHeader(
-            decoration: BoxDecoration(
-              color: Colors.orange[700],
-            ),
-            child: const Text(
-              'CateredToYou Menu',
-              style: TextStyle(fontSize: 24, color: Colors.white),
+          SizedBox(
+            height: 150, // Ensures proper header height
+            width: double.infinity, // Stretches header across full width
+            child: DrawerHeader(
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFC533), // Your preferred header color
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'CateredToYou',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             ),
           ),
           ListTile(
@@ -31,7 +40,7 @@ class CustomDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.restaurant_menu),
-            title: const Text('Menu Items'),
+            title: const Text('Menu Management'),
             onTap: () => context.go('/menu-items'),
           ),
           ListTile(
@@ -39,15 +48,11 @@ class CustomDrawer extends StatelessWidget {
             title: const Text('Fleet Management'),
             onTap: () => context.go('/vehicles'),
           ),
-          ListTile(
-            leading: const Icon(Icons.route),
-            title: const Text('My Deliveries'),
-            onTap: () => context.go('/driver-deliveries'),
-          ),
+          const Spacer(),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Logout'),
-            onTap: () => Navigator.pop(context), // Closes drawer
+            onTap: () {}, // Handle logout logic
           ),
         ],
       ),
