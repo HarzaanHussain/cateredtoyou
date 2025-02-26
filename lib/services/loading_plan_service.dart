@@ -38,27 +38,53 @@ class LoadingPlanService extends ChangeNotifier { // Defining LoadingPlanService
     }
   }
 
-  Stream<LoadingPlan?> getLoadingPlanByEventId(String eventId) async* { // Method to get a loading plan by event ID
+  Stream<LoadingPlan?> getLoadingPlanByEventId(String eventId) async* {
     try {
-      final currentUser = _auth.currentUser; // Getting the current authenticated user
-      if (currentUser == null) { // If no user is authenticated
-        yield null; // Yield null
-        return; // Return from the method
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        yield null;
+        return;
       }
 
-      yield* _firestore // Query Firestore for loading plans
-          .collection('loading_plans') // Access the 'loading_plans' collection
-          .where('eventId', isEqualTo: eventId) // Filter by event ID
-          .limit(1) // Limit to 1 result
-          .snapshots() // Get real-time updates
-          .map((snapshot) => snapshot.docs.isNotEmpty // Map the snapshot to a LoadingPlan object or null
-          ? LoadingPlan.fromMap(snapshot.docs.first.data(), snapshot.docs.first.id)
-          : null);
-    } catch (e) { // Catch any errors
-      debugPrint('Error getting loading plan by event ID: $e'); // Print the error
-      yield null; // Yield null
+      yield* _firestore
+          .collection('loading_plans')
+          .where('eventId', isEqualTo: eventId)
+          .limit(1)
+          .snapshots()
+          .map((snapshot) {
+        if (snapshot.docs.isNotEmpty) {
+          // Print the snapshot data for debugging
+          debugPrint('Snapshot data: ${snapshot.docs.first.data()}');
+          // Print the document ID for debugging
+          debugPrint('Document ID: ${snapshot.docs.first.id}');
+          // Map the snapshot to a LoadingPlan object
+          return LoadingPlan.fromMap(snapshot.docs.first.data(), snapshot.docs.first.id);
+        } else {
+          debugPrint('No loading plan found for event ID: $eventId');
+          return null;
+        }
+      });
+    } catch (e) {
+      debugPrint('Error getting loading plan by event ID: $e');
+      yield null;
     }
   }
+
+  Future<bool> doesLoadingPlanExist(String eventId) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('loading_plans')
+          .where('eventId', isEqualTo: eventId)
+          .limit(1)
+          .get();
+
+      return querySnapshot.docs.isNotEmpty;
+    } catch (e) {
+      debugPrint('Error checking loading plan existence: $e');
+      return false;
+    }
+  }
+
 
   Future<LoadingPlan> createLoadingPlan({ // Method to create a new loading plan
     required String eventId, // Required event ID parameter
@@ -100,6 +126,7 @@ class LoadingPlanService extends ChangeNotifier { // Defining LoadingPlanService
       final loadingPlan = LoadingPlan( // Create a new LoadingPlan object
         id: docRef.id, // Set the loading plan ID
         eventId: eventId, // Set the event ID
+        organizationId: organization.id, // Set the organization ID
         items: items, // Set the items
         createdAt: now, // Set the creation date
         updatedAt: now, // Set the update date
@@ -165,7 +192,11 @@ class LoadingPlanService extends ChangeNotifier { // Defining LoadingPlanService
     }
   }
 
-  Future<void> assignVehicleToItem(String loadingPlanId, String eventMenuItemId, String vehicleId) async { // Method to assign a vehicle to an item
+  Future<void> assignVehicleToItem({
+    required String loadingPlanId,
+    required String loadingItemId,
+    required String vehicleId,
+  }) async {
     try {
       final currentUser = _auth.currentUser; // Get the current authenticated user
       if (currentUser == null) throw 'Not authenticated'; // Throw an error if not authenticated
@@ -205,7 +236,7 @@ class LoadingPlanService extends ChangeNotifier { // Defining LoadingPlanService
       bool itemFound = false; // Flag to track if the item was found
 
       for (int i = 0; i < items.length; i++) { // Loop through the items
-        if (items[i]['eventMenuItemId'] == eventMenuItemId) { // If the item is found
+        if (items[i]['id'] == loadingItemId) { // If the item is found by its ID
           items[i]['vehicleId'] = vehicleId; // Assign the vehicle
           itemFound = true; // Set the flag
           break; // Break the loop
@@ -227,59 +258,6 @@ class LoadingPlanService extends ChangeNotifier { // Defining LoadingPlanService
     }
   }
 
-  Future<void> removeVehicleFromItem(String loadingPlanId, String eventMenuItemId) async { // Method to remove a vehicle from an item
-    try {
-      final currentUser = _auth.currentUser; // Get the current authenticated user
-      if (currentUser == null) throw 'Not authenticated'; // Throw an error if not authenticated
-
-      // Get the loading plan
-      final loadingPlanDoc = await _firestore.collection('loading_plans').doc(loadingPlanId).get(); // Get the loading plan document
-      if (!loadingPlanDoc.exists) throw 'Loading plan not found'; // Throw an error if loading plan not found
-
-      final loadingPlanData = loadingPlanDoc.data()!; // Get the loading plan data
-
-      // Check permissions
-      final organization = await _organizationService.getCurrentUserOrganization(); // Get the user's organization
-      if (organization == null) throw 'Organization not found'; // Throw an error if no organization found
-
-      if (loadingPlanData['organizationId'] != organization.id) { // Check if the loading plan belongs to the user's organization
-        throw 'Loading plan belongs to a different organization'; // Throw an error if loading plan belongs to a different organization
-      }
-
-      final userDoc = await _firestore.collection('users').doc(currentUser.uid).get(); // Get the user document
-      if (!userDoc.exists) throw 'User not found'; // Throw an error if user not found
-
-      final userRole = userDoc.get('role') as String?; // Get the user's role
-      if (!['admin', 'manager', 'client'].contains(userRole)) { // Check if the user has sufficient permissions
-        throw 'Insufficient permissions to modify vehicle assignments'; // Throw an error if insufficient permissions
-      }
-
-      // Update the loading item by removing the vehicle ID
-      final List<dynamic> items = loadingPlanData['items'] as List<dynamic>; // Get the items
-      bool itemFound = false; // Flag to track if the item was found
-
-      for (int i = 0; i < items.length; i++) { // Loop through the items
-        if (items[i]['eventMenuItemId'] == eventMenuItemId) { // If the item is found
-          items[i]['vehicleId'] = null; // Remove the vehicle assignment
-          itemFound = true; // Set the flag
-          break; // Break the loop
-        }
-      }
-
-      if (!itemFound) throw 'Item not found in loading plan'; // Throw an error if item not found
-
-      // Update the loading plan
-      await loadingPlanDoc.reference.update({ // Update the loading plan document
-        'items': items, // Update the items
-        'updatedAt': FieldValue.serverTimestamp(), // Update the timestamp
-      });
-
-      notifyListeners(); // Notify listeners of the change
-    } catch (e) { // Catch any errors
-      debugPrint('Error removing vehicle from item: $e'); // Print the error
-      rethrow; // Rethrow the error
-    }
-  }
 
   Future<void> deleteLoadingPlan(String loadingPlanId) async { // Method to delete a loading plan
     try {
