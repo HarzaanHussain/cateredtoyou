@@ -1,10 +1,9 @@
-//lib/models/loading_plan_model.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoadingPlan {
   final String id; // Unique identifier for the loading plan
   final String eventId; // Associated event ID
+  final String organizationId; // Associated organization ID
   final List<LoadingItem> items; // List of items assigned to this loading plan
   final DateTime createdAt; // Timestamp for when the plan was created
   final DateTime updatedAt; // Timestamp for when the plan was last updated
@@ -12,6 +11,7 @@ class LoadingPlan {
   LoadingPlan({
     required this.id,
     required this.eventId,
+    required this.organizationId,
     required this.items,
     required this.createdAt,
     required this.updatedAt,
@@ -21,6 +21,7 @@ class LoadingPlan {
   Map<String, dynamic> toMap() {
     return {
       'eventId': eventId,
+      'organizationId': organizationId,
       'items': items.map((item) => item.toMap()).toList(),
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
@@ -32,6 +33,7 @@ class LoadingPlan {
     return LoadingPlan(
       id: docId,
       eventId: map['eventId'] ?? '',
+      organizationId: map['organizationId'] ?? '',
       items: (map['items'] as List<dynamic>?)
           ?.map((item) => LoadingItem.fromMap(item))
           .toList() ??
@@ -44,11 +46,13 @@ class LoadingPlan {
   // Copy with updated fields
   LoadingPlan copyWith({
     String? eventId,
+    String? organizationId,
     List<LoadingItem>? items,
   }) {
     return LoadingPlan(
       id: id,
       eventId: eventId ?? this.eventId,
+      organizationId: organizationId ?? this.organizationId,
       items: items ?? this.items,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
@@ -57,12 +61,14 @@ class LoadingPlan {
 }
 
 class LoadingItem {
-  final String eventMenuItemId; // ID of the menu item
+  final String id; // Unique identifier for the loading item
+  final String menuItemId; // ID of the menu item
   final int quantity; // Quantity of the item
   final String? vehicleId; // Assigned vehicle ID (nullable)
 
   LoadingItem({
-    required this.eventMenuItemId,
+    required this.id,
+    required this.menuItemId,
     required this.quantity,
     this.vehicleId,
   });
@@ -70,7 +76,8 @@ class LoadingItem {
   // Convert to Firestore-compatible map
   Map<String, dynamic> toMap() {
     return {
-      'eventMenuItemId': eventMenuItemId,
+      'id': id,
+      'menuItemId': menuItemId,
       'quantity': quantity,
       'vehicleId': vehicleId,
     };
@@ -79,7 +86,8 @@ class LoadingItem {
   // Create from Firestore map
   factory LoadingItem.fromMap(Map<String, dynamic> map) {
     return LoadingItem(
-      eventMenuItemId: map['eventMenuItemId'] ?? '',
+      id: map['id'] ?? '',
+      menuItemId: map['menuItemId'] ?? '',
       quantity: map['quantity'] ?? 0,
       vehicleId: map['vehicleId'],
     );
