@@ -6,6 +6,8 @@ import 'package:cateredtoyou/models/user_model.dart';
 import 'package:cateredtoyou/services/role_permissions.dart';
 import 'package:cateredtoyou/widgets/permission_widget.dart';
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
+import 'package:cateredtoyou/widgets/custom_app_bar.dart';
+import 'package:cateredtoyou/widgets/custom_drawer.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -18,16 +20,9 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Color(0xFFFFC533), // Set background color to orange
+      appBar: const CustomAppBar(title: 'CateredToYou'),
+      drawer: const CustomDrawer(),
       bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
-        title: const Text('CateredToYou'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => authModel.signOut(),
-          ),
-        ],
-      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
