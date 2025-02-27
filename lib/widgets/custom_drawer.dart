@@ -1,0 +1,82 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:cateredtoyou/models/auth_model.dart';
+import 'package:cateredtoyou/models/user_model.dart';
+import 'package:cateredtoyou/services/role_permissions.dart';
+import 'package:cateredtoyou/widgets/permission_widget.dart';
+
+class CustomDrawer extends StatelessWidget {
+  const CustomDrawer({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final authModel = context.watch<AuthModel>();
+    final UserModel? user = authModel.user;
+    final rolePermissions = context.read<RolePermissions>();
+
+    return Drawer(
+      child: Column(
+        children: [
+          // Header Section
+          SizedBox(
+            height: 150,
+            width: double.infinity,
+            child: DrawerHeader(
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFC533), // Header background color
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'CateredToYou',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Inventory Section
+          PermissionWidget(
+            permissionId: 'manage_inventory',
+            child: ListTile(
+              leading: const Icon(Icons.inventory),
+              title: const Text('Inventory'),
+              subtitle: const Text('Manage kitchen inventory'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () => context.push('/inventory'),
+            ),
+          ),
+
+          // Staff Management Section
+          PermissionWidget(
+            permissionId: 'manage_staff',
+            child: ListTile(
+              leading: const Icon(Icons.people),
+              title: const Text('Staff'),
+              subtitle: const Text('Manage staff and roles'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () => context.push('/staff'),
+            ),
+          ),
+
+          // Task Management Section
+          PermissionWidget(
+            permissionId: 'view_tasks',
+            child: ListTile(
+              leading: const Icon(Icons.task),
+              title: const Text('Tasks'),
+              subtitle: const Text('View and assign tasks'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () => context.push('/tasks'),
+            ),
+          ),
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+}

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart'; // Importing go_router package for na
 import 'package:intl/intl.dart'; // Importing intl package for date formatting.
 import 'package:cateredtoyou/models/event_model.dart'; // Importing event model.
 import 'package:cateredtoyou/services/event_service.dart'; // Importing event service for API calls.
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart'; // Imports bottom toolbar class
+
 
 class EventListScreen extends StatefulWidget {
   const EventListScreen({super.key}); // Constructor for EventListScreen.
@@ -88,6 +90,7 @@ class _EventListScreenState extends State<EventListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back), // Back button icon.

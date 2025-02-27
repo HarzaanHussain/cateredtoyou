@@ -6,6 +6,8 @@ import 'package:cateredtoyou/models/delivery_route_model.dart'; // Import Delive
 import 'package:cateredtoyou/services/delivery_route_service.dart'; // Import DeliveryRouteService for fetching delivery routes.
 import 'package:go_router/go_router.dart'; // Import GoRouter for navigation.
 import 'package:intl/intl.dart'; // Import Intl package for date formatting.
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
+
 
 /// A stateless widget that displays a list of delivery routes.
 class DeliveryListScreen extends StatelessWidget {
@@ -14,6 +16,7 @@ class DeliveryListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         title: const Text('Deliveries'), // AppBar title.
         actions: [

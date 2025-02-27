@@ -5,6 +5,9 @@ import 'package:cateredtoyou/models/auth_model.dart';
 import 'package:cateredtoyou/models/user_model.dart';
 import 'package:cateredtoyou/services/role_permissions.dart';
 import 'package:cateredtoyou/widgets/permission_widget.dart';
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
+import 'package:cateredtoyou/widgets/custom_app_bar.dart';
+import 'package:cateredtoyou/widgets/custom_drawer.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -16,15 +19,10 @@ class HomeScreen extends StatelessWidget {
     final rolePermissions = context.read<RolePermissions>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('CateredToYou'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => authModel.signOut(),
-          ),
-        ],
-      ),
+      backgroundColor: Color(0xFFFFC533), // Set background color to orange
+      appBar: const CustomAppBar(title: 'CateredToYou'),
+      drawer: const CustomDrawer(),
+      bottomNavigationBar: const BottomToolbar(),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -83,6 +81,7 @@ class HomeScreen extends StatelessWidget {
                                 onTap: () => context.push('/staff'),
                               ),
                             ),
+                            const Divider(),
                             PermissionWidget(
                               permissionId: 'view_customers',
                               child: ListTile(
@@ -112,14 +111,6 @@ class HomeScreen extends StatelessWidget {
                 },
               ),
 
-              // Operations Section
-              const SizedBox(height: 24),
-              Text(
-                'Operations',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
               const SizedBox(height: 16),
 
               // Vehicle and Delivery Section
@@ -166,6 +157,7 @@ class HomeScreen extends StatelessWidget {
                                 onTap: () => context.push('/vehicles'),
                               ),
                             ),
+                            const Divider(),
                             PermissionWidget(
                               permissionId: 'view_deliveries',
                               child: ListTile(
@@ -176,6 +168,7 @@ class HomeScreen extends StatelessWidget {
                                 onTap: () => context.push('/driver-deliveries'),
                               ),
                             ),
+                            const Divider(),
                             PermissionWidget(
                               permissionId: 'manage_deliveries',
                               child: ListTile(
@@ -204,63 +197,6 @@ class HomeScreen extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-      bottomNavigationBar: BottomAppBar(
-        height: 80,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            PermissionWidget(
-              permissionId: 'view_tasks',
-              child: IconButton(
-                icon: const Icon(Icons.task, size: 32),
-                tooltip: 'Tasks',
-                iconSize: 32,
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(64, 64),
-                  padding: const EdgeInsets.all(12),
-                ),
-                onPressed: () => context.push('/tasks'),
-              ),
-            ),
-            PermissionWidget(
-              permissionId: 'manage_events',
-              child: IconButton(
-                icon: const Icon(Icons.event_available, size: 32),
-                tooltip: 'Events',
-                iconSize: 32,
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(64, 64),
-                  padding: const EdgeInsets.all(12),
-                ),
-                onPressed: () => context.push('/events'),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.calendar_today, size: 32),
-              tooltip: 'Calendar',
-              iconSize: 32,
-              style: IconButton.styleFrom(
-                minimumSize: const Size(64, 64),
-                padding: const EdgeInsets.all(12),
-              ),
-              onPressed: () => context.push('/calendar'),
-            ),
-            PermissionWidget(
-              permissionId: 'view_inventory',
-              child: IconButton(
-                icon: const Icon(Icons.inventory, size: 32),
-                tooltip: 'Inventory',
-                iconSize: 32,
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(64, 64),
-                  padding: const EdgeInsets.all(12),
-                ),
-                onPressed: () => context.push('/inventory'),
-              ),
-            ),
-          ],
         ),
       ),
     );
