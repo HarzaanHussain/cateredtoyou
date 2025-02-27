@@ -1,14 +1,16 @@
+//lib/models/manifest_model.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class LoadingPlan {
-  final String id; // Unique identifier for the loading plan
+class Manifest {
+  final String id; // Unique identifier for the manifest
   final String eventId; // Associated event ID
   final String organizationId; // Associated organization ID
-  final List<LoadingItem> items; // List of items assigned to this loading plan
+  final List<ManifestItem> items; // List of items assigned to this manifest
   final DateTime createdAt; // Timestamp for when the plan was created
   final DateTime updatedAt; // Timestamp for when the plan was last updated
 
-  LoadingPlan({
+  Manifest({
     required this.id,
     required this.eventId,
     required this.organizationId,
@@ -29,13 +31,13 @@ class LoadingPlan {
   }
 
   // Create from Firestore map
-  factory LoadingPlan.fromMap(Map<String, dynamic> map, String docId) {
-    return LoadingPlan(
+  factory Manifest.fromMap(Map<String, dynamic> map, String docId) {
+    return Manifest(
       id: docId,
       eventId: map['eventId'] ?? '',
       organizationId: map['organizationId'] ?? '',
       items: (map['items'] as List<dynamic>?)
-          ?.map((item) => LoadingItem.fromMap(item))
+          ?.map((item) => ManifestItem.fromMap(item))
           .toList() ??
           [],
       createdAt: (map['createdAt'] as Timestamp).toDate(),
@@ -44,12 +46,12 @@ class LoadingPlan {
   }
 
   // Copy with updated fields
-  LoadingPlan copyWith({
+  Manifest copyWith({
     String? eventId,
     String? organizationId,
-    List<LoadingItem>? items,
+    List<ManifestItem>? items,
   }) {
-    return LoadingPlan(
+    return Manifest(
       id: id,
       eventId: eventId ?? this.eventId,
       organizationId: organizationId ?? this.organizationId,
@@ -60,17 +62,21 @@ class LoadingPlan {
   }
 }
 
-class LoadingItem {
-  final String id; // Unique identifier for the loading item
+enum LoadingStatus { unassigned, pending, loaded }
+
+class ManifestItem {
+  final String id; // Unique identifier for the manifest item
   final String menuItemId; // ID of the menu item
   final int quantity; // Quantity of the item
   final String? vehicleId; // Assigned vehicle ID (nullable)
+  final LoadingStatus loadingStatus; // Status of the manifest item
 
-  LoadingItem({
+  ManifestItem({
     required this.id,
     required this.menuItemId,
     required this.quantity,
     this.vehicleId,
+    required this.loadingStatus,
   });
 
   // Convert to Firestore-compatible map
@@ -80,16 +86,21 @@ class LoadingItem {
       'menuItemId': menuItemId,
       'quantity': quantity,
       'vehicleId': vehicleId,
+      'loadingStatus': loadingStatus.toString().split('.').last,
     };
   }
 
   // Create from Firestore map
-  factory LoadingItem.fromMap(Map<String, dynamic> map) {
-    return LoadingItem(
+  factory ManifestItem.fromMap(Map<String, dynamic> map) {
+    return ManifestItem(
       id: map['id'] ?? '',
       menuItemId: map['menuItemId'] ?? '',
       quantity: map['quantity'] ?? 0,
       vehicleId: map['vehicleId'],
+      loadingStatus: LoadingStatus.values.firstWhere(
+            (e) => e.toString().split('.').last == map['loadingStatus'],
+        orElse: () => LoadingStatus.unassigned,
+      ),
     );
   }
 }

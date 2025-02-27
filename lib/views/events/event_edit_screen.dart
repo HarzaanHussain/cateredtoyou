@@ -16,8 +16,8 @@ import 'package:cateredtoyou/widgets/event_menu_selection.dart'; // Importing ev
 import 'package:cateredtoyou/widgets/event_supplies_selection.dart'; // Importing event supplies selection widget.
 import 'package:cateredtoyou/widgets/add_customer_dialog.dart';
 
-import '../../models/loading_plan_model.dart';
-import '../../services/loading_plan_service.dart'; // Importing add customer dialog widget.
+import '../../models/manifest_model.dart';
+import '../../services/manifest_service.dart'; // Importing add customer dialog widget.
 
 class EventEditScreen extends StatefulWidget {
   final Event? event; // Event object to edit, if null, a new event is created.
@@ -299,29 +299,27 @@ class _EventEditScreenState extends State<EventEditScreen> {
 // Function to manage the loading plan for an event
   Future<void> _manageLoadingPlan(String eventId) async {
     try {
-      final loadingPlanService = context.read<LoadingPlanService>();
-      debugPrint('Managing loading plan for event: $eventId');
-
+      final loadingPlanService = context.read<ManifestService>();
       // Check if a loading plan already exists for this event
-      debugPrint('Checking if loading plan exists for event: $eventId');
-      if (!(await loadingPlanService.doesLoadingPlanExist(eventId))) {
+      if (!(await loadingPlanService.doesManifestExist(eventId))) {
           debugPrint('No existing loading plan found. Creating a new one.');
       // Create loading items from selected menu items
         final loadingItems = _selectedMenuItems.map((menuItem) {
-          final newItemId = FirebaseFirestore.instance.collection('loading_plans').doc().id;
+          final newItemId = FirebaseFirestore.instance.collection('manifests').doc().id;
           debugPrint('Creating loading item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
 
-          return LoadingItem(
+          return ManifestItem(
               id: newItemId,
               menuItemId: menuItem.menuItemId,
               quantity: menuItem.quantity,
               vehicleId: null, // Initially, no vehicle is assigned
+              loadingStatus: LoadingStatus.unassigned, // Initial status is unassigned
             );
         }).toList();
 
           if (loadingItems.isNotEmpty) {
             debugPrint('Saving new loading plan with ${loadingItems.length} items.');
-            await loadingPlanService.createLoadingPlan(
+            await loadingPlanService.createManifest(
               eventId: eventId,
               items: loadingItems,
             );
@@ -330,13 +328,13 @@ class _EventEditScreenState extends State<EventEditScreen> {
           }
       } else {
         debugPrint('Existing loading plan found. Updating it.');
-        final existingPlan = await loadingPlanService.getLoadingPlanByEventId(eventId).first;
+        final existingPlan = await loadingPlanService.getManifestByEventId(eventId).first;
         // Get current menu item IDs
         final currentMenuItemIds = _selectedMenuItems.map((item) => item.menuItemId).toSet();
         debugPrint('Current menu item IDs: $currentMenuItemIds');
 
         // Keep existing items that still exist in the menu
-        final updatedItems = (existingPlan?.items ?? <LoadingItem>[])
+        final updatedItems = (existingPlan?.items ?? <ManifestItem>[])
             .where((item) => currentMenuItemIds.contains(item.menuItemId))
             .toList();
         debugPrint('Retaining ${updatedItems.length} existing loading items.');
@@ -346,14 +344,15 @@ class _EventEditScreenState extends State<EventEditScreen> {
           final existingItem = updatedItems.any((item) => item.menuItemId == menuItem.menuItemId);
 
           if (!existingItem) {
-            final newItemId = FirebaseFirestore.instance.collection('loading_plans').doc().id;
+            final newItemId = FirebaseFirestore.instance.collection('manifests').doc().id;
             debugPrint('Adding new loading item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
 
-            updatedItems.add(LoadingItem(
+            updatedItems.add(ManifestItem(
               id: newItemId,
               menuItemId: menuItem.menuItemId,
               quantity: menuItem.quantity,
               vehicleId: null,
+              loadingStatus: LoadingStatus.unassigned,
             ));
           }
         }
@@ -361,7 +360,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
         debugPrint('Updating loading plan with ${updatedItems.length} total items.');
         if (existingPlan != null) {
           final updatedPlan = existingPlan.copyWith(items: updatedItems);
-          await loadingPlanService.updateLoadingPlan(updatedPlan);
+          await loadingPlanService.updateManifest(updatedPlan);
         }
       }
 

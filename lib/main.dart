@@ -1,7 +1,7 @@
 import 'package:cateredtoyou/services/auth_service.dart';
 import 'package:cateredtoyou/services/delivery_route_service.dart'; // Import DeliveryRouteService for delivery route-related operations
 import 'package:cateredtoyou/services/event_service.dart'; // Import EventService for event-related operations
-import 'package:cateredtoyou/services/loading_plan_service.dart';
+import 'package:cateredtoyou/services/manifest_service.dart';
 import 'package:cateredtoyou/services/menu_item_service.dart'; // Import MenuItemService for menu item-related operations
 import 'package:cateredtoyou/services/task_automation_service.dart'; // Import TaskAutomationService for task automation operations
 import 'package:cateredtoyou/services/task_service.dart'; // Import TaskService for task-related operations
@@ -72,7 +72,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider(
-          create: (context) => LoadingPlanService(
+          create: (context) => ManifestService(
             context.read<OrganizationService>(),
           ),
         ),
