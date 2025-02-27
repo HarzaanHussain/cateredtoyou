@@ -6,6 +6,15 @@ import 'package:cateredtoyou/models/user_model.dart';
 import 'package:cateredtoyou/services/role_permissions.dart';
 import 'package:cateredtoyou/widgets/permission_widget.dart';
 
+// This is the hamburger menu, to use it in views you also need the top bar :
+  // import 'package:cateredtoyou/widgets/custom_app_bar.dart';
+  // import 'package:cateredtoyou/widgets/custom_drawer.dart';
+  // Place these two in the scaffold:
+    //appBar: const CustomAppBar(title: 'CateredToYou'),
+    //drawer: const CustomDrawer(),
+
+
+drawer: const CustomDrawer(),
 class CustomDrawer extends StatelessWidget {
   const CustomDrawer({super.key});
 
