@@ -14,7 +14,10 @@ import 'package:cateredtoyou/widgets/custom_text_field.dart'; // Importing custo
 import 'package:cateredtoyou/widgets/customer_selector.dart'; // Importing customer selector widget.
 import 'package:cateredtoyou/widgets/event_menu_selection.dart'; // Importing event menu selection widget.
 import 'package:cateredtoyou/widgets/event_supplies_selection.dart'; // Importing event supplies selection widget.
-import 'package:cateredtoyou/widgets/add_customer_dialog.dart'; // Importing add customer dialog widget.
+import 'package:cateredtoyou/widgets/add_customer_dialog.dart';
+
+import '../../models/loading_plan_model.dart';
+import '../../services/loading_plan_service.dart'; // Importing add customer dialog widget.
 
 class EventEditScreen extends StatefulWidget {
   final Event? event; // Event object to edit, if null, a new event is created.
@@ -220,9 +223,11 @@ class _EventEditScreenState extends State<EventEditScreen> {
         _endTime.minute,
       ); // Combining the end date and time.
 
+      // Create or update event
+      String eventId;
       if (widget.event == null) {
-        await eventService.createEvent(
-          name: _nameController.text.trim(), // Creating a new event.
+        final createdEvent = await eventService.createEvent(
+          name: _nameController.text.trim(),
           description: _descriptionController.text.trim(),
           startDate: _startDate,
           endDate: _endDate,
@@ -238,6 +243,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
           assignedStaff: _assignedStaff,
           metadata: _metadata,
         );
+        eventId = createdEvent.id; // Store the ID of the newly created event
       } else {
         final updatedEvent = widget.event!.copyWith(
           name: _nameController.text.trim(), // Updating the existing event.
@@ -258,8 +264,12 @@ class _EventEditScreenState extends State<EventEditScreen> {
           metadata: _metadata?.toMap(),
         );
 
-        await eventService.updateEvent(updatedEvent); // Updating the event in the database.
+        await eventService.updateEvent(updatedEvent);
+        eventId = widget.event!.id; // Use the ID of the existing event
       }
+
+      // Create or update the loading plan for this event
+      await _manageLoadingPlan(eventId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -283,6 +293,83 @@ class _EventEditScreenState extends State<EventEditScreen> {
           _isLoading = false; // Clearing the loading state.
         });
       }
+    }
+  }
+
+// Function to manage the loading plan for an event
+  Future<void> _manageLoadingPlan(String eventId) async {
+    try {
+      final loadingPlanService = context.read<LoadingPlanService>();
+      debugPrint('Managing loading plan for event: $eventId');
+
+      // Check if a loading plan already exists for this event
+      debugPrint('Checking if loading plan exists for event: $eventId');
+      if (!(await loadingPlanService.doesLoadingPlanExist(eventId))) {
+          debugPrint('No existing loading plan found. Creating a new one.');
+      // Create loading items from selected menu items
+        final loadingItems = _selectedMenuItems.map((menuItem) {
+          final newItemId = FirebaseFirestore.instance.collection('loading_plans').doc().id;
+          debugPrint('Creating loading item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
+
+          return LoadingItem(
+              id: newItemId,
+              menuItemId: menuItem.menuItemId,
+              quantity: menuItem.quantity,
+              vehicleId: null, // Initially, no vehicle is assigned
+            );
+        }).toList();
+
+          if (loadingItems.isNotEmpty) {
+            debugPrint('Saving new loading plan with ${loadingItems.length} items.');
+            await loadingPlanService.createLoadingPlan(
+              eventId: eventId,
+              items: loadingItems,
+            );
+          } else {
+            debugPrint('No menu items selected, skipping loading plan creation.');
+          }
+      } else {
+        debugPrint('Existing loading plan found. Updating it.');
+        final existingPlan = await loadingPlanService.getLoadingPlanByEventId(eventId).first;
+        // Get current menu item IDs
+        final currentMenuItemIds = _selectedMenuItems.map((item) => item.menuItemId).toSet();
+        debugPrint('Current menu item IDs: $currentMenuItemIds');
+
+        // Keep existing items that still exist in the menu
+        final updatedItems = (existingPlan?.items ?? <LoadingItem>[])
+            .where((item) => currentMenuItemIds.contains(item.menuItemId))
+            .toList();
+        debugPrint('Retaining ${updatedItems.length} existing loading items.');
+
+        // Add new items that aren't in the loading plan yet
+        for (final menuItem in _selectedMenuItems) {
+          final existingItem = updatedItems.any((item) => item.menuItemId == menuItem.menuItemId);
+
+          if (!existingItem) {
+            final newItemId = FirebaseFirestore.instance.collection('loading_plans').doc().id;
+            debugPrint('Adding new loading item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
+
+            updatedItems.add(LoadingItem(
+              id: newItemId,
+              menuItemId: menuItem.menuItemId,
+              quantity: menuItem.quantity,
+              vehicleId: null,
+            ));
+          }
+        }
+
+        debugPrint('Updating loading plan with ${updatedItems.length} total items.');
+        if (existingPlan != null) {
+          final updatedPlan = existingPlan.copyWith(items: updatedItems);
+          await loadingPlanService.updateLoadingPlan(updatedPlan);
+        }
+      }
+
+      debugPrint('Loading plan management complete.');
+    } catch (e) {
+      debugPrint('Error managing loading plan: $e');
+      // We don't want to fail the whole submission if just the loading plan fails
+      // So we catch the error here and just log it
     }
   }
 
