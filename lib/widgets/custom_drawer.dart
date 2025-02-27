@@ -13,8 +13,6 @@ import 'package:cateredtoyou/widgets/permission_widget.dart';
     //appBar: const CustomAppBar(title: 'CateredToYou'),
     //drawer: const CustomDrawer(),
 
-
-drawer: const CustomDrawer(),
 class CustomDrawer extends StatelessWidget {
   const CustomDrawer({super.key});
 
