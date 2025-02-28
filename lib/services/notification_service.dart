@@ -1,4 +1,3 @@
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -7,15 +6,10 @@ import 'package:timezone/data/latest.dart' as tz;
 
 class NotificationService {
   final notificationsPlugin = FlutterLocalNotificationsPlugin();
-  final _firebaseMessaging = FirebaseMessaging.instance;
 
   bool _isInitialized = false;
 
   bool get isInitialized => _isInitialized;
-
-  Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-    print('Handling background message: ${message.notification?.title} - ${message.notification?.body}');
-  }
 
   //INITIALIZATION
   Future<void> initNotification() async {
@@ -25,17 +19,6 @@ class NotificationService {
     tz.initializeTimeZones();
     final String currentTimeZone = await FlutterTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(currentTimeZone));
-
-    //firebase messaging
-    await _firebaseMessaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    final fCMToken = await _firebaseMessaging.getToken(); //fcmtoken for this device
-    print('Token: $fCMToken');
-
 
     final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
           notificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -51,26 +34,8 @@ class NotificationService {
 
     await notificationsPlugin.initialize(initSettings);
 
-    //background message handler
-    // FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-    //LISTEN FOR FOREGROUND MESSAGES
-    FirebaseMessaging.onMessage.listen((RemoteMessage message){
-      print('Foreground message received: ${message.notification?.title} - ${message.notification?.body}');
-      showNotification(
-        title: message.notification?.title ?? 'New Notification',
-        body: message.notification?.body ?? '',
-      );
-    });
-
-    //ON TAP
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message){
-      print('User tapped on notification ${message.data}');
-      //if there is any on tap event for the notification
-    });
-
-    _isInitialized = true; // Mark as initialized
-    print("Notifications initialized");
+    _isInitialized = true;
+    print("Notifications Initialized");
 
   }
 

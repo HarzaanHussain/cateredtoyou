@@ -52,11 +52,6 @@ void main() async {
       .initializeSecondary(); // Initialize secondary Firebase app
   await NotificationService().initNotification();
 
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
-  RemoteMessage? initialMessage = await messaging.getInitialMessage();
-  if(initialMessage != null){
-    print('App opened from a terminated state');
-  }
   runApp(const MyApp()); // Run the MyApp widget
 }
 
