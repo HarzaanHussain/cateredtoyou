@@ -19,8 +19,6 @@ class CustomDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authModel = context.watch<AuthModel>();
-    final UserModel? user = authModel.user;
-    final rolePermissions = context.read<RolePermissions>();
 
     return Drawer(
       child: Column(
@@ -81,6 +79,18 @@ class CustomDrawer extends StatelessWidget {
               onTap: () => context.push('/tasks'),
             ),
           ),
+          // Vehicle Loading System Section
+          PermissionWidget(
+            permissionId: 'manage_manifest',
+            child: ListTile(
+              leading: const Icon(Icons.local_shipping),
+              title: const Text('Vehicle Loading'),
+              subtitle: const Text('Manage vehicle loading manifests'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () => context.push('/manifest'),
+            ),
+          ),
+
           const Spacer(),
         ],
       ),

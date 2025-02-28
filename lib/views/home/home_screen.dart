@@ -52,7 +52,12 @@ class HomeScreen extends StatelessWidget {
 
               // Management Section
               FutureBuilder<bool>(
-                future: rolePermissions.hasPermission('manage_staff'),
+                future: Future.wait([
+                  rolePermissions.hasPermission('manage_staff'),
+                  rolePermissions.hasPermission('view_customers'),
+                  rolePermissions.hasPermission('manage_menu'),
+                  rolePermissions.hasPermission('manage_manifest'),
+                ]).then((permissions) => permissions.any((p) => p)),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData || !snapshot.data!) {
                     return const SizedBox.shrink();
@@ -101,6 +106,17 @@ class HomeScreen extends StatelessWidget {
                                 subtitle: const Text('Manage menu items and recipes'),
                                 trailing: const Icon(Icons.arrow_forward_ios),
                                 onTap: () => context.push('/menu-items'),
+                              ),
+                            ),
+                            const Divider(),
+                            PermissionWidget(
+                              permissionId: 'manage_menu',
+                              child: ListTile(
+                                leading: const Icon(Icons.list_alt),
+                                title: const Text('Manifest Management'),
+                                subtitle: const Text('Create and manage load manifests'),
+                                trailing: const Icon(Icons.arrow_forward_ios),
+                                onTap: () => context.push('/manifest'),
                               ),
                             ),
                           ],
