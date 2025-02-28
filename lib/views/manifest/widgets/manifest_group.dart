@@ -97,7 +97,7 @@ class _ManifestGroupState extends State<ManifestGroup> {
         .toList();
 
     final quantities = selectedItems
-        .map((item) => widget.itemQuantities[item.id] ?? item.quantity)
+        .map((item) => widget.itemQuantities[item.id] ?? 0)
         .toList();
 
     setState(() {
@@ -172,16 +172,15 @@ class _ManifestGroupState extends State<ManifestGroup> {
                     ),
                   ),
                   if (hasUnassignedItems)
-                    Row(
-                      children: [
-                        Text('Select All'),
-                        Checkbox(
-                          value: _areAllItemsSelected(),
-                          onChanged: (value) {
-                            widget.onSelectAll(value ?? false);
-                          },
-                        ),
-                      ],
+                    IconButton(
+                      icon: Icon(
+                        _areAllItemsSelected() ? Icons.select_all : Icons.check_box_outline_blank,
+                        color: Colors.blue.shade800,
+                      ),
+                      tooltip: _areAllItemsSelected() ? 'Deselect All' : 'Select All',
+                      onPressed: () {
+                        widget.onSelectAll(!_areAllItemsSelected());
+                      },
                     ),
                 ],
               ),
@@ -190,59 +189,35 @@ class _ManifestGroupState extends State<ManifestGroup> {
 
           // Items list (shown when expanded)
           if (_isExpanded)
-            LongPressDraggable<Map<String, dynamic>>(
+            Draggable<Map<String, dynamic>>(
+              // Changed from LongPressDraggable to Draggable for easier drag initiation
               data: _areAnyItemsSelected() ? {
                 'items': _draggedItems,
                 'quantities': _draggedQuantities,
+                'eventId': widget.manifest.eventId, // Include the event ID
               } : null,
               onDragStarted: _handleMultiDrag,
               onDragEnd: (_) => _handleDragEnd(),
               maxSimultaneousDrags: _areAnyItemsSelected() ? 1 : 0,
               feedback: _buildMultiDragFeedback(),
+              childWhenDragging: _areAnyItemsSelected() ? Opacity(
+                opacity: 0.5,
+                child: _buildItemsList(),
+              ) : null,
               child: Column(
                 children: [
                   if (_areAnyItemsSelected())
                     Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: Text(
-                        'Long press to drag multiple selected items',
+                        'Drag selected items to a vehicle',
                         style: TextStyle(
                           fontStyle: FontStyle.italic,
                           color: Colors.blue.shade700,
                         ),
                       ),
                     ),
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: widget.manifest.items.length,
-                    itemBuilder: (context, index) {
-                      final item = widget.manifest.items[index];
-                      final isSelected = widget.selectedItems[item.id] ?? false;
-                      final quantity = widget.itemQuantities[item.id] ?? item.quantity;
-                      return ManifestItemTile(
-                        manifestItem: item,
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          widget.onItemSelected(item.id, selected);
-                        },
-                        quantity: quantity,
-                        onQuantityChanged: (newQuantity) {
-                          widget.onQuantityChanged(item.id, newQuantity);
-                        },
-                        eventName: _eventName,
-                        onDragStarted: () {
-                          // Single item drag
-                          if (isSelected) {
-                            widget.onItemDragged([item], [quantity]);
-                          }
-                        },
-                        onDragEnd: () {
-                          // Handle drag end for single item
-                        },
-                      );
-                    },
-                  ),
+                  _buildItemsList(),
                 ],
               ),
             ),
@@ -251,42 +226,132 @@ class _ManifestGroupState extends State<ManifestGroup> {
     );
   }
 
+  Widget _buildItemsList() {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: widget.manifest.items.length,
+      itemBuilder: (context, index) {
+        final item = widget.manifest.items[index];
+
+        // Skip items that have been assigned to vehicles
+        if (item.vehicleId != null) {
+          return const SizedBox.shrink();
+        }
+
+        final isSelected = widget.selectedItems[item.id] ?? false;
+        final quantity = widget.itemQuantities[item.id] ?? item.quantity;
+
+        return ManifestItemTile(
+          manifestItem: item,
+          selected: isSelected,
+          onSelected: (selected) {
+            widget.onItemSelected(item.id, selected);
+          },
+          quantity: quantity,
+          onQuantityChanged: (newQuantity) {
+            widget.onQuantityChanged(item.id, newQuantity);
+          },
+          onDragStarted: () {
+            // Single item drag
+            widget.onItemDragged([item], [quantity]);
+          },
+          onDragEnd: () {
+            // Handle drag end for single item
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildMultiDragFeedback() {
     if (_draggedItems.isEmpty) {
       return const SizedBox.shrink();
     }
 
+    // Simplified feedback showing "stacked cards" representation
     return Material(
-      elevation: 6.0,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.blue.shade100,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.blue, width: 2),
-        ),
-        width: 250,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Multiple Items (${_draggedItems.length})',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+      color: Colors.transparent,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Bottom card (for stack effect)
+          Transform.translate(
+            offset: const Offset(8.0, 8.0),
+            child: Container(
+              width: 200,
+              height: 60,
+              decoration: BoxDecoration(
+                color: Colors.blue.shade200,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text('Event: $_eventName'),
-            const SizedBox(height: 4),
-            const Text(
-              'Drop on a vehicle to assign',
-              style: TextStyle(fontStyle: FontStyle.italic),
+          ),
+          // Middle card (for stack effect)
+          Transform.translate(
+            offset: const Offset(4.0, 4.0),
+            child: Container(
+              width: 200,
+              height: 60,
+              decoration: BoxDecoration(
+                color: Colors.blue.shade300,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
+          ),
+          // Top card with count
+          Container(
+            width: 200,
+            height: 60,
+            decoration: BoxDecoration(
+              color: Colors.blue.shade400,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade700, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 5,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '${_draggedItems.length}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
+                    color: Colors.white,
+                  ),
+                ),
+                const Text(
+                  'items',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

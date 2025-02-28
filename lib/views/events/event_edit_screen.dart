@@ -268,8 +268,8 @@ class _EventEditScreenState extends State<EventEditScreen> {
         eventId = widget.event!.id; // Use the ID of the existing event
       }
 
-      // Create or update the loading plan for this event
-      await _manageLoadingPlan(eventId);
+      // Create or update the manifest for this event
+      await _manageManifest(eventId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -296,39 +296,40 @@ class _EventEditScreenState extends State<EventEditScreen> {
     }
   }
 
-// Function to manage the loading plan for an event
-  Future<void> _manageLoadingPlan(String eventId) async {
+// Function to manage the manifest for an event
+  Future<void> _manageManifest(String eventId) async {
     try {
-      final loadingPlanService = context.read<ManifestService>();
-      // Check if a loading plan already exists for this event
-      if (!(await loadingPlanService.doesManifestExist(eventId))) {
-          debugPrint('No existing loading plan found. Creating a new one.');
-      // Create loading items from selected menu items
-        final loadingItems = _selectedMenuItems.map((menuItem) {
+      final manifestService = context.read<ManifestService>();
+      // Check if a manifest already exists for this event
+      if (!(await manifestService.doesManifestExist(eventId))) {
+          debugPrint('No existing manifest found. Creating a new one.');
+      // Create manifest items from selected menu items
+        final manifestItems = _selectedMenuItems.map((menuItem) {
           final newItemId = FirebaseFirestore.instance.collection('manifests').doc().id;
-          debugPrint('Creating loading item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
+          debugPrint('Creating manifest item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
 
           return ManifestItem(
               id: newItemId,
               menuItemId: menuItem.menuItemId,
+              name: menuItem.name,
               quantity: menuItem.quantity,
               vehicleId: null, // Initially, no vehicle is assigned
               loadingStatus: LoadingStatus.unassigned, // Initial status is unassigned
             );
         }).toList();
 
-          if (loadingItems.isNotEmpty) {
-            debugPrint('Saving new loading plan with ${loadingItems.length} items.');
-            await loadingPlanService.createManifest(
+          if (manifestItems.isNotEmpty) {
+            debugPrint('Saving new manifest with ${manifestItems.length} items.');
+            await manifestService.createManifest(
               eventId: eventId,
-              items: loadingItems,
+              items: manifestItems,
             );
           } else {
-            debugPrint('No menu items selected, skipping loading plan creation.');
+            debugPrint('No menu items selected, skipping manifest creation.');
           }
       } else {
-        debugPrint('Existing loading plan found. Updating it.');
-        final existingPlan = await loadingPlanService.getManifestByEventId(eventId).first;
+        debugPrint('Existing manifest found. Updating it.');
+        final existingPlan = await manifestService.getManifestByEventId(eventId).first;
         // Get current menu item IDs
         final currentMenuItemIds = _selectedMenuItems.map((item) => item.menuItemId).toSet();
         debugPrint('Current menu item IDs: $currentMenuItemIds');
@@ -337,19 +338,20 @@ class _EventEditScreenState extends State<EventEditScreen> {
         final updatedItems = (existingPlan?.items ?? <ManifestItem>[])
             .where((item) => currentMenuItemIds.contains(item.menuItemId))
             .toList();
-        debugPrint('Retaining ${updatedItems.length} existing loading items.');
+        debugPrint('Retaining ${updatedItems.length} existing manifest items.');
 
-        // Add new items that aren't in the loading plan yet
+        // Add new items that aren't in the manifest yet
         for (final menuItem in _selectedMenuItems) {
           final existingItem = updatedItems.any((item) => item.menuItemId == menuItem.menuItemId);
 
           if (!existingItem) {
             final newItemId = FirebaseFirestore.instance.collection('manifests').doc().id;
-            debugPrint('Adding new loading item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
+            debugPrint('Adding new manifest item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
 
             updatedItems.add(ManifestItem(
               id: newItemId,
               menuItemId: menuItem.menuItemId,
+              name: menuItem.name,
               quantity: menuItem.quantity,
               vehicleId: null,
               loadingStatus: LoadingStatus.unassigned,
@@ -357,17 +359,17 @@ class _EventEditScreenState extends State<EventEditScreen> {
           }
         }
 
-        debugPrint('Updating loading plan with ${updatedItems.length} total items.');
+        debugPrint('Updating manifest with ${updatedItems.length} total items.');
         if (existingPlan != null) {
           final updatedPlan = existingPlan.copyWith(items: updatedItems);
-          await loadingPlanService.updateManifest(updatedPlan);
+          await manifestService.updateManifest(updatedPlan);
         }
       }
 
-      debugPrint('Loading plan management complete.');
+      debugPrint('Manifest management complete.');
     } catch (e) {
-      debugPrint('Error managing loading plan: $e');
-      // We don't want to fail the whole submission if just the loading plan fails
+      debugPrint('Error managing manifest: $e');
+      // We don't want to fail the whole submission if just the manifest fails
       // So we catch the error here and just log it
     }
   }
