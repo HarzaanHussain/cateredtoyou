@@ -1,11 +1,14 @@
 import 'package:cateredtoyou/services/auth_service.dart';
 import 'package:cateredtoyou/services/delivery_route_service.dart'; // Import DeliveryRouteService for delivery route-related operations
 import 'package:cateredtoyou/services/event_service.dart'; // Import EventService for event-related operations
+import 'package:cateredtoyou/services/loading_plan_service.dart';
 import 'package:cateredtoyou/services/menu_item_service.dart'; // Import MenuItemService for menu item-related operations
+import 'package:cateredtoyou/services/notification_service.dart';
 import 'package:cateredtoyou/services/task_automation_service.dart'; // Import TaskAutomationService for task automation operations
 import 'package:cateredtoyou/services/task_service.dart'; // Import TaskService for task-related operations
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth package for Firebase authentication
 import 'package:firebase_core/firebase_core.dart'; // Import Firebase core package for Firebase initialization
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart'; // Import Flutter material package for UI components
 import 'package:provider/provider.dart'; // Import provider package for state management
 import 'package:cateredtoyou/models/auth_model.dart'; // Import AuthModel for authentication state
@@ -47,6 +50,8 @@ void main() async {
   await FirebaseService.initialize(); // Initialize Firebase services
   await FirebaseSecondary
       .initializeSecondary(); // Initialize secondary Firebase app
+  await NotificationService().initNotification();
+
   runApp(const MyApp()); // Run the MyApp widget
 }
 
@@ -59,8 +64,7 @@ class MyApp extends StatelessWidget {
       providers: [
         // Organization service should be first as other services depend on it
         ChangeNotifierProvider(
-          create: (_) =>
-              OrganizationService(), // Provide OrganizationService instance
+          create: (_) => OrganizationService(),
         ),
         Provider<AuthService>(
           create: (_) => AuthService(),
@@ -68,80 +72,73 @@ class MyApp extends StatelessWidget {
         // Staff service depends on OrganizationService
         ChangeNotifierProvider(
           create: (context) => StaffService(
-            context.read<
-                OrganizationService>(), // Provide StaffService instance with OrganizationService dependency
+            context.read<OrganizationService>(),
           ),
         ),
-
+        ChangeNotifierProvider(
+          create: (context) => LoadingPlanService(
+            context.read<OrganizationService>(),
+          ),
+        ),
         // Inventory service depends on OrganizationService
         ChangeNotifierProvider(
           create: (context) => InventoryService(
-            context.read<
-                OrganizationService>(), // Provide InventoryService instance with OrganizationService dependency
+            context.read<OrganizationService>(),
           ),
         ),
         // Vehicle service depends on OrganizationService
         ChangeNotifierProvider(
           create: (context) => VehicleService(
-            context.read<
-                OrganizationService>(), // Provide VehicleService instance with OrganizationService dependency
+            context.read<OrganizationService>(),
           ),
         ),
         // Delivery route service depends on OrganizationService
         ChangeNotifierProvider(
           create: (context) => DeliveryRouteService(
-            context.read<
-                OrganizationService>(), // Provide DeliveryRouteService instance with OrganizationService dependency
+            context.read<OrganizationService>(),
           ),
         ),
         // Role permissions service
         ChangeNotifierProvider(
-          create: (_) => RolePermissions(), // Provide RolePermissions instance
+          create: (_) => RolePermissions(),
         ),
-
         // Auth model should be last as it might depend on other services
         ChangeNotifierProvider(
-          create: (_) => AuthModel(), // Provide AuthModel instance
+          create: (_) => AuthModel(),
         ),
         // Task service depends on OrganizationService
         ChangeNotifierProvider(
           create: (context) => TaskService(
-            context.read<
-                OrganizationService>(), // Provide TaskService instance with OrganizationService dependency
+            context.read<OrganizationService>(),
           ),
         ),
         // Task automation service depends on TaskService
         Provider(
           create: (context) => TaskAutomationService(
-            context.read<
-                TaskService>(), // Provide TaskAutomationService instance with TaskService dependency
+            context.read<TaskService>(),
           ),
         ),
         // Event service depends on OrganizationService and TaskAutomationService
         ChangeNotifierProvider(
           create: (context) => EventService(
-            context.read<
-                OrganizationService>(), // Provide EventService instance with OrganizationService dependency
-            context.read<
-                TaskAutomationService>(), // Provide TaskAutomationService dependency
+            context.read<OrganizationService>(),
+            context.read<TaskAutomationService>(),
           ),
         ),
         // Menu item service depends on OrganizationService
         ChangeNotifierProvider(
           create: (context) => MenuItemService(
-            context.read<
-                OrganizationService>(), // Provide MenuItemService instance with OrganizationService dependency
+            context.read<OrganizationService>(),
           ),
         ),
         // Customer service depends on OrganizationService
         ChangeNotifierProvider(
           create: (context) => CustomerService(
-            context.read<
-                OrganizationService>(), // Provide CustomerService instance with OrganizationService dependency
+            context.read<OrganizationService>(),
           ),
         ),
       ],
-      child: Builder(
+    child: Builder(
         builder: (context) {
           final authModel =
               context.watch<AuthModel>(); // Watch AuthModel for changes
@@ -152,10 +149,12 @@ class MyApp extends StatelessWidget {
             title: 'CateredToYou', // Set the title of the app
             debugShowCheckedModeBanner: false, // Disable debug banner
             theme: ThemeData(
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: Colors.blue, // Set primary color to blue
-                brightness: Brightness.light, // Set brightness to light mode
-              ),
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: Colors.blue, // Set primary color to blue
+                  brightness: Brightness.light, // Set brightness to light mode
+                ),
+              primaryColor: const Color(0xFFFBC72B),
+
               useMaterial3: true, // Use Material 3 design
               inputDecorationTheme: InputDecorationTheme(
                 border: OutlineInputBorder(
@@ -169,6 +168,8 @@ class MyApp extends StatelessWidget {
               ),
               elevatedButtonTheme: ElevatedButtonThemeData(
                 style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFFFFC533), //Button BG color to orange
+                  foregroundColor: Colors.black, // Button text color to black
                   minimumSize: const Size.fromHeight(
                       48), // Set minimum height for buttons
                   shape: RoundedRectangleBorder(

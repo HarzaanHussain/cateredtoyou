@@ -5,6 +5,7 @@ import 'package:flutter/material.dart'; // Flutter framework for building UI.
 import 'package:go_router/go_router.dart'; // Package for navigation.
 import 'package:intl/intl.dart'; // Package for date formatting.
 import 'package:provider/provider.dart'; // Package for state management.
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart'; // Imports bottom toolbar class
 
 /// A stateless widget that displays a list of vehicles.
 class VehicleListScreen extends StatelessWidget {
@@ -13,6 +14,7 @@ class VehicleListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         title: const Text('Fleet Management'), // Title of the screen.
         actions: [
