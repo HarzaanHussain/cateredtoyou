@@ -103,6 +103,17 @@ class HomeScreen extends StatelessWidget {
                                 onTap: () => context.push('/menu-items'),
                               ),
                             ),
+                            const Divider(),
+                            PermissionWidget(
+                              permissionId: 'manage_menu',
+                              child: ListTile(
+                                leading: const Icon(Icons.notifications),
+                                title: const Text('Notifications'),
+                                subtitle: const Text('See all past notifications'),
+                                trailing: const Icon(Icons.arrow_forward_ios),
+                                onTap: () => context.push('/notifications'),
+                              ),
+                            ),
                           ],
                         ),
                       ),
