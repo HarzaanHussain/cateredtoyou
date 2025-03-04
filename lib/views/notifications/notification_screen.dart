@@ -3,6 +3,8 @@ import 'package:cateredtoyou/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
+
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -79,7 +81,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
         _notifications.any((notification) => !notification.isRead);
 
     return Scaffold(
-        appBar: AppBar(
+      bottomNavigationBar: const BottomToolbar(),
+      appBar: AppBar(
           title: const Text('Notifications'),
           actions: [
             if (hasUnread)
