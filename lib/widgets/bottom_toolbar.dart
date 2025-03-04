@@ -2,12 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cateredtoyou/widgets/permission_widget.dart';
 
-// This class is used to place a bottom toolbar into any view easily by adding
-  // 'bottomNavigationBar: const BottomToolbar()'
-// onto the Scaffold portion of the view
-// and using import:
-  // 'import package:cateredtoyou/widgets/bottom_toolbar.dart;'
-
 class BottomToolbar extends StatelessWidget {
   const BottomToolbar({super.key});
 
@@ -40,11 +34,11 @@ class BottomToolbar extends StatelessWidget {
             onPressed: () => context.push('/calendar'),
           ),
           PermissionWidget(
-            permissionId: 'view_inventory',
+            permissionId: 'view_deliveries',
             child: IconButton(
-              icon: const Icon(Icons.inventory, size: 32),
-              tooltip: 'Inventory',
-              onPressed: () => context.push('/inventory'),
+              icon: const Icon(Icons.route, size: 32),
+              tooltip: 'My Deliveries',
+              onPressed: () => context.push('/driver-deliveries'),
             ),
           ),
         ],
