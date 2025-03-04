@@ -246,4 +246,29 @@ class MenuItemService extends ChangeNotifier {
       rethrow; // Rethrow the exception
     }
   }
+
+  Future<MenuItem?> getMenuItemById(String menuItemId) async {
+    try {
+      final currentUser = _auth.currentUser; // Check authenticated user
+      if (currentUser == null) throw 'Not authenticated';
+
+      final organization = await _organizationService.getCurrentUserOrganization(); // Get user's organization
+      if (organization == null) throw 'Organization not found';
+
+      final doc = await _firestore.collection('menu_items').doc(menuItemId).get(); // Fetch menu item document
+
+      if (!doc.exists) return null; // Return null if no such menu item exists
+
+      final data = doc.data();
+      if (data?['organizationId'] != organization.id) {
+        throw 'Menu item does not belong to your organization'; // Ensure the menu item belongs to this user's organization
+      }
+
+      return MenuItem.fromMap(data!, doc.id); // Map the document to a MenuItem object
+    } catch (e) {
+      debugPrint('Error getting menu item by ID: $e');
+      rethrow;
+    }
+  }
+
 }

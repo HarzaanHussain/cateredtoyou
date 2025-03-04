@@ -36,7 +36,8 @@ import 'package:cateredtoyou/views/auth/register_screen.dart'; // Importing Regi
 import 'package:cateredtoyou/views/home/home_screen.dart';
 import 'package:cateredtoyou/views/calendar/calendarscreen.dart';
 
-import '../models/customer_model.dart'; // Importing HomeScreen widget
+import '../models/customer_model.dart';
+import '../views/manifest/manifest_screen.dart'; // Importing HomeScreen widget
 
 class AppRouter {
   final AuthModel authModel; // Declaring a final variable for AuthModel
@@ -45,7 +46,7 @@ class AppRouter {
 
   late final GoRouter router = GoRouter(
     refreshListenable:
-        authModel, // Listening to changes in authModel for refreshing routes
+    authModel, // Listening to changes in authModel for refreshing routes
     debugLogDiagnostics: true, // Enabling debug logs for diagnostics
     initialLocation: '/login', // Setting initial route to '/login'
     routes: [
@@ -53,7 +54,7 @@ class AppRouter {
         path: '/login', // Path for login route
         name: 'login', // Name for login route
         builder: (context, state) =>
-            const LoginScreen(), // Building LoginScreen widget
+        const LoginScreen(), // Building LoginScreen widget
         redirect: (context, state) {
           if (authModel.isAuthenticated) {
             // If user is authenticated
@@ -66,7 +67,7 @@ class AppRouter {
         path: '/register', // Path for register route
         name: 'register', // Name for register route
         builder: (context, state) =>
-            const RegisterScreen(), // Building RegisterScreen widget
+        const RegisterScreen(), // Building RegisterScreen widget
         redirect: (context, state) {
           if (authModel.isAuthenticated) {
             // If user is authenticated
@@ -79,7 +80,7 @@ class AppRouter {
         path: '/home', // Path for home route
         name: 'home', // Name for home route
         builder: (context, state) =>
-            const HomeScreen(), // Building HomeScreen widget
+        const HomeScreen(), // Building HomeScreen widget
         redirect: (context, state) {
           if (!authModel.isAuthenticated) {
             // If user is not authenticated
@@ -91,27 +92,27 @@ class AppRouter {
       GoRoute(
         path: '/staff', // Path for staff list route
         builder: (context, state) =>
-            const StaffListScreen(), // Building StaffListScreen widget
+        const StaffListScreen(), // Building StaffListScreen widget
       ),
       GoRoute(
         path: '/add-staff', // Path for add staff route
         builder: (context, state) =>
-            const AddStaffScreen(), // Building AddStaffScreen widget
+        const AddStaffScreen(), // Building AddStaffScreen widget
       ),
       GoRoute(
         path: '/edit-staff', // Path for edit staff route
         builder: (context, state) {
           final staff =
-              state.extra as UserModel; // Extracting UserModel from state
+          state.extra as UserModel; // Extracting UserModel from state
           return EditStaffScreen(
               staff: staff); // Building EditStaffScreen widget with staff data
         },
       ),
-    GoRoute(
-      path: '/customers',
-      builder: (context, state) =>
-          const CustomerListScreen(),
-    ),
+      GoRoute(
+        path: '/customers',
+        builder: (context, state) =>
+        const CustomerListScreen(),
+      ),
       GoRoute(
         path: '/add_customer',
         builder: (context, state) =>
@@ -124,28 +125,28 @@ class AppRouter {
           return EditCustomerScreen(customer: customer);
         },
       ),
-    GoRoute(
-      path: '/staff/:id/permissions',
-      builder: (context, state) {
-        final user = state.extra as UserModel; // Extracting UserModel from state
-        return UserPermissionsScreen(user: user); // Building UserPermissionsScreen widget with user data
-      },
-    ),
+      GoRoute(
+        path: '/staff/:id/permissions',
+        builder: (context, state) {
+          final user = state.extra as UserModel; // Extracting UserModel from state
+          return UserPermissionsScreen(user: user); // Building UserPermissionsScreen widget with user data
+        },
+      ),
       GoRoute(
         path: '/inventory', // Path for inventory list route
         builder: (context, state) =>
-            const InventoryListScreen(), // Building InventoryListScreen widget
+        const InventoryListScreen(), // Building InventoryListScreen widget
       ),
       GoRoute(
         path: '/add-inventory', // Path for add inventory route
         builder: (context, state) =>
-            const InventoryEditScreen(), // Building InventoryEditScreen widget
+        const InventoryEditScreen(), // Building InventoryEditScreen widget
       ),
       GoRoute(
         path: '/edit-inventory', // Path for edit inventory route
         builder: (context, state) {
           final item = state.extra
-              as InventoryItem; // Extracting InventoryItem from state
+          as InventoryItem; // Extracting InventoryItem from state
           return InventoryEditScreen(
               item: item); // Building InventoryEditScreen widget with item data
         },
@@ -153,7 +154,7 @@ class AppRouter {
       GoRoute(
         path: '/events', // Path for event list route
         builder: (context, state) =>
-            const EventListScreen(), // Building EventListScreen widget
+        const EventListScreen(), // Building EventListScreen widget
         redirect: (context, state) {
           if (!authModel.isAuthenticated) {
             // If user is not authenticated
@@ -165,7 +166,7 @@ class AppRouter {
       GoRoute(
         path: '/add-event', // Path for add event route
         builder: (context, state) =>
-            const EventEditScreen(), // Building EventEditScreen widget
+        const EventEditScreen(), // Building EventEditScreen widget
         redirect: (context, state) {
           if (!authModel.isAuthenticated) {
             // If user is not authenticated
@@ -195,7 +196,7 @@ class AppRouter {
           final event = state.extra as Event; // Extracting Event from state
           return EventDetailsScreen(
               event:
-                  event); // Building EventDetailsScreen widget with event data
+              event); // Building EventDetailsScreen widget with event data
         },
         redirect: (context, state) {
           if (!authModel.isAuthenticated) {
@@ -208,21 +209,21 @@ class AppRouter {
       GoRoute(
         path: '/menu-items', // Path for menu items list route
         builder: (context, state) =>
-            const MenuItemListScreen(), // Building MenuItemListScreen widget
+        const MenuItemListScreen(), // Building MenuItemListScreen widget
       ),
       GoRoute(
         path: '/add-menu-item', // Path for add menu item route
         builder: (context, state) =>
-            const MenuItemEditScreen(), // Building MenuItemEditScreen widget
+        const MenuItemEditScreen(), // Building MenuItemEditScreen widget
       ),
       GoRoute(
         path: '/edit-menu-item', // Path for edit menu item route
         builder: (context, state) {
           final menuItem =
-              state.extra as MenuItem; // Extracting MenuItem from state
+          state.extra as MenuItem; // Extracting MenuItem from state
           return MenuItemEditScreen(
               menuItem:
-                  menuItem); // Building MenuItemEditScreen widget with menuItem data
+              menuItem); // Building MenuItemEditScreen widget with menuItem data
         },
       ),
       GoRoute(
@@ -234,7 +235,7 @@ class AppRouter {
         // Route for tasks list
         path: '/tasks',
         builder: (context, state) =>
-            const TaskListScreen(), // Building TaskListScreen widget
+        const TaskListScreen(), // Building TaskListScreen widget
         redirect: (context, state) {
           // Redirecting to login if not authenticated
           if (!authModel.isAuthenticated) {
@@ -247,7 +248,7 @@ class AppRouter {
         // Route for manage tasks
         path: '/manage-tasks',
         builder: (context, state) =>
-            const ManageTasksScreen(), // Building ManageTasksScreen widget
+        const ManageTasksScreen(), // Building ManageTasksScreen widget
         redirect: (context, state) {
           // Redirecting to login if not authenticated
           if (!authModel.isAuthenticated) {
@@ -259,12 +260,12 @@ class AppRouter {
       GoRoute(
         path: '/vehicles', // Path for vehicle list route
         builder: (context, state) =>
-            const VehicleListScreen(), // Building VehicleListScreen widget
+        const VehicleListScreen(), // Building VehicleListScreen widget
       ),
       GoRoute(
         path: '/add-vehicle', // Path for add vehicle route
         builder: (context, state) =>
-            const VehicleFormScreen(), // Building VehicleFormScreen widget
+        const VehicleFormScreen(), // Building VehicleFormScreen widget
       ),
       GoRoute(
         path: '/edit-vehicle', // Path for edit vehicle route
@@ -293,25 +294,36 @@ class AppRouter {
       GoRoute(
         path: '/deliveries', // Path for deliveries list route
         builder: (context, state) =>
-            const DeliveryListScreen(), // Building DeliveryListScreen widget
+        const DeliveryListScreen(), // Building DeliveryListScreen widget
       ),
       GoRoute(
         path: '/add-delivery', // Path for add delivery route
         builder: (context, state) =>
-            const DeliveryFormScreen(), // Building DeliveryFormScreen widget
+        const DeliveryFormScreen(), // Building DeliveryFormScreen widget
       ),
       GoRoute(
         path: '/driver-deliveries', // Path for driver deliveries route
         builder: (context, state) =>
-            const DriverDeliveriesScreen(), // Building DriverDeliveriesScreen widget
+        const DriverDeliveriesScreen(), // Building DriverDeliveriesScreen widget
       ),
-    GoRoute(
-  path: '/calendar',
-  builder: (context, state) => const CalendarScreen(),
-),
-
+      GoRoute(
+        path: '/calendar',
+        builder: (context, state) => const CalendarScreen(),
+      ),
+      // Add the new route for the manifest screen
+      GoRoute(
+        path: '/manifest',
+        builder: (context, state) => const ManifestScreen(),
+        redirect: (context, state) {
+          // Redirecting to login if not authenticated
+          if (!authModel.isAuthenticated) {
+            return '/login';
+          }
+          return null;
+        },
+      ),
     ],
-    
+
     errorBuilder: (context, state) => Material(
       child: Center(
         child: Text('Error: ${state.error}'), // Displaying error message
