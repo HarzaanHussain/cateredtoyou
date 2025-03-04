@@ -18,6 +18,7 @@ import 'package:cateredtoyou/views/inventory/inventory_edit_screen.dart'; // Imp
 import 'package:cateredtoyou/views/inventory/inventory_list_screen.dart'; // Importing InventoryListScreen widget
 import 'package:cateredtoyou/views/menu_item/menu_item_edit_screen.dart'; // Importing MenuItemEditScreen widget
 import 'package:cateredtoyou/views/menu_item/menu_item_list_screen.dart'; // Importing MenuItemListScreen widget
+import 'package:cateredtoyou/views/notifications/notification_screen.dart';
 import 'package:cateredtoyou/views/staff/add_staff_screen.dart'; // Importing AddStaffScreen widget
 import 'package:cateredtoyou/views/staff/edit_staff_screen.dart'; // Importing EditStaffScreen widget
 import 'package:cateredtoyou/views/staff/staff_list_screen.dart'; // Importing StaffListScreen widget
@@ -224,6 +225,11 @@ class AppRouter {
               menuItem:
               menuItem); // Building MenuItemEditScreen widget with menuItem data
         },
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => 
+          const NotificationScreen(),
       ),
       GoRoute(
         // Route for tasks list
