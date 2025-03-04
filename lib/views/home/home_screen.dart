@@ -144,7 +144,7 @@ class HomeScreen extends StatelessWidget {
               FutureBuilder<bool>(
                 future: Future.wait([
                   rolePermissions.hasPermission('manage_vehicles'),
-                  rolePermissions.hasPermission('view_deliveries')
+                  rolePermissions.hasPermission('manage_deliveries')
                 ]).then((permissions) => permissions.any((p) => p)),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData || !snapshot.data!) {
@@ -182,17 +182,6 @@ class HomeScreen extends StatelessWidget {
                                   ],
                                 ),
                                 onTap: () => context.push('/vehicles'),
-                              ),
-                            ),
-                            const Divider(),
-                            PermissionWidget(
-                              permissionId: 'view_deliveries',
-                              child: ListTile(
-                                leading: const Icon(Icons.route),
-                                title: const Text('My Deliveries'),
-                                subtitle: const Text('View assigned routes and deliveries'),
-                                trailing: const Icon(Icons.arrow_forward_ios),
-                                onTap: () => context.push('/driver-deliveries'),
                               ),
                             ),
                             const Divider(),
