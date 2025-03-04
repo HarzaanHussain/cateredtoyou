@@ -53,7 +53,6 @@ class HomeScreen extends StatelessWidget {
               // Management Section
               FutureBuilder<bool>(
                 future: Future.wait([
-                  rolePermissions.hasPermission('manage_staff'),
                   rolePermissions.hasPermission('view_customers'),
                   rolePermissions.hasPermission('manage_menu'),
                   rolePermissions.hasPermission('manage_manifest'),
@@ -76,17 +75,6 @@ class HomeScreen extends StatelessWidget {
                       Card(
                         child: Column(
                           children: [
-                            PermissionWidget(
-                              permissionId: 'manage_staff',
-                              child: ListTile(
-                                leading: const Icon(Icons.people),
-                                title: const Text('Staff Management'),
-                                subtitle: const Text('Manage staff members and roles'),
-                                trailing: const Icon(Icons.arrow_forward_ios),
-                                onTap: () => context.push('/staff'),
-                              ),
-                            ),
-                            const Divider(),
                             PermissionWidget(
                               permissionId: 'view_customers',
                               child: ListTile(
