@@ -52,7 +52,10 @@ class HomeScreen extends StatelessWidget {
 
               // Management Section
               FutureBuilder<bool>(
-                future: rolePermissions.hasPermission('manage_staff'),
+                future: Future.wait([
+                  rolePermissions.hasPermission('view_customers'),
+                  rolePermissions.hasPermission('manage_manifest'),
+                ]).then((permissions) => permissions.any((p) => p)),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData || !snapshot.data!) {
                     return const SizedBox.shrink();
@@ -72,17 +75,6 @@ class HomeScreen extends StatelessWidget {
                         child: Column(
                           children: [
                             PermissionWidget(
-                              permissionId: 'manage_staff',
-                              child: ListTile(
-                                leading: const Icon(Icons.people),
-                                title: const Text('Staff Management'),
-                                subtitle: const Text('Manage staff members and roles'),
-                                trailing: const Icon(Icons.arrow_forward_ios),
-                                onTap: () => context.push('/staff'),
-                              ),
-                            ),
-                            const Divider(),
-                            PermissionWidget(
                               permissionId: 'view_customers',
                               child: ListTile(
                                 leading: const Icon(Icons.handshake),
@@ -96,11 +88,11 @@ class HomeScreen extends StatelessWidget {
                             PermissionWidget(
                               permissionId: 'manage_menu',
                               child: ListTile(
-                                leading: const Icon(Icons.restaurant_menu),
-                                title: const Text('Menu Management'),
-                                subtitle: const Text('Manage menu items and recipes'),
+                                leading: const Icon(Icons.list_alt),
+                                title: const Text('Manifest Management'),
+                                subtitle: const Text('Create and manage load manifests'),
                                 trailing: const Icon(Icons.arrow_forward_ios),
-                                onTap: () => context.push('/menu-items'),
+                                onTap: () => context.push('/manifest'),
                               ),
                             ),
                           ],
@@ -117,7 +109,7 @@ class HomeScreen extends StatelessWidget {
               FutureBuilder<bool>(
                 future: Future.wait([
                   rolePermissions.hasPermission('manage_vehicles'),
-                  rolePermissions.hasPermission('view_deliveries')
+                  rolePermissions.hasPermission('manage_deliveries')
                 ]).then((permissions) => permissions.any((p) => p)),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData || !snapshot.data!) {
@@ -155,17 +147,6 @@ class HomeScreen extends StatelessWidget {
                                   ],
                                 ),
                                 onTap: () => context.push('/vehicles'),
-                              ),
-                            ),
-                            const Divider(),
-                            PermissionWidget(
-                              permissionId: 'view_deliveries',
-                              child: ListTile(
-                                leading: const Icon(Icons.route),
-                                title: const Text('My Deliveries'),
-                                subtitle: const Text('View assigned routes and deliveries'),
-                                trailing: const Icon(Icons.arrow_forward_ios),
-                                onTap: () => context.push('/driver-deliveries'),
                               ),
                             ),
                             const Divider(),
