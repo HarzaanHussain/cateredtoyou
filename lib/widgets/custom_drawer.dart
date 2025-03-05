@@ -44,6 +44,8 @@ class CustomDrawer extends StatelessWidget {
             ),
           ),
 
+
+
           // Inventory Section
           PermissionWidget(
             permissionId: 'manage_inventory',
@@ -79,6 +81,7 @@ class CustomDrawer extends StatelessWidget {
               onTap: () => context.push('/tasks'),
             ),
           ),
+
           // Vehicle Loading System Section
           PermissionWidget(
             permissionId: 'manage_manifest',
@@ -90,6 +93,18 @@ class CustomDrawer extends StatelessWidget {
               onTap: () => context.push('/manifest'),
             ),
           ),
+          // Menu Management Section
+          PermissionWidget(
+            permissionId: 'manage_menu',
+            child: ListTile(
+              leading: const Icon(Icons.restaurant_menu),
+              title: const Text('Menu Management'),
+              subtitle: const Text('Manage menu items and recipes'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () => context.push('/menu-items'),
+            ),
+          ),
+
 
           const Spacer(),
         ],

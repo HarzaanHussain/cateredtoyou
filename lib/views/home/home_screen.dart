@@ -54,7 +54,6 @@ class HomeScreen extends StatelessWidget {
               FutureBuilder<bool>(
                 future: Future.wait([
                   rolePermissions.hasPermission('view_customers'),
-                  rolePermissions.hasPermission('manage_menu'),
                   rolePermissions.hasPermission('manage_manifest'),
                 ]).then((permissions) => permissions.any((p) => p)),
                 builder: (context, snapshot) {
@@ -83,17 +82,6 @@ class HomeScreen extends StatelessWidget {
                                 subtitle: const Text('View and edit customer information'),
                                 trailing: const Icon(Icons.arrow_forward_ios),
                                 onTap: () => context.push('/customers'),
-                              ),
-                            ),
-                            const Divider(),
-                            PermissionWidget(
-                              permissionId: 'manage_menu',
-                              child: ListTile(
-                                leading: const Icon(Icons.restaurant_menu),
-                                title: const Text('Menu Management'),
-                                subtitle: const Text('Manage menu items and recipes'),
-                                trailing: const Icon(Icons.arrow_forward_ios),
-                                onTap: () => context.push('/menu-items'),
                               ),
                             ),
                             const Divider(),
