@@ -148,7 +148,7 @@ class MapMarkerHelper {
                   borderRadius: BorderRadius.circular(4), // Adding rounded corners to the title container
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2), // Adding a shadow to the title container
+                      color: Colors.black.withAlpha((0.2 * 255).toInt()), // Adding a shadow to the title container
                       blurRadius: 4, // Setting the blur radius of the shadow
                     ),
                   ],

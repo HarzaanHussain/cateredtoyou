@@ -297,7 +297,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
                   angle: (_currentRoute!.currentHeading ?? 0) * (3.14159 / 180),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.2),
+                      color: Colors.blue.withAlpha((0.2 * 255).toInt()),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(

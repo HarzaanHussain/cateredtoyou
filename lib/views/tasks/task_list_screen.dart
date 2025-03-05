@@ -190,7 +190,7 @@ class _TaskListState extends State<_TaskList> {
         color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
+            color: Colors.grey.withAlpha((0.2 * 255).toInt()),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -247,8 +247,8 @@ class _TaskListState extends State<_TaskList> {
                           _selectedPriority = selected ? priority : null; // Sets the selected priority.
                         });
                       },
-                      backgroundColor: _getPriorityColor(priority).withOpacity(0.1), // Background color for the chip.
-                      selectedColor: _getPriorityColor(priority).withOpacity(0.2), // Selected color for the chip.
+                      backgroundColor: _getPriorityColor(priority).withAlpha((0.1 * 255).toInt()), // Background color for the chip.
+                      selectedColor: _getPriorityColor(priority).withAlpha((0.2 * 255).toInt()), // Selected color for the chip.
                       labelStyle: TextStyle(
                         color: _selectedPriority == priority
                             ? _getPriorityColor(priority)
@@ -434,7 +434,7 @@ class TaskCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), // Padding inside the container.
       decoration: BoxDecoration(
-        color: _getPriorityColor().withOpacity(0.1), // Background color based on priority.
+        color: _getPriorityColor().withAlpha((0.1 * 255).toInt()), // Background color based on priority.
         borderRadius: BorderRadius.circular(12), // Rounded corners for the container.
       ),
       child: Row(
@@ -490,7 +490,7 @@ class TaskCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), // Padding inside the container.
       decoration: BoxDecoration(
-        color: _getStatusColor().withOpacity(0.1), // Background color based on status.
+        color: _getStatusColor().withAlpha((0.1 * 255).toInt()), // Background color based on status.
         borderRadius: BorderRadius.circular(12), // Rounded corners for the container.
       ),
       child: Row(

@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart'; // Imports bottom toolbar class
 
 class CalendarScreen extends StatefulWidget {
-  const CalendarScreen({Key? key}) : super(key: key);
+  const CalendarScreen({super.key});
 
   @override
   _CalendarScreenState createState() => _CalendarScreenState();
