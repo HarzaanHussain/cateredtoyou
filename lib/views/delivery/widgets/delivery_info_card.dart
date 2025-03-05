@@ -137,7 +137,7 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
         Container(
           padding: const EdgeInsets.all(8), // Padding for the icon container
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1), // Background color with opacity
+            color: color.withAlpha((0.1 * 255).toInt()), // Background color with opacity
             borderRadius: BorderRadius.circular(8), // Border radius
           ),
           child: Icon(icon, color: color, size: 20), // Icon
@@ -280,7 +280,7 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1), // Shadow color
+            color: Colors.black.withAlpha((0.1 * 255).toInt()), // Shadow color
             blurRadius: 10, // Blur radius
             offset: const Offset(0, -5), // Offset
           ),
@@ -295,7 +295,7 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
               height: 4, // Height of the handle
               margin: const EdgeInsets.only(bottom: 16), // Margin for the handle
               decoration: BoxDecoration(
-                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4), // Handle color
+                color: theme.colorScheme.onSurfaceVariant.withAlpha((0.4 * 255).toInt()), // Handle color
                 borderRadius: BorderRadius.circular(2), // Border radius
               ),
             ),

@@ -610,7 +610,7 @@ class EventDetailsScreen extends StatelessWidget {
                                             Icons.restaurant,
                                             size: 20,
                                             color: theme.colorScheme.primary
-                                                .withOpacity(0.7),
+                                                .withAlpha((0.7 * 255).toInt()),
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
@@ -638,7 +638,7 @@ class EventDetailsScreen extends StatelessWidget {
                                                   ),
                                                   backgroundColor: theme
                                                       .colorScheme.primary
-                                                      .withOpacity(0.1),
+                                                      .withAlpha((0.1 * 255).toInt()),
                                                 ))
                                             .toList(),
                                       ),
@@ -655,7 +655,7 @@ class EventDetailsScreen extends StatelessWidget {
                                             Icons.hardware,
                                             size: 20,
                                             color: theme.colorScheme.primary
-                                                .withOpacity(0.7),
+                                                .withAlpha((0.7 * 255).toInt()),
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
@@ -683,7 +683,7 @@ class EventDetailsScreen extends StatelessWidget {
                                                   ),
                                                   backgroundColor: theme
                                                       .colorScheme.primary
-                                                      .withOpacity(0.1),
+                                                      .withAlpha((0.1 * 255).toInt()),
                                                 ))
                                             .toList(),
                                       ),
@@ -699,7 +699,7 @@ class EventDetailsScreen extends StatelessWidget {
                                             Icons.local_bar,
                                             size: 20,
                                             color: theme.colorScheme.primary
-                                                .withOpacity(0.7),
+                                                .withAlpha((0.7 * 255).toInt()),
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
@@ -719,7 +719,7 @@ class EventDetailsScreen extends StatelessWidget {
                                         ),
                                         decoration: BoxDecoration(
                                           color: theme.colorScheme.primary
-                                              .withOpacity(0.1),
+                                              .withAlpha((0.1 * 255).toInt()),
                                           borderRadius:
                                               BorderRadius.circular(4),
                                         ),
@@ -741,7 +741,7 @@ class EventDetailsScreen extends StatelessWidget {
                                             Icons.more_horiz,
                                             size: 20,
                                             color: theme.colorScheme.primary
-                                                .withOpacity(0.7),
+                                                .withAlpha((0.7 * 255).toInt()),
                                           ),
                                           const SizedBox(width: 8),
                                           Text(

@@ -138,7 +138,7 @@ class DriverDeliveriesScreen extends StatelessWidget {
           Icon(
             icon,
             size: 64,
-            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5), // Icon color with opacity
+            color: theme.colorScheme.onSurfaceVariant.withAlpha((0.5 * 255).toInt()), // Icon color with opacity
           ),
           const SizedBox(height: 16), // Spacing
           Text(

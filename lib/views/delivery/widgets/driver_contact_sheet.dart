@@ -57,7 +57,7 @@ class DriverContactSheet extends StatelessWidget { // Defining a stateless widge
                 height: 4, // Height of the handle
                 margin: const EdgeInsets.only(bottom: 24), // Margin below the handle
                 decoration: BoxDecoration( // Decoration for the handle
-                  color: theme.colorScheme.onSurfaceVariant.withOpacity(0.4), // Color with opacity
+                  color: theme.colorScheme.onSurfaceVariant.withAlpha((0.4 * 255).toInt()), // Color with alpha
                   borderRadius: BorderRadius.circular(2), // Rounded corners
                 ),
               ),

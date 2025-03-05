@@ -306,7 +306,7 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4), // Handle color.
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha((0.4 * 255).toInt()), // Handle color.
                   borderRadius: BorderRadius.circular(2), // Rounded handle.
                 ),
               ),
@@ -640,7 +640,7 @@ Widget _buildMapSection() {
           if (_isLoading)
             Positioned.fill(
               child: Container(
-                color: Colors.black.withOpacity(0.3), // Set the overlay color.
+                color: Colors.black.withAlpha((0.3 * 255).toInt()), // Set the overlay color.
                 child: const Center(
                   child: CircularProgressIndicator(), // Show a loading indicator.
                 ),

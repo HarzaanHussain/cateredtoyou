@@ -232,7 +232,7 @@ class DeliveryRouteCard extends StatelessWidget {
         textColor = Colors.grey.shade700;
         break;
       case 'in_progress':
-        backgroundColor = theme.colorScheme.primary.withOpacity(0.1);
+        backgroundColor = theme.colorScheme.primary.withAlpha((0.1 * 255).toInt());
         textColor = theme.colorScheme.primary;
         break;
       case 'completed':

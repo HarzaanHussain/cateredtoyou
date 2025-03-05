@@ -352,7 +352,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             .cardColor, // Sets the background color from the theme.
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.2), // Adds a shadow effect.
+            color: Colors.grey.withAlpha((0.2 * 255).toInt()), // Adds a shadow effect.
             blurRadius: 4, // Sets the blur radius for the shadow.
             offset: const Offset(0, -2), // Sets the shadow offset.
           ),
@@ -431,7 +431,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: _getPriorityColor(priority).withOpacity(0.1),
+        color: _getPriorityColor(priority).withAlpha((0.1 * 255).toInt()),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: _getPriorityColor(priority),
@@ -466,7 +466,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: _getStatusColor(status).withOpacity(0.1),
+        color: _getStatusColor(status).withAlpha((0.1 * 255).toInt()),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: _getStatusColor(status),

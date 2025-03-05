@@ -19,7 +19,7 @@ class StatusChip extends StatelessWidget { // Defining a stateless widget called
         color: backgroundColor, // Setting the background color.
         borderRadius: BorderRadius.circular(16), // Making the corners rounded.
         border: Border.all( // Adding a border around the container.
-          color: textColor.withOpacity(0.2), // Setting the border color with some opacity.
+          color: textColor.withAlpha((0.2 * 255).toInt()), // Setting the border color with some opacity.
         ),
       ),
       child: Row( // Using a Row widget to arrange children horizontally.
