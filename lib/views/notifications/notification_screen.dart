@@ -2,6 +2,7 @@ import 'package:cateredtoyou/models/notification_model.dart';
 import 'package:cateredtoyou/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 
@@ -75,6 +76,61 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
+  Widget _buildPayloadInfo(String? payload) {
+    if (payload == null || payload.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    // Parse the payload
+    final pairs = payload.split(';');
+    final payloadItems = <Widget>[];
+    
+    for (final pair in pairs) {
+      final parts = pair.split(':');
+      if (parts.length == 2) {
+        final key = parts[0].trim();
+        final value = parts[1].trim();
+        
+        // Format the key-value pair
+        payloadItems.add(
+          RichText(
+            text: TextSpan(
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              children: [
+                TextSpan(
+                  text: key,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const TextSpan(text: ': '),
+                TextSpan(text: value),
+              ],
+            ),
+          ),
+        );
+      }
+    }
+    
+    if (payloadItems.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(),
+        const Text(
+          'Notification Data:',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 4),
+        ...payloadItems,
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasUnread =
@@ -97,6 +153,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
               onPressed:
                   _notifications.isEmpty ? null : _deleteAllNotificaitons,
             ),
+            IconButton(
+              icon: const Icon(Icons.add),
+              tooltip: 'Add Notification',
+              onPressed: () => context.push('/add_notification'),
+            )
           ],
         ),
         body: _isLoading
@@ -160,6 +221,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                     color: Colors.grey.shade600,
                                   ),
                                 ),
+                                if (notification.payload != null && notification.payload!.contains('screen:'))
+                                  Text(
+                                    '📱 Tappable: Opens a screen',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue.shade600,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
                               ],
                             ),
                             isThreeLine: true,
@@ -198,13 +268,25 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                           Text(
                                             'Scheduled for: ${dateFormat.format(notification.scheduledTime!)}',
                                             style: const TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.grey),
-                                          )
+                                                fontSize: 14, color: Colors.grey),
+                                          ),
+                                        
+                                        // Display payload information if available
+                                        if (notification.payload != null && notification.payload!.isNotEmpty)
+                                          _buildPayloadInfo(notification.payload),
                                       ],
                                     ),
                                   ),
                                   actions: [
+                                    if (notification.payload != null && notification.payload!.contains('screen:'))
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.pop(context);
+                                          // Handle the navigation based on payload
+                                          _notificationService.handleNotificationPayload(notification.payload!, context);
+                                        },
+                                        child: const Text('GO TO SCREEN'),
+                                      ),
                                     TextButton(
                                       onPressed: () => Navigator.pop(context),
                                       child: const Text('CLOSE'),

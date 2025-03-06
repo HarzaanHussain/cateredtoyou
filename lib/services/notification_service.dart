@@ -1,9 +1,13 @@
 import 'package:cateredtoyou/models/notification_model.dart';
 import 'package:cateredtoyou/utils/notification_storage.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:go_router/go_router.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz;
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -47,11 +51,11 @@ class NotificationService {
     print('Android notification permission granted: $permissionGranted');
 
     // Define the callback for when a notification is tapped
-    final onDidReceiveLocalNotification =
-        (int id, String? title, String? body, String? payload) {
-      print('Notification tapped: $id, $title, $body, $payload');
-      // handle tap here or payload to navigate to specific view
-    };
+    // final onDidReceiveLocalNotification =
+    //     (int id, String? title, String? body, String? payload) {
+    //   print('Notification tapped: $id, $title, $body, $payload');
+    //   // handle tap here or payload to navigate to specific view
+    // };
 
     //android settings
     const initSettingsAndroid =
@@ -60,10 +64,67 @@ class NotificationService {
       android: initSettingsAndroid,
     );
 
-    await notificationsPlugin.initialize(initSettings);
+    await notificationsPlugin.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response){
+        print('Notification tapped: ${response.id}, payload: ${response.payload}');
+        if(response.payload !=null && response.payload!.isNotEmpty){
+          Future.delayed(const Duration(milliseconds: 500), () {
+            final context = navigatorKey.currentContext;
+            if(context != null){
+              handleNotificationPayload(response.payload!, context);
+            }
+          }) ;
+        }
+      }
+    );
 
     _isInitialized = true;
     print("Notifications Initialized");
+  }
+
+  void handleNotificationPayload(String payload, BuildContext context){
+    try{
+      final Map<String, String> payloadData = _parsePayload(payload);
+
+      if(payloadData.containsKey('screen')){
+        final screen = payloadData['screen'];
+
+        switch(screen){
+          case 'home':
+            GoRouter.of(context).go('/home');
+            break;
+          case 'events':
+            GoRouter.of(context).go('/events');
+            break;
+          case 'staff':
+            GoRouter.of(context).go('/staff');
+            break;
+          case 'inventory':
+            GoRouter.of(context).go('/inventory');
+            break;
+          case 'menu-items':
+            GoRouter.of(context).go('/menu-items');
+            break;
+          default:
+            print('Unknown screen in payload: $screen');
+        }
+      }
+    } catch (e) {
+      print('Error handling notification payload: $e');
+    }
+  }
+
+  Map<String, String> _parsePayload(String payload){
+    final Map<String, String> result = {};
+    final pairs = payload.split(';');
+    for(final pair in pairs){
+      final keyValue = pair.split(':');
+      if(keyValue.length == 2){
+        result[keyValue[0].trim()] = keyValue[1].trim();
+      }
+    }
+    return result;
   }
 
   //NOTIFICATION DETAILS
@@ -99,10 +160,12 @@ class NotificationService {
 
     //saving the notification to storage
     final notification = AppNotification(
-        id: notificationId,
-        title: title ?? 'New Notification',
-        body: body ?? '',
-        timestamp: DateTime.now());
+      id: notificationId,
+      title: title ?? 'New Notification',
+      body: body ?? '',
+      timestamp: DateTime.now(),
+      payload: payload,
+    );
 
     await NotificationStorage.addNotification(notification);
   }
@@ -122,11 +185,13 @@ class NotificationService {
     tz.TZDateTime scheduledDate = tz.TZDateTime.from(scheduledTime, tz.local);
 
     final notification = AppNotification(
-        id: notificationId,
-        title: title,
-        body: body,
-        timestamp: DateTime.now(),
-        scheduledTime: scheduledTime);
+      id: notificationId,
+      title: title,
+      body: body,
+      timestamp: DateTime.now(),
+      scheduledTime: scheduledTime,
+      payload: payload,
+    );
 
     await NotificationStorage.addNotification(notification);
 
