@@ -1,214 +1,155 @@
-import 'package:cateredtoyou/services/auth_service.dart'; // Importing the authentication service
-import 'package:flutter/material.dart'; // Importing Flutter material package for UI components
-import 'package:provider/provider.dart'; // Importing provider for state management
-import 'package:go_router/go_router.dart'; // Importing go_router for navigation
-import 'package:cateredtoyou/models/auth_model.dart'; // Importing the authentication model
-import 'package:cateredtoyou/widgets/custom_button.dart'; // Importing custom button widget
-import 'package:cateredtoyou/widgets/custom_text_field.dart'; // Importing custom text field widget
-import 'package:cateredtoyou/utils/validators.dart'; // Importing validators for form validation
+import 'package:cateredtoyou/services/auth_service.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:cateredtoyou/models/auth_model.dart';
+import 'package:cateredtoyou/widgets/custom_button.dart';
+import 'package:cateredtoyou/widgets/custom_text_field.dart';
+import 'package:cateredtoyou/utils/validators.dart';
 
-/// LoginScreen is a stateful widget that represents the login screen.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key}); // Constructor for LoginScreen
+  const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState(); // Creates the mutable state for this widget
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-/// _LoginScreenState is the state class for LoginScreen.
 class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>(); // Key to identify the form
-  final _emailController = TextEditingController(); // Controller for email input
-  final _passwordController = TextEditingController(); // Controller for password input
-  bool _isPasswordVisible = false; // State to manage password visibility
-  bool _isLoading = false; // State to manage loading indicator for login
-  bool _isForgotPasswordLoading = false; // State to manage loading indicator for forgot password
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isPasswordVisible = false;
+  bool _isLoading = false;
+  bool _isForgotPasswordLoading = false;
 
   @override
   void dispose() {
-    _emailController.dispose(); // Dispose email controller when widget is removed
-    _passwordController.dispose(); // Dispose password controller when widget is removed
-    super.dispose(); // Call the dispose method of the superclass
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
-  /// Handles the login process.
-  Future<void> _handleLogin() async {
-    if (_formKey.currentState?.validate() ?? false) { // Validate the form
-      setState(() {
-        _isLoading = true; // Show loading indicator
-      });
+  String _sanitizeInput(String input) {
+    return input.trim().replaceAll(RegExp(r'[^a-zA-Z0-9@._-]'), '');
+  }
 
+  Future<void> _handleLogin() async {
+    if (_formKey.currentState?.validate() ?? false) {
+      setState(() => _isLoading = true);
       try {
-        final authModel = context.read<AuthModel>(); // Read the authentication model from the context
-        final success = await authModel.signIn(
-          _emailController.text.trim(), // Get the trimmed email
-          _passwordController.text, // Get the password
-        );
+        final email = _sanitizeInput(_emailController.text);
+        final password = _passwordController.text.trim();
+
+        if (email.isEmpty || password.isEmpty) {
+          throw Exception('Email and password cannot be empty.');
+        }
+
+        final authModel = context.read<AuthModel>();
+        final success = await authModel.signIn(email, password);
 
         if (success && mounted) {
-          context.go('/home'); // Navigate to home screen on successful login
+          context.go('/home');
+        } else {
+          throw Exception('Invalid email or password.');
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content:
-                  Text('An error occurred during login. Please try again.'), // Show error message
-              duration: Duration(seconds: 4), // Duration of the snackbar
-              backgroundColor: Colors.red, // Background color of the snackbar
-            ),
-          );
+          showSnackBar(e.toString(), Colors.red);
         }
       } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false; // Hide loading indicator
-          });
-        }
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
 
-  /// Shows a snackbar with a given message and background color.
-  void showSnackBar(String message, Color backgroundColor,
-      {Duration duration = const Duration(seconds: 4)}) {
-    debugPrint('Showing SnackBar: $message'); // Debug print for showing snackbar
+  void showSnackBar(String message, Color backgroundColor) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message), // Message to be shown in the snackbar
-        duration: duration, // Duration of the snackbar
-        backgroundColor: backgroundColor, // Background color of the snackbar
+        content: Text(message),
+        backgroundColor: backgroundColor,
       ),
     );
   }
 
-  /// Handles the forgot password process.
   Future<void> _handleForgotPassword() async {
-    final email = _emailController.text.trim(); // Get the trimmed email
+    final email = _sanitizeInput(_emailController.text);
     if (email.isEmpty) {
-      showSnackBar(
-        'Please enter the email address associated with your client account', // Show error if email is empty
-        Colors.red,
-      );
+      showSnackBar('Please enter a valid email address.', Colors.red);
       return;
     }
 
-    setState(() => _isForgotPasswordLoading = true); // Show loading indicator
-
+    setState(() => _isForgotPasswordLoading = true);
     try {
-      final authService = AuthService(); // Create an instance of AuthService
-      final result = await authService.resetPassword(email); // Call resetPassword method
+      final authService = AuthService();
+      final result = await authService.resetPassword(email);
 
       if (result.success) {
-        showSnackBar(
-          'Password Reset Email Sent to $email\n\n'
-          'Please check your email inbox and click the link to reset your password. '
-          'If you don\'t see the email, please check your spam folder.', // Show success message
-          Colors.green,
-          duration: const Duration(seconds: 8), // Duration of the snackbar
-        );
+        showSnackBar('Password reset email sent.', Colors.green);
       } else {
-        showSnackBar(
-          result.error ?? 'Failed to send reset email. Please try again later.', // Show error message
-          Colors.red,
-        );
+        throw Exception(result.error ?? 'Failed to send reset email.');
       }
     } catch (e) {
-      showSnackBar(
-        'An unexpected error occurred. Please try again or contact support if the problem continues.', // Show unexpected error message
-        Colors.red,
-      );
+      showSnackBar(e.toString(), Colors.red);
     } finally {
-      setState(() => _isForgotPasswordLoading = false); // Hide loading indicator
+      setState(() => _isForgotPasswordLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authModel = context.watch<AuthModel>(); // Watch the authentication model for changes
-
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0), // Padding for the scroll view
+          padding: const EdgeInsets.all(24.0),
           child: Form(
-            key: _formKey, // Assign the form key
+            key: _formKey,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center, // Center the column vertically
-              crossAxisAlignment: CrossAxisAlignment.stretch, // Stretch the column horizontally
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Welcome Back', // Welcome message
-                  style: TextStyle(
-                    fontSize: 28, // Font size
-                    fontWeight: FontWeight.bold, // Font weight
-                  ),
-                  textAlign: TextAlign.center, // Center align the text
-                ),
-                const SizedBox(height: 32), // Spacing
+                const Text('Welcome Back',
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 32),
                 CustomTextField(
-                  controller: _emailController, // Controller for email input
-                  label: 'Email', // Label for the text field
-                  prefixIcon: Icons.email, // Prefix icon for the text field
-                  keyboardType: TextInputType.emailAddress, // Keyboard type for email input
-                  validator: Validators.validateEmail, // Validator for email input
+                  controller: _emailController,
+                  label: 'Email',
+                  prefixIcon: Icons.email,
+                  keyboardType: TextInputType.emailAddress,
+                  validator: Validators.validateEmail,
                 ),
-                const SizedBox(height: 16), // Spacing
+                const SizedBox(height: 16),
                 CustomTextField(
-                  controller: _passwordController, // Controller for password input
-                  label: 'Password', // Label for the text field
-                  prefixIcon: Icons.lock, // Prefix icon for the text field
-                  obscureText: !_isPasswordVisible, // Obscure text for password input
+                  controller: _passwordController,
+                  label: 'Password',
+                  prefixIcon: Icons.lock,
+                  obscureText: !_isPasswordVisible,
                   suffixIcon: IconButton(
-                    icon: Icon(
-                      _isPasswordVisible
-                          ? Icons.visibility_off
-                          : Icons.visibility, // Toggle visibility icon
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isPasswordVisible = !_isPasswordVisible; // Toggle password visibility
-                      });
-                    },
+                    icon: Icon(_isPasswordVisible
+                        ? Icons.visibility_off
+                        : Icons.visibility),
+                    onPressed: () => setState(() {
+                      _isPasswordVisible = !_isPasswordVisible;
+                    }),
                   ),
-                  validator: Validators.validatePassword, // Validator for password input
+                  validator: Validators.validatePassword,
                 ),
-                const SizedBox(height: 24), // Spacing
-                if (authModel.error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16), // Padding for error message
-                    child: Text(
-                      authModel.error!, // Display error message
-                      style: const TextStyle(
-                        color: Colors.red, // Text color
-                        fontSize: 14, // Font size
-                      ),
-                      textAlign: TextAlign.center, // Center align the text
-                    ),
-                  ),
+                const SizedBox(height: 24),
                 CustomButton(
-                  label: 'Login', // Label for the button
-                  onPressed: _isLoading ? null : _handleLogin, // Disable button if loading
-                  isLoading: _isLoading, // Show loading indicator if loading
+                  label: 'Login',
+                  onPressed: _isLoading ? null : _handleLogin,
+                  isLoading: _isLoading,
                 ),
-                const SizedBox(height: 16), // Spacing
+                const SizedBox(height: 16),
                 TextButton(
-                  onPressed:
-                      _isForgotPasswordLoading ? null : _handleForgotPassword, // Disable button if loading
+                  onPressed: _isForgotPasswordLoading ? null : _handleForgotPassword,
                   child: _isForgotPasswordLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2), // Show loading indicator
-                        )
-                      : const Text('Forgot Password?'), // Forgot password text
+                      ? const CircularProgressIndicator(strokeWidth: 2)
+                      : const Text('Forgot Password?'),
                 ),
-                const SizedBox(height: 16), // Spacing
+                const SizedBox(height: 16),
                 TextButton(
-                  onPressed: () {
-                    context.push('/register'); // Navigate to register screen
-                  },
-                  child: const Text('Don\'t have an account? Register'), // Register text
+                  onPressed: () => context.push('/register'),
+                  child: const Text("Don't have an account? Register"),
                 ),
               ],
             ),
@@ -218,4 +159,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-  
