@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cateredtoyou/models/notification_model.dart';
 import 'package:cateredtoyou/utils/notification_storage.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +9,7 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
+//Defining a global key.....not sure if its useful in this context
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class NotificationService {
@@ -50,13 +53,6 @@ class NotificationService {
         await androidPlugin?.requestNotificationsPermission();
     print('Android notification permission granted: $permissionGranted');
 
-    // Define the callback for when a notification is tapped
-    // final onDidReceiveLocalNotification =
-    //     (int id, String? title, String? body, String? payload) {
-    //   print('Notification tapped: $id, $title, $body, $payload');
-    //   // handle tap here or payload to navigate to specific view
-    // };
-
     //android settings
     const initSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -66,65 +62,112 @@ class NotificationService {
 
     await notificationsPlugin.initialize(
       initSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response){
-        print('Notification tapped: ${response.id}, payload: ${response.payload}');
-        if(response.payload !=null && response.payload!.isNotEmpty){
-          Future.delayed(const Duration(milliseconds: 500), () {
-            final context = navigatorKey.currentContext;
-            if(context != null){
-              handleNotificationPayload(response.payload!, context);
-            }
-          }) ;
-        }
-      }
+      onDidReceiveNotificationResponse: _onNotificationTapped,
     );
 
     _isInitialized = true;
     print("Notifications Initialized");
   }
 
-  void handleNotificationPayload(String payload, BuildContext context){
-    try{
-      final Map<String, String> payloadData = _parsePayload(payload);
+  // notification response handler when tapped
+  void _onNotificationTapped(NotificationResponse response) {
+    print("Notification tapped: ${response.id}, payload: ${response.payload}");
 
-      if(payloadData.containsKey('screen')){
-        final screen = payloadData['screen'];
+    // Makes sure this is a valid payload
+    if (response.payload == null || response.payload!.isEmpty) {
+      print('Empty payload, cannot navigate');
+      return;
+    }
 
-        switch(screen){
-          case 'home':
-            GoRouter.of(context).go('/home');
-            break;
-          case 'events':
-            GoRouter.of(context).go('/events');
-            break;
-          case 'staff':
-            GoRouter.of(context).go('/staff');
-            break;
-          case 'inventory':
-            GoRouter.of(context).go('/inventory');
-            break;
-          case 'menu-items':
-            GoRouter.of(context).go('/menu-items');
-            break;
-          default:
-            print('Unknown screen in payload: $screen');
+    // waits a bit for the app to be ready to navigate
+    Future.delayed(const Duration(milliseconds: 500), () {
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        try {
+          handleNotificationPayload(response.payload!, context);
+        } catch (e) {
+          print('No valid context available for navigation');
         }
+      }
+    });
+  }
+
+  void handleNotificationPayload(String payload, BuildContext context) {
+    try {
+      //parse the payload
+      final Map<String, dynamic> payloadData = _parsePayload(payload);
+      print('Parsed payload: $payloadData');
+
+      if (payloadData.containsKey('screen')) {
+        final String screen = payloadData['screen'].toString();
+        print('Attempting to navigate to: $screen');
+
+        // get route from screen name
+        final String route = _getRouteFromScreen(screen);
+
+        if (route.isNotEmpty) {
+          // navigate using the context
+          print('Navigating to route: $route');
+          GoRouter.of(context).go(route);
+        } else {
+          print('Unknown screen in payload $screen');
+        }
+      } else {
+        print('Payload does not contain screen information');
       }
     } catch (e) {
       print('Error handling notification payload: $e');
     }
   }
 
-  Map<String, String> _parsePayload(String payload){
-    final Map<String, String> result = {};
-    final pairs = payload.split(';');
-    for(final pair in pairs){
-      final keyValue = pair.split(':');
-      if(keyValue.length == 2){
-        result[keyValue[0].trim()] = keyValue[1].trim();
-      }
+  // helper method to get the route from screen name
+  String _getRouteFromScreen(String screen) {
+    switch (screen) {
+      case 'home':
+        return '/home';
+      case 'events':
+        return '/events';
+      case 'staff':
+        return '/staff';
+      case 'inventory':
+        return '/inventory';
+      case 'menu-items':
+        return '/menu-items';
+      case 'customers':
+        return '/customers';
+      case 'vehicles':
+        return '/vehicles';
+      case 'deliveries':
+        return '/deliveries';
+      case 'calendar':
+        return '/calendar';
+      case 'tasks':
+        return '/tasks';
+      case 'notifications':
+        return '/notifications';
+      default:
+        return '';
     }
-    return result;
+  }
+
+  // improved payload parsing that handles both formats
+  Map<String, dynamic> _parsePayload(String payload) {
+    // first try to parse as json
+    try {
+      return json.decode(payload);
+    } catch (_) {
+      // if that fails, try to parse as semicolon-delimited string
+      final Map<String, dynamic> result = {};
+      final pairs = payload.split(';');
+
+      for (final pair in pairs) {
+        final keyValue = pair.split(';');
+        if (keyValue.length == 2) {
+          result[keyValue[0].trim()] = keyValue[1].trim();
+        }
+      }
+      return result;
+    }
   }
 
   //NOTIFICATION DETAILS
@@ -144,12 +187,26 @@ class NotificationService {
     int? id,
     String? title,
     String? body,
-    String? payload,
+    String? screen,
+    Map<String, dynamic>? extraData,
   }) async {
     if (!_isInitialized) await initNotification();
     final notificationId = id ?? await _getNextId();
 
-    print('Show Notification: $title - $body');
+    // create a standardized payload
+    final Map<String, dynamic> payloadMap = {
+      'screen': screen ?? 'home',
+    };
+
+    // add any extra data
+    if (extraData != null) {
+      payloadMap.addAll(extraData);
+    }
+
+    // convert to a json string
+    final String payload = json.encode(payloadMap);
+
+    print('Show Notification: $title - $body with payload: $payload');
     await notificationsPlugin.show(
       notificationId,
       title,
@@ -176,10 +233,19 @@ class NotificationService {
     required String title,
     required String body,
     required DateTime scheduledTime,
-    String? payload,
+    String? screen,
+    Map<String, dynamic>? extraData,
   }) async {
     if (!_isInitialized) await initNotification();
     final notificationId = id ?? await _getNextId();
+
+    final Map<String, dynamic> payloadMap = {'screen': screen ?? 'home'};
+
+    if (extraData != null) {
+      payloadMap.addAll(extraData);
+    }
+
+    final String payload = json.encode(payloadMap);
 
     //Get the current date/time in device's local timezone
     tz.TZDateTime scheduledDate = tz.TZDateTime.from(scheduledTime, tz.local);

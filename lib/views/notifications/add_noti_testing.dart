@@ -1,132 +1,142 @@
-import 'package:cateredtoyou/services/notification_service.dart';
 import 'package:flutter/material.dart';
+import 'package:cateredtoyou/services/notification_service.dart';
+import 'package:intl/intl.dart';
 
 class CreateNotificationPage extends StatefulWidget {
-  const CreateNotificationPage({Key? key}) : super(key: key);
+  const CreateNotificationPage({super.key});
 
   @override
-  _CreateNotificationPageState createState() => _CreateNotificationPageState();
+  State<CreateNotificationPage> createState() => _CreateNotificationPageState();
 }
 
 class _CreateNotificationPageState extends State<CreateNotificationPage> {
-  final NotificationService _notificationService = NotificationService();
   final _formKey = GlobalKey<FormState>();
-  
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _bodyController = TextEditingController();
-  final TextEditingController _payloadController = TextEditingController();
-  
+  final _titleController = TextEditingController();
+  final _bodyController = TextEditingController();
+  final _screenController = TextEditingController(text: 'home');
+  final _extraDataController = TextEditingController();
+
+  DateTime _scheduledDate = DateTime.now().add(const Duration(minutes: 1));
   bool _isScheduled = false;
-  bool _isSending = false;
-  bool _showAdvancedOptions = false;
-  
-  // Predefined navigation options for the payload
-  final List<Map<String, String>> _navigationOptions = [
-    {'label': 'None', 'value': ''},
-    {'label': 'Home Screen', 'value': 'screen:home'},
-    {'label': 'Staff List', 'value': 'screen:staff'},
-    {'label': 'Events', 'value': 'screen:events'},
-    {'label': 'Inventory', 'value': 'screen:inventory'},
-    {'label': 'Menu Items', 'value': 'screen:menu-items'},
-    // Add more options as needed
+  final NotificationService _notificationService = NotificationService();
+  final List<String> _availableScreens = [
+    'home',
+    'events',
+    'staff',
+    'inventory',
+    'menu-items',
+    'customers',
+    'vehicles',
+    'deliveries',
+    'calendar',
+    'tasks',
+    'notifications',
   ];
-  
-  String _selectedNavigation = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _notificationService.initNotification();
+  }
 
   @override
   void dispose() {
     _titleController.dispose();
     _bodyController.dispose();
-    _payloadController.dispose();
+    _screenController.dispose();
+    _extraDataController.dispose();
     super.dispose();
   }
 
-  Future<void> _sendNotification() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
+  Future<void> _selectDateTime(BuildContext context) async {
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _scheduledDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (pickedDate != null) {
+      final TimeOfDay? pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(_scheduledDate),
+      );
+      if (pickedTime != null) {
+        setState(() {
+          _scheduledDate = DateTime(
+            pickedDate.year,
+            pickedDate.month,
+            pickedDate.day,
+            pickedTime.hour,
+            pickedTime.minute,
+          );
+        });
+      }
     }
+  }
 
-    setState(() {
-      _isSending = true;
-    });
+  void _sendNotification() async {
+    if (_formKey.currentState!.validate()) {
+      String screen = _screenController.text.trim();
+      Map<String, dynamic> extraData = {};
 
-    try {
-      final title = _titleController.text.trim();
-      final body = _bodyController.text.trim();
-      
-      // Build the payload from dropdown and custom field
-      String? payload;
-      if (_selectedNavigation.isNotEmpty) {
-        payload = _selectedNavigation;
+      // Parse extra data if provided
+      if (_extraDataController.text.isNotEmpty) {
+        try {
+          // Format expected: key1:value1;key2:value2
+          final pairs = _extraDataController.text.split(';');
+          for (final pair in pairs) {
+            final parts = pair.split(':');
+            if (parts.length == 2) {
+              extraData[parts[0].trim()] = parts[1].trim();
+            }
+          }
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error parsing extra data: $e')),
+          );
+          return;
+        }
       }
-      
-      // Add custom payload if provided
-      if (_payloadController.text.isNotEmpty) {
-        payload = payload != null 
-            ? '$payload;${_payloadController.text}' 
-            : _payloadController.text;
-      }
 
-      if (_isScheduled) {
-        // Schedule for 10 seconds in the future
-        final scheduledTime = DateTime.now().add(const Duration(seconds: 10));
-        
-        await _notificationService.scheduleNotification(
-          title: title,
-          body: body,
-          scheduledTime: scheduledTime,
-          payload: payload,
-        );
-        
+      try {
+        if (_isScheduled) {
+          await _notificationService.scheduleNotification(
+            title: _titleController.text,
+            body: _bodyController.text,
+            scheduledTime: _scheduledDate,
+            screen: screen,
+            extraData: extraData,
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Notification scheduled successfully!'),
+              ),
+            );
+          }
+        } else {
+          await _notificationService.showNotification(
+            title: _titleController.text,
+            body: _bodyController.text,
+            screen: screen,
+            extraData: extraData,
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Notification sent successfully!'),
+              ),
+            );
+          }
+        }
+      } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Notification scheduled for ${scheduledTime.toString()}'),
-              backgroundColor: Colors.green,
+              content: Text('Error: $e'),
             ),
           );
         }
-      } else {
-        // Send immediately
-        await _notificationService.showNotification(
-          title: title,
-          body: body,
-          payload: payload,
-        );
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Notification sent successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      }
-
-      // Clear the form after sending
-      _titleController.clear();
-      _bodyController.clear();
-      _payloadController.clear();
-      setState(() {
-        _isScheduled = false;
-        _showAdvancedOptions = false;
-        _selectedNavigation = '';
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error sending notification: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSending = false;
-        });
       }
     }
   }
@@ -141,140 +151,99 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextFormField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notification Title',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter a title';
-                    }
-                    return null;
-                  },
+          child: ListView(
+            children: [
+              TextFormField(
+                controller: _titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Title',
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _bodyController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notification Body',
-                    border: OutlineInputBorder(),
-                    alignLabelWithHint: true,
-                  ),
-                  maxLines: 5,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter a message';
-                    }
-                    return null;
-                  },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a title';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _bodyController,
+                decoration: const InputDecoration(
+                  labelText: 'Body',
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(height: 16),
-                InkWell(
-                  onTap: () {
+                maxLines: 3,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a body';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _screenController.text,
+                decoration: const InputDecoration(
+                  labelText: 'Navigate to Screen',
+                  border: OutlineInputBorder(),
+                ),
+                items: _availableScreens.map((String screen) {
+                  return DropdownMenuItem<String>(
+                    value: screen,
+                    child: Text(screen),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
                     setState(() {
-                      _showAdvancedOptions = !_showAdvancedOptions;
+                      _screenController.text = newValue;
                     });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _showAdvancedOptions
-                              ? Icons.keyboard_arrow_down
-                              : Icons.keyboard_arrow_right,
-                        ),
-                        const Text(
-                          'Advanced Options',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _extraDataController,
+                decoration: const InputDecoration(
+                  labelText: 'Extra Data (key1:value1;key2:value2)',
+                  border: OutlineInputBorder(),
+                  hintText: 'Optional: id:123;type:reminder',
                 ),
-                if (_showAdvancedOptions)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        decoration: const InputDecoration(
-                          labelText: 'Navigate To',
-                          border: OutlineInputBorder(),
-                          helperText: 'Screen to open when notification is tapped',
-                        ),
-                        value: _selectedNavigation,
-                        items: _navigationOptions.map((option) {
-                          return DropdownMenuItem<String>(
-                            value: option['value'],
-                            child: Text(option['label']!),
-                          );
-                        }).toList(),
-                        onChanged: (String? value) {
-                          setState(() {
-                            _selectedNavigation = value ?? '';
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _payloadController,
-                        decoration: const InputDecoration(
-                          labelText: 'Custom Payload (Optional)',
-                          border: OutlineInputBorder(),
-                          helperText:
-                              'Format: key1:value1;key2:value2',
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12.0),
-                        child: Text(
-                          'This data will be included in the notification for advanced functionality.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                    ],
+              ),
+              const SizedBox(height: 24),
+              SwitchListTile(
+                title: const Text('Schedule Notification'),
+                value: _isScheduled,
+                onChanged: (value) {
+                  setState(() {
+                    _isScheduled = value;
+                  });
+                },
+              ),
+              if (_isScheduled) ...[
+                ListTile(
+                  title: const Text('Scheduled Time'),
+                  subtitle: Text(
+                    DateFormat('MMM d, yyyy - h:mm a').format(_scheduledDate),
                   ),
-                const SizedBox(height: 24),
-                SwitchListTile(
-                  title: const Text('Schedule for 10 seconds later'),
-                  subtitle: const Text(
-                      'When enabled, the notification will be scheduled instead of sent immediately'),
-                  value: _isScheduled,
-                  onChanged: (value) {
-                    setState(() {
-                      _isScheduled = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _isSending ? null : _sendNotification,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.calendar_today),
+                    onPressed: () => _selectDateTime(context),
                   ),
-                  child: _isSending
-                      ? const CircularProgressIndicator()
-                      : Text(
-                          _isScheduled ? 'Schedule Notification' : 'Send Notification',
-                          style: const TextStyle(fontSize: 16),
-                        ),
                 ),
               ],
-            ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _sendNotification,
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
+                ),
+                child: Text(_isScheduled
+                    ? 'Schedule Notification'
+                    : 'Send Notification'),
+              ),
+            ],
           ),
         ),
       ),
