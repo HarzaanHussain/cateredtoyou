@@ -42,6 +42,7 @@ class AppNotification {
       scheduledTime: json['scheduledTime'] != null
           ? DateTime.parse(json['scheduledTime'])
           : null,
+      payload: json['payload'],
       isRead: json['isRead'] ?? false,
     );
   }
@@ -66,20 +67,20 @@ class AppNotification {
         isRead: isRead ?? this.isRead);
   }
 
-  Map<String, String> parsePayload(){
-    if(payload == null || payload!.isEmpty){
+  Map<String, String> parsePayload() {
+    if (payload == null || payload!.isEmpty) {
       return {};
     }
 
-    try{
+    try {
       return Map<String, String>.from(jsonDecode(payload!));
-    }catch (_){
+    } catch (_) {
       final result = <String, String>{};
       final pairs = payload!.split(';');
 
-      for(final pair in pairs){
+      for (final pair in pairs) {
         final parts = pair.split(':');
-        if(parts.length == 2){
+        if (parts.length == 2) {
           result[parts[0].trim()] = parts[1].trim();
         }
       }
