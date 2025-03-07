@@ -83,16 +83,17 @@ class CustomDrawer extends StatelessWidget {
           ),
 
           // Vehicle Loading System Section
-          PermissionWidget(
-            permissionId: 'manage_manifest',
-            child: ListTile(
-              leading: const Icon(Icons.local_shipping),
-              title: const Text('Vehicle Loading'),
-              subtitle: const Text('Manage vehicle loading manifests'),
-              trailing: const Icon(Icons.arrow_forward_ios),
-              onTap: () => context.push('/manifest'),
-            ),
+        // Vehicle Loading System Section (Moved to Sidebar)
+        PermissionWidget(
+          permissionId: 'manage_manifest',
+          child: ListTile(
+            leading: const Icon(Icons.local_shipping),
+            title: const Text('Vehicle Loading'),
+            subtitle: const Text('Manage vehicle loading manifests'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () => context.push('/manifest'),
           ),
+        ),
           // Menu Management Section
           PermissionWidget(
             permissionId: 'manage_menu',

@@ -84,17 +84,6 @@ class HomeScreen extends StatelessWidget {
                                 onTap: () => context.push('/customers'),
                               ),
                             ),
-                            const Divider(),
-                            PermissionWidget(
-                              permissionId: 'manage_menu',
-                              child: ListTile(
-                                leading: const Icon(Icons.list_alt),
-                                title: const Text('Manifest Management'),
-                                subtitle: const Text('Create and manage load manifests'),
-                                trailing: const Icon(Icons.arrow_forward_ios),
-                                onTap: () => context.push('/manifest'),
-                              ),
-                            ),
                           ],
                         ),
                       ),
