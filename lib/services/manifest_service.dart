@@ -1,310 +1,17 @@
-import 'package:cateredtoyou/models/manifest_model.dart'; // Importing the manifest model
-import 'package:cateredtoyou/services/organization_service.dart'; // Importing the OrganizationService
-import 'package:flutter/foundation.dart'; // Importing foundation for ChangeNotifier
-import 'package:cloud_firestore/cloud_firestore.dart'; // Importing Firestore for database operations
-import 'package:firebase_auth/firebase_auth.dart'; // Importing FirebaseAuth for authentication
+import 'package:cateredtoyou/models/manifest_model.dart';
+import 'package:cateredtoyou/services/organization_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class ManifestService extends ChangeNotifier { // Defining manifestService class that extends ChangeNotifier
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance; // Initializing Firestore instance
-  final FirebaseAuth _auth = FirebaseAuth.instance; // Initializing FirebaseAuth instance
-  final OrganizationService _organizationService; // Declaring OrganizationService instance
+class ManifestService extends ChangeNotifier {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final OrganizationService _organizationService;
 
-  ManifestService(this._organizationService); // Constructor to initialize OrganizationService
+  ManifestService(this._organizationService);
 
-  Stream<List<Manifest>> getManifests() async* { // Method to get a stream of manifests
-    try {
-      final currentUser = _auth.currentUser; // Getting the current authenticated user
-      if (currentUser == null) { // If no user is authenticated
-        yield []; // Yield an empty list
-        return; // Return from the method
-      }
-
-      final organization = await _organizationService.getCurrentUserOrganization(); // Get the user's organization
-      if (organization == null) { // If no organization is found
-        yield []; // Yield an empty list
-        return; // Return from the method
-      }
-
-      yield* _firestore // Query Firestore for manifests
-          .collection('manifests') // Access the 'manifests' collection
-          .where('organizationId', isEqualTo: organization.id) // Filter by organization ID
-          .snapshots() // Get real-time updates
-          .map((snapshot) => snapshot.docs // Map the snapshot to a list of manifests
-          .map((doc) => Manifest.fromMap(doc.data(), doc.id)) // Convert each document to a Manifest object
-          .toList()); // Convert the iterable to a list
-    } catch (e) { // Catch any errors
-      debugPrint('Error getting manifests: $e'); // Print the error
-      yield []; // Yield an empty list
-    }
-  }
-
-  Stream<Manifest?> getManifestByEventId(String eventId) async* {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        yield null;
-        return;
-      }
-
-      yield* _firestore
-          .collection('manifests')
-          .where('eventId', isEqualTo: eventId)
-          .limit(1)
-          .snapshots()
-          .map((snapshot) {
-        if (snapshot.docs.isNotEmpty) {
-          // Print the snapshot data for debugging
-          debugPrint('Snapshot data: ${snapshot.docs.first.data()}');
-          // Print the document ID for debugging
-          debugPrint('Document ID: ${snapshot.docs.first.id}');
-          // Map the snapshot to a Manifest object
-          return Manifest.fromMap(snapshot.docs.first.data(), snapshot.docs.first.id);
-        } else {
-          debugPrint('No manifests found for event ID: $eventId');
-          return null;
-        }
-      });
-    } catch (e) {
-      debugPrint('Error getting manifests by event ID: $e');
-      yield null;
-    }
-  }
-
-  Future<bool> doesManifestExist(String eventId) async {
-    try {
-      final querySnapshot = await _firestore
-          .collection('manifests')
-          .where('eventId', isEqualTo: eventId)
-          .limit(1)
-          .get();
-
-      return querySnapshot.docs.isNotEmpty;
-    } catch (e) {
-      debugPrint('Error checking manifests existence: $e');
-      return false;
-    }
-  }
-
-
-  Future<Manifest> createManifest({ // Method to create a new manifests
-    required String eventId, // Required event ID parameter
-    required List<ManifestItem> items, // Required items parameter
-  }) async {
-    try {
-      final currentUser = _auth.currentUser; // Get the current authenticated user
-      if (currentUser == null) throw 'Not authenticated'; // Throw an error if not authenticated
-
-      final organization = await _organizationService.getCurrentUserOrganization(); // Get the user's organization
-      if (organization == null) throw 'Organization not found'; // Throw an error if no organization found
-
-      final userDoc = await _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .get(); // Get the user document
-
-      if (!userDoc.exists) throw 'User data not found'; // Throw an error if user data not found
-      final userRole = userDoc.get('role') as String?; // Get the user's role
-
-      if (userRole == null || !['admin', 'client', 'manager'].contains(userRole)) { // Check if the user has sufficient permissions
-        throw 'Insufficient permissions to create manifests'; // Throw an error if insufficient permissions
-      }
-
-      // Check if a manifest already exists for this event
-      final existingPlanQuery = await _firestore
-          .collection('manifests')
-          .where('eventId', isEqualTo: eventId)
-          .limit(1)
-          .get();
-
-      if (existingPlanQuery.docs.isNotEmpty) { // If a manifest already exists
-        throw 'A manifest already exists for this event'; // Throw an error
-      }
-
-      final now = DateTime.now(); // Get the current date and time
-      final docRef = _firestore.collection('manifests').doc(); // Create a new document reference
-
-      final manifest = Manifest( // Create a new Manifest object
-        id: docRef.id, // Set the manifest ID
-        eventId: eventId, // Set the event ID
-        organizationId: organization.id, // Set the organization ID
-        items: items, // Set the items
-        createdAt: now, // Set the creation date
-        updatedAt: now, // Set the update date
-      );
-
-      final Map<String, dynamic> data = manifest.toMap(); // Convert the manifest to a map
-      data['organizationId'] = organization.id; // Add the organization ID
-      data['createdBy'] = currentUser.uid; // Add the creator ID
-
-      await docRef.set(data); // Save the manifest to Firestore
-      notifyListeners(); // Notify listeners of the change
-      return manifest; // Return the created manifest
-    } catch (e) { // Catch any errors
-      debugPrint('Error creating manifest: $e'); // Print the error
-      rethrow; // Rethrow the error
-    }
-  }
-
-  Future<void> updateManifest(Manifest manifest) async { // Method to update a manifest
-    try {
-      final currentUser = _auth.currentUser; // Get the current authenticated user
-      if (currentUser == null) throw 'Not authenticated'; // Throw an error if not authenticated
-
-      final organization = await _organizationService.getCurrentUserOrganization(); // Get the user's organization
-      if (organization == null) throw 'Organization not found'; // Throw an error if no organization found
-
-      final manifestDoc = await _firestore
-          .collection('manifests')
-          .doc(manifest.id)
-          .get(); // Get the manifest document
-
-      if (!manifestDoc.exists) throw 'manifest not found'; // Throw an error if manifest not found
-
-      final manifestData = manifestDoc.data()!; // Get the manifest data
-      if (manifestData['organizationId'] != organization.id) { // Check if the manifest belongs to the user's organization
-        throw 'manifest belongs to a different organization'; // Throw an error if manifest belongs to a different organization
-      }
-
-      final userDoc = await _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .get(); // Get the user document
-
-      if (!userDoc.exists) throw 'User data not found'; // Throw an error if user data not found
-      final userRole = userDoc.get('role') as String?; // Get the user's role
-
-      if (userRole == null || !['admin', 'client', 'manager'].contains(userRole)) { // Check if the user has sufficient permissions
-        throw 'Insufficient permissions to update manifests'; // Throw an error if insufficient permissions
-      }
-
-      final Map<String, dynamic> updates = manifest.toMap(); // Convert the manifest to a map
-      updates['updatedAt'] = FieldValue.serverTimestamp(); // Update the timestamp
-
-      await _firestore
-          .collection('manifests')
-          .doc(manifest.id)
-          .update(updates); // Update the manifest document
-
-      notifyListeners(); // Notify listeners of the change
-    } catch (e) { // Catch any errors
-      debugPrint('Error updating manifest: $e'); // Print the error
-      rethrow; // Rethrow the error
-    }
-  }
-
-  Future<void> assignVehicleToItem({
-    required String manifestId,
-    required String manifestItemId,
-    required String vehicleId,
-  }) async {
-    try {
-      final currentUser = _auth.currentUser; // Get the current authenticated user
-      if (currentUser == null) throw 'Not authenticated'; // Throw an error if not authenticated
-
-      final organization = await _organizationService.getCurrentUserOrganization(); // Get the user's organization
-      if (organization == null) throw 'Organization not found'; // Throw an error if no organization found
-
-      // Check permissions
-      final userDoc = await _firestore.collection('users').doc(currentUser.uid).get(); // Get the user document
-      if (!userDoc.exists) throw 'User not found'; // Throw an error if user not found
-
-      final userRole = userDoc.get('role') as String?; // Get the user's role
-      if (!['admin', 'manager', 'client'].contains(userRole)) { // Check if the user has sufficient permissions
-        throw 'Insufficient permissions to assign vehicles'; // Throw an error if insufficient permissions
-      }
-
-      // Check if the vehicle exists and is available
-      final vehicleDoc = await _firestore.collection('vehicles').doc(vehicleId).get(); // Get the vehicle document
-      if (!vehicleDoc.exists) throw 'Vehicle not found'; // Throw an error if vehicle not found
-
-      final vehicleData = vehicleDoc.data()!; // Get the vehicle data
-      if (vehicleData['organizationId'] != organization.id) { // Check if the vehicle belongs to the user's organization
-        throw 'Vehicle belongs to a different organization'; // Throw an error if vehicle belongs to a different organization
-      }
-
-      // Get the manifest
-      final manifestDoc = await _firestore.collection('manifests').doc(manifestId).get(); // Get the manifest document
-      if (!manifestDoc.exists) throw 'manifest not found'; // Throw an error if manifest not found
-
-      final manifestData = manifestDoc.data()!; // Get the manifest data
-      if (manifestData['organizationId'] != organization.id) { // Check if the manifest belongs to the user's organization
-        throw 'manifest belongs to a different organization'; // Throw an error if manifest belongs to a different organization
-      }
-
-      // Update the manifest item with the vehicle ID
-      final List<dynamic> items = manifestData['items'] as List<dynamic>; // Get the items
-      bool itemFound = false; // Flag to track if the item was found
-
-      for (int i = 0; i < items.length; i++) { // Loop through the items
-        if (items[i]['id'] == manifestItemId) { // If the item is found by its ID
-          items[i]['vehicleId'] = vehicleId; // Assign the vehicle
-          items[i]['loadingStatus'] = 'pending'; // Update the loading status
-          itemFound = true; // Set the flag
-          break; // Break the loop
-        }
-      }
-
-      if (!itemFound) throw 'Item not found in manifest'; // Throw an error if item not found
-
-      // Update the manifest
-      await manifestDoc.reference.update({ // Update the manifest document
-        'items': items, // Update the items
-        'updatedAt': FieldValue.serverTimestamp(), // Update the timestamp
-      });
-
-      notifyListeners(); // Notify listeners of the change
-    } catch (e) { // Catch any errors
-      debugPrint('Error assigning vehicle to item: $e'); // Print the error
-      rethrow; // Rethrow the error
-    }
-  }
-
-
-  Future<void> manifestPlan(String manifestId) async { // Method to delete a manifest
-    try {
-      final currentUser = _auth.currentUser; // Get the current authenticated user
-      if (currentUser == null) throw 'Not authenticated'; // Throw an error if not authenticated
-
-      final organization = await _organizationService.getCurrentUserOrganization(); // Get the user's organization
-      if (organization == null) throw 'Organization not found'; // Throw an error if no organization found
-
-      final manifestDoc = await _firestore
-          .collection('manifests')
-          .doc(manifestId)
-          .get(); // Get the manifest document
-
-      if (!manifestDoc.exists) throw 'manifest not found'; // Throw an error if manifest not found
-
-      final manifestData = manifestDoc.data()!; // Get the manifest data
-      if (manifestData['organizationId'] != organization.id) { // Check if the manifest belongs to the user's organization
-        throw 'manifest belongs to a different organization'; // Throw an error if manifest belongs to a different organization
-      }
-
-      final userDoc = await _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .get(); // Get the user document
-
-      if (!userDoc.exists) throw 'User data not found'; // Throw an error if user data not found
-      final userRole = userDoc.get('role') as String?; // Get the user's role
-
-      if (userRole == null || !['admin', 'client'].contains(userRole)) { // Check if the user has sufficient permissions (note: only admin and client can delete)
-        throw 'Insufficient permissions to delete manifests'; // Throw an error if insufficient permissions
-      }
-
-      await _firestore
-          .collection('manifests')
-          .doc(manifestId)
-          .delete(); // Delete the manifest document
-
-      notifyListeners(); // Notify listeners of the change
-    } catch (e) { // Catch any errors
-      debugPrint('Error deleting manifest: $e'); // Print the error
-      rethrow; // Rethrow the error
-    }
-  }
-
-  Stream<List<ManifestItem>> getManifestItemsByVehicleId(String vehicleId) async* {
+  Stream<List<Manifest>> getManifests() async* {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) {
@@ -322,18 +29,444 @@ class ManifestService extends ChangeNotifier { // Defining manifestService class
           .collection('manifests')
           .where('organizationId', isEqualTo: organization.id)
           .snapshots()
+          .map((snapshot) => snapshot.docs
+          .map((doc) => _manifestFromMap(doc.data(), doc.id))
+          .toList());
+    } catch (e) {
+      debugPrint('Error getting manifests: $e');
+      yield [];
+    }
+  }
+
+  Stream<Manifest?> getEventManifestByEventId(String eventId) async* {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        yield null;
+        return;
+      }
+
+      yield* _firestore
+          .collection('manifests')
+          .where('eventId', isEqualTo: eventId)
+          .where('manifestType', isEqualTo: 'event')
+          .limit(1)
+          .snapshots()
           .map((snapshot) {
-        final items = <ManifestItem>[];
-        for (final doc in snapshot.docs) {
-          final plan = Manifest.fromMap(doc.data(), doc.id);
-          final vehicleItems = plan.items.where((item) => item.vehicleId == vehicleId).toList();
-          items.addAll(vehicleItems);
+        if (snapshot.docs.isNotEmpty) {
+          debugPrint('Snapshot data: ${snapshot.docs.first.data()}');
+          debugPrint('Document ID: ${snapshot.docs.first.id}');
+          return _manifestFromMap(snapshot.docs.first.data(), snapshot.docs.first.id);
+        } else {
+          debugPrint('No event manifests found for event ID: $eventId');
+          return null;
         }
-        return items;
       });
     } catch (e) {
-      debugPrint('Error getting manifests by vehicle ID: $e');
+      debugPrint('Error getting event manifests by event ID: $e');
+      yield null;
+    }
+  }
+
+
+  Future<bool> doesManifestExist(String eventId) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('manifests')
+          .where('eventId', isEqualTo: eventId)
+          .limit(1)
+          .get();
+
+      return querySnapshot.docs.isNotEmpty;
+    } catch (e) {
+      debugPrint('Error checking manifests existence: $e');
+      return false;
+    }
+  }
+
+  Future<Manifest> createManifest({
+    required String eventId,
+    required List<ManifestItem> items,
+    required String manifestType,
+    String? vehicleId, // New optional parameter
+  }) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
+
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) throw 'Organization not found';
+
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (!userDoc.exists) throw 'User data not found';
+      final userRole = userDoc.get('role') as String?;
+
+      if (userRole == null || !['admin', 'client', 'manager'].contains(userRole)) {
+        throw 'Insufficient permissions to create manifests';
+      }
+
+      // Check if a manifest already exists for this event
+      final existingPlanQuery = await _firestore
+          .collection('manifests')
+          .where('eventId', isEqualTo: eventId)
+          .limit(1)
+          .get();
+
+      if (existingPlanQuery.docs.isNotEmpty) {
+        throw 'A manifest already exists for this event';
+      }
+
+      final now = DateTime.now();
+      final docRef = _firestore.collection('manifests').doc();
+
+      // Create the appropriate manifest type based on the parameter
+      Manifest manifest;
+      if (manifestType == 'event') {
+        manifest = EventManifest(
+          id: docRef.id,
+          eventId: eventId,
+          organizationId: organization.id,
+          items: _convertToEventManifestItems(items),
+          createdAt: now,
+          updatedAt: now,
+        );
+      } else if (manifestType == 'delivery') {
+        manifest = DeliveryManifest(
+          id: docRef.id,
+          eventId: eventId,
+          organizationId: organization.id,
+          items: _convertToDeliveryManifestItems(items),
+          createdAt: now,
+          updatedAt: now,
+          vehicleId: vehicleId,
+        );
+      } else {
+        throw 'Invalid manifest type';
+      }
+
+      final Map<String, dynamic> data = manifest.toMap();
+      data['manifestType'] = manifestType; // Store the manifest type
+      data['organizationId'] = organization.id;
+      data['createdBy'] = currentUser.uid;
+
+      await docRef.set(data);
+      notifyListeners();
+      return manifest;
+    } catch (e) {
+      debugPrint('Error creating manifest: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateManifest(Manifest manifest) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
+
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) throw 'Organization not found';
+
+      final manifestDoc = await _firestore
+          .collection('manifests')
+          .doc(manifest.id)
+          .get();
+
+      if (!manifestDoc.exists) throw 'Manifest not found';
+
+      final manifestData = manifestDoc.data()!;
+      if (manifestData['organizationId'] != organization.id) {
+        throw 'Manifest belongs to a different organization';
+      }
+
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (!userDoc.exists) throw 'User data not found';
+      final userRole = userDoc.get('role') as String?;
+
+      if (userRole == null || !['admin', 'client', 'manager'].contains(userRole)) {
+        throw 'Insufficient permissions to update manifests';
+      }
+
+      final Map<String, dynamic> updates = manifest.toMap();
+      // Preserve the manifestType field
+      updates['manifestType'] = manifestData['manifestType'];
+      updates['updatedAt'] = FieldValue.serverTimestamp();
+
+      await _firestore
+          .collection('manifests')
+          .doc(manifest.id)
+          .update(updates);
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating manifest: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteManifest(String manifestId) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
+
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) throw 'Organization not found';
+
+      final manifestDoc = await _firestore
+          .collection('manifests')
+          .doc(manifestId)
+          .get();
+
+      if (!manifestDoc.exists) throw 'Manifest not found';
+
+      final manifestData = manifestDoc.data()!;
+      if (manifestData['organizationId'] != organization.id) {
+        throw 'Manifest belongs to a different organization';
+      }
+
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (!userDoc.exists) throw 'User data not found';
+      final userRole = userDoc.get('role') as String?;
+
+      if (userRole == null || !['admin', 'client'].contains(userRole)) {
+        throw 'Insufficient permissions to delete manifests';
+      }
+
+      await _firestore
+          .collection('manifests')
+          .doc(manifestId)
+          .delete();
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error deleting manifest: $e');
+      rethrow;
+    }
+  }
+
+  Stream<List<DeliveryManifest>> getDeliveryManifestsByVehicle(String vehicleId) async* {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        yield [];
+        return;
+      }
+
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) {
+        yield [];
+        return;
+      }
+
+      yield* _firestore
+          .collection('manifests')
+          .where('organizationId', isEqualTo: organization.id)
+          .where('manifestType', isEqualTo: 'delivery')
+          .where('vehicleId', isEqualTo: vehicleId)
+          .snapshots()
+          .map((snapshot) => snapshot.docs
+          .map((doc) => _manifestFromMap(doc.data(), doc.id) as DeliveryManifest)
+          .toList());
+    } catch (e) {
+      debugPrint('Error getting delivery manifests by vehicle: $e');
       yield [];
+    }
+  }
+
+  // Helper method to create the appropriate manifest from Firestore data
+  Manifest _manifestFromMap(Map<String, dynamic> map, String docId) {
+    String manifestType = map['manifestType'] ?? 'event'; // Default to event if not specified
+
+    if (manifestType == 'delivery') {
+      return DeliveryManifest.fromMap(map, docId);
+    } else {
+      return EventManifest.fromMap(map, docId);
+    }
+  }
+
+  // Helper method to convert generic ManifestItems to EventManifestItems
+  List<EventManifestItem> _convertToEventManifestItems(List<ManifestItem> items) {
+    return items.map((item) {
+      if (item is EventManifestItem) {
+        return item;
+      } else {
+        // Create a new EventManifestItem with default values
+        return EventManifestItem(
+          menuItemId: item.menuItemId,
+          name: item.name,
+          originalQuantity: 0,
+          quantityRemaining: 0,
+          readiness: item.readiness,
+        );
+      }
+    }).toList();
+  }
+
+  // Helper method to convert generic ManifestItems to DeliveryManifestItems
+  List<DeliveryManifestItem> _convertToDeliveryManifestItems(List<ManifestItem> items) {
+    return items.map((item) {
+      if (item is DeliveryManifestItem) {
+        return item;
+      } else {
+        // Create a new DeliveryManifestItem with default values
+        return DeliveryManifestItem(
+          menuItemId: item.menuItemId,
+          name: item.name,
+          quantity: 0,
+          readiness: item.readiness,
+        );
+      }
+    }).toList();
+  }
+
+  Future<void> moveEventItemsToDelivery({
+    required String eventId,
+    required String vehicleId,
+    required List<EventManifestItem> eventItems,
+    required List<int> quantities,
+  }) async {
+    try {
+      // Authentication and organization validation
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
+
+      final organization = await _organizationService.getCurrentUserOrganization();
+      if (organization == null) throw 'Organization not found';
+
+      // Validate input
+      if (eventItems.length != quantities.length) {
+        throw ArgumentError('Event items and quantities must have the same length');
+      }
+
+      // Validate vehicle
+      final vehicleDoc = await _firestore.collection('vehicles').doc(vehicleId).get();
+      if (!vehicleDoc.exists) throw 'Vehicle not found';
+
+      final vehicleData = vehicleDoc.data()!;
+      if (vehicleData['organizationId'] != organization.id) {
+        throw 'Vehicle belongs to a different organization';
+      }
+
+      // Find the event manifest
+      final eventManifest = await _firestore
+          .collection('manifests')
+          .where('eventId', isEqualTo: eventId)
+          .where('manifestType', isEqualTo: 'event')
+          .limit(1)
+          .get()
+          .then((snapshot) {
+        if (snapshot.docs.isEmpty) throw 'Event manifest not found';
+        return EventManifest.fromMap(snapshot.docs.first.data(), snapshot.docs.first.id);
+      });
+
+      // Prepare delivery items and updated event items
+      final List<DeliveryManifestItem> deliveryItems = [];
+      final List<EventManifestItem> updatedEventItems = List.from(eventManifest.items);
+
+      // Process each item being moved
+      for (int i = 0; i < eventItems.length; i++) {
+        final eventItem = eventItems[i];
+        final quantity = quantities[i];
+
+        // Validate quantity
+        if (quantity <= 0) continue;
+        if (quantity > eventItem.quantityRemaining) {
+          throw ArgumentError('Assigned quantity exceeds remaining for ${eventItem.name}');
+        }
+
+        // Create delivery manifest item
+        deliveryItems.add(DeliveryManifestItem(
+          menuItemId: eventItem.menuItemId,
+          name: eventItem.name,
+          quantity: quantity,
+          readiness: eventItem.readiness,
+        ));
+
+        // Update event manifest item quantity
+        final eventItemIndex = updatedEventItems.indexWhere((item) => item.menuItemId == eventItem.menuItemId);
+        if (eventItemIndex != -1) {
+          final original = updatedEventItems[eventItemIndex];
+          updatedEventItems[eventItemIndex] = original.copyWith(
+            quantityRemaining: original.quantityRemaining - quantity,
+          );
+        }
+      }
+
+      // Start a batch write for atomicity
+      final batch = _firestore.batch();
+
+      // Reference to existing delivery manifest (if any)
+      final existingDeliveryManifestQuery = await _firestore
+          .collection('manifests')
+          .where('eventId', isEqualTo: eventId)
+          .where('manifestType', isEqualTo: 'delivery')
+          .where('vehicleId', isEqualTo: vehicleId)
+          .limit(1)
+          .get();
+
+      if (existingDeliveryManifestQuery.docs.isNotEmpty) {
+        // Update existing delivery manifest
+        final existingDeliveryManifestDoc = existingDeliveryManifestQuery.docs.first;
+        final existingItems = List<Map<String, dynamic>>.from(existingDeliveryManifestDoc.data()['items'] ?? []);
+
+        // Merge new items with existing items
+        for (final newItem in deliveryItems) {
+          final existingItemIndex = existingItems.indexWhere(
+                  (item) => item['menuItemId'] == newItem.menuItemId
+          );
+
+          if (existingItemIndex != -1) {
+            // Update quantity of existing item
+            existingItems[existingItemIndex]['quantity'] += newItem.quantity;
+          } else {
+            // Add new item
+            existingItems.add(newItem.toMap());
+          }
+        }
+
+        batch.update(existingDeliveryManifestDoc.reference, {
+          'items': existingItems,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Create new delivery manifest
+        final newDeliveryManifestRef = _firestore.collection('manifests').doc();
+        batch.set(newDeliveryManifestRef, {
+          'eventId': eventId,
+          'organizationId': organization.id,
+          'manifestType': 'delivery',
+          'vehicleId': vehicleId,
+          'items': deliveryItems.map((item) => item.toMap()).toList(),
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Update event manifest
+      final eventManifestRef = _firestore.collection('manifests').doc(eventManifest.id);
+      batch.update(eventManifestRef, {
+        'items': updatedEventItems.map((item) => item.toMap()).toList(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Commit the batch
+      await batch.commit();
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error moving event items to delivery: $e');
+      rethrow;
     }
   }
 }

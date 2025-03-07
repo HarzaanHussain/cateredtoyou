@@ -12,9 +12,9 @@ class VehicleTabList extends StatelessWidget {
   final DragDropManager dragDropManager;
 
   const VehicleTabList({
-    Key? key,
+    super.key,
     required this.dragDropManager,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

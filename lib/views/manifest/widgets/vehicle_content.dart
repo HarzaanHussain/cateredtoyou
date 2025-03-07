@@ -4,21 +4,23 @@ import 'package:cateredtoyou/models/vehicle_model.dart';
 
 class VehicleContent extends StatelessWidget {
   final Vehicle vehicle;
-  final List<ManifestItem> assignedItems;
-  final Function(ManifestItem) onItemRemoved;
-  final Function(ManifestItem, LoadingStatus) onItemStatusChanged;
+  final Map<String, List<DeliveryManifestItem>> manifestGroups;
+  final Function(DeliveryManifestItem) onItemRemoved;
+  final Function(DeliveryManifestItem, ItemReadiness) onItemStatusChanged;
 
   const VehicleContent({
-    Key? key,
+    super.key,
     required this.vehicle,
-    required this.assignedItems,
+    required this.manifestGroups,
     required this.onItemRemoved,
     required this.onItemStatusChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (assignedItems.isEmpty) {
+    final allItems = manifestGroups.values.expand((items) => items).toList();
+
+    if (allItems.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -51,7 +53,7 @@ class VehicleContent extends StatelessWidget {
 
     return Column(
       children: [
-        // Vehicle info header
+        // Vehicle info header (same as before)
         Container(
           padding: const EdgeInsets.all(12),
           color: Colors.grey[200],
@@ -64,19 +66,19 @@ class VehicleContent extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${vehicle.model}',
+                      vehicle.model,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
                       ),
                     ),
-                      Text(
-                        'License: ${vehicle.licensePlate}',
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontSize: 14,
-                        ),
+                    Text(
+                      'License: ${vehicle.licensePlate}',
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontSize: 14,
                       ),
+                    ),
                   ],
                 ),
               ),
@@ -87,7 +89,7 @@ class VehicleContent extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
-                  '${assignedItems.length} Items',
+                  '${allItems.length} Items',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -98,30 +100,40 @@ class VehicleContent extends StatelessWidget {
           ),
         ),
 
-        // Items list
+        // Grouped Manifests List
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(8),
-            itemCount: assignedItems.length,
-            itemBuilder: (context, index) {
-              final item = assignedItems[index];
-              return _buildItemCard(context, item);
+            itemCount: manifestGroups.length,
+            itemBuilder: (context, groupIndex) {
+              final eventId = manifestGroups.keys.elementAt(groupIndex);
+              final groupItems = manifestGroups[eventId]!;
+
+              return ExpansionTile(
+                title: Text('Event ID: $eventId'),
+                subtitle: Text('${groupItems.length} items'),
+                children: groupItems.map((item) => _buildItemCard(context, item)).toList(),
+              );
             },
           ),
         ),
 
-        // Loading summary
+        // Loading summary (same as before)
         Container(
           padding: const EdgeInsets.all(12),
           color: Colors.grey[200],
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStatusCounter('Pending',
-                  assignedItems.where((item) => item.loadingStatus == LoadingStatus.pending).length,
-                  Colors.orange),
-              _buildStatusCounter('Loaded',
-                  assignedItems.where((item) => item.loadingStatus == LoadingStatus.loaded).length,
+              _buildStatusCounter('Unloadable',
+                  allItems.where((item) => item.readiness == ItemReadiness.unloadable).length,
+                  Colors.red),
+              _buildStatusCounter('Ready',
+                  allItems.where((item) =>
+                  item.readiness == ItemReadiness.raw ||
+                      item.readiness == ItemReadiness.unassembled ||
+                      item.readiness == ItemReadiness.dished
+                  ).length,
                   Colors.green),
             ],
           ),
@@ -130,20 +142,24 @@ class VehicleContent extends StatelessWidget {
     );
   }
 
-  Widget _buildItemCard(BuildContext context, ManifestItem item) {
+  Widget _buildItemCard(BuildContext context, DeliveryManifestItem item) {
     Color statusColor;
     Icon statusIcon;
 
-    switch (item.loadingStatus) {
-      case LoadingStatus.unassigned:
-        statusColor = Colors.grey;
-        statusIcon = const Icon(Icons.help_outline, color: Colors.grey);
+    switch (item.readiness) {
+      case ItemReadiness.unloadable:
+        statusColor = Colors.red;
+        statusIcon = const Icon(Icons.error_outline, color: Colors.red);
         break;
-      case LoadingStatus.pending:
+      case ItemReadiness.raw:
         statusColor = Colors.orange;
-        statusIcon = const Icon(Icons.pending_outlined, color: Colors.orange);
+        statusIcon = const Icon(Icons.food_bank_outlined, color: Colors.orange);
         break;
-      case LoadingStatus.loaded:
+      case ItemReadiness.unassembled:
+        statusColor = Colors.blue;
+        statusIcon = const Icon(Icons.dashboard_customize_outlined, color: Colors.blue);
+        break;
+      case ItemReadiness.dished:
         statusColor = Colors.green;
         statusIcon = const Icon(Icons.check_circle_outline, color: Colors.green);
         break;
@@ -169,7 +185,7 @@ class VehicleContent extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.name.length > 8 ? "${item.name.substring(0, 8)}..." : item.name,
+                    item.name.length > 20 ? "${item.name.substring(0, 20)}..." : item.name,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -198,38 +214,42 @@ class VehicleContent extends StatelessWidget {
             const SizedBox(width: 12),
 
             // Status dropdown
-            DropdownButton<LoadingStatus>(
-              value: item.loadingStatus,
+            DropdownButton<ItemReadiness>(
+              value: item.readiness,
               icon: statusIcon,
               underline: Container(
                 height: 2,
                 color: statusColor,
               ),
-              onChanged: (LoadingStatus? newValue) {
+              onChanged: (ItemReadiness? newValue) {
                 if (newValue != null) {
                   onItemStatusChanged(item, newValue);
                 }
               },
-              items: LoadingStatus.values.map<DropdownMenuItem<LoadingStatus>>((LoadingStatus value) {
+              items: ItemReadiness.values.map<DropdownMenuItem<ItemReadiness>>((ItemReadiness value) {
                 String statusText;
                 Icon icon;
 
                 switch (value) {
-                  case LoadingStatus.unassigned:
-                    statusText = 'Unassigned';
-                    icon = const Icon(Icons.help_outline, color: Colors.grey);
+                  case ItemReadiness.unloadable:
+                    statusText = 'Unloadable';
+                    icon = const Icon(Icons.error_outline, color: Colors.red);
                     break;
-                  case LoadingStatus.pending:
-                    statusText = 'Pending';
-                    icon = const Icon(Icons.pending_outlined, color: Colors.orange);
+                  case ItemReadiness.raw:
+                    statusText = 'Raw';
+                    icon = const Icon(Icons.food_bank_outlined, color: Colors.orange);
                     break;
-                  case LoadingStatus.loaded:
-                    statusText = 'Loaded';
+                  case ItemReadiness.unassembled:
+                    statusText = 'Unassembled';
+                    icon = const Icon(Icons.dashboard_customize_outlined, color: Colors.blue);
+                    break;
+                  case ItemReadiness.dished:
+                    statusText = 'Dished';
                     icon = const Icon(Icons.check_circle_outline, color: Colors.green);
                     break;
                 }
 
-                return DropdownMenuItem<LoadingStatus>(
+                return DropdownMenuItem<ItemReadiness>(
                   value: value,
                   child: Row(
                     children: [

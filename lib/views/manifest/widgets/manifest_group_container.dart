@@ -10,30 +10,30 @@ import 'package:cateredtoyou/views/manifest/widgets/manifest_group.dart';
 /// widget identity that doesn't change when parent state changes. It acts as
 /// a pure passthrough for properties to the ManifestGroup widget.
 class ManifestGroupContainer extends StatelessWidget {
-  final Manifest manifest;
+  final EventManifest eventManifest;
   final Map<String, bool> selectedItems;
   final Map<String, int> itemQuantities;
   final Function(bool) onSelectAll;
   final Function(String, bool) onItemSelected;
   final Function(String, int) onQuantityChanged;
-  final Function(List<ManifestItem>, List<int>) onItemDragged;
+  final Function(List<EventManifestItem>, List<int>) onItemDragged;
 
   const ManifestGroupContainer({
-    Key? key,
-    required this.manifest,
+    super.key,
+    required this.eventManifest,
     required this.selectedItems,
     required this.itemQuantities,
     required this.onSelectAll,
     required this.onItemSelected,
     required this.onQuantityChanged,
     required this.onItemDragged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    // Forward all properties to the actual widget
+    // Forward all properties to the actual ManifestGroup widget
     return ManifestGroup(
-      manifest: manifest,
+      eventManifest: eventManifest,
       selectedItems: selectedItems,
       itemQuantities: itemQuantities,
       onSelectAll: onSelectAll,

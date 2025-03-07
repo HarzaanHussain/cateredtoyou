@@ -7,7 +7,7 @@ import 'package:cateredtoyou/services/manifest_service.dart';
 import 'package:cateredtoyou/managers/drag_drop_manager.dart';
 import 'package:cateredtoyou/views/manifest/widgets/manifest_group_container.dart';
 
-/// Widget responsible for displaying the list of manifests
+/// Widget responsible for displaying the list of event manifests
 ///
 /// This stateful widget manages its own selection state to prevent
 /// unnecessary rebuilds of other parts of the application.
@@ -15,9 +15,9 @@ class ManifestPanel extends StatefulWidget {
   final DragDropManager dragDropManager;
 
   const ManifestPanel({
-    Key? key,
+    super.key,
     required this.dragDropManager,
-  }) : super(key: key);
+  });
 
   @override
   State<ManifestPanel> createState() => _ManifestPanelState();
@@ -67,28 +67,34 @@ class _ManifestPanelState extends State<ManifestPanel> {
               return Center(child: Text('Error: ${snapshot.error}'));
             }
 
-            final manifests = snapshot.data ?? [];
+            final allManifests = snapshot.data ?? [];
+
+            // Filter to only include EventManifests
+            final eventManifests = allManifests
+                .whereType<EventManifest>()
+                .map((manifest) => manifest)
+                .toList();
 
             // Handle empty state
-            if (manifests.isEmpty) {
-              return const Center(child: Text('No manifests available'));
+            if (eventManifests.isEmpty) {
+              return const Center(child: Text('No event manifests available'));
             }
 
             // Build list of manifest groups
             return ListView.builder(
               padding: const EdgeInsets.all(8.0),
-              itemCount: manifests.length,
+              itemCount: eventManifests.length,
               itemBuilder: (context, index) {
-                final manifest = manifests[index];
+                final eventManifest = eventManifests[index];
 
                 // Skip manifests with no items
-                if (manifest.items.isEmpty) {
+                if (eventManifest.items.isEmpty) {
                   return const SizedBox.shrink();
                 }
 
                 // Use container widget to maintain stable identity and prevent unnecessary rebuilds
                 return ManifestGroupContainer(
-                  manifest: manifest,
+                  eventManifest: eventManifest,
                   onItemSelected: _handleItemSelected,
                   onQuantityChanged: _handleQuantityChanged,
                   selectedItems: _selectedItems,
@@ -96,14 +102,15 @@ class _ManifestPanelState extends State<ManifestPanel> {
                   onSelectAll: (bool selected) {
                     setState(() {
                       // Update local state when selecting/deselecting all items
-                      for (var item in manifest.items) {
-                        _selectedItems[item.id] = selected;
+                      for (var item in eventManifest.items) {
+                        _selectedItems[item.menuItemId] = selected;
                       }
                     });
                   },
-                  onItemDragged: (List<ManifestItem> items, List<int> quantities) {
+                  onItemDragged: (List<EventManifestItem> items, List<int> quantities) {
                     // Delegate drag start to the manager
-                    widget.dragDropManager.handleItemDragStart(items, quantities, manifest.eventId);
+                    debugPrint('Items dragged: $items\nQuantities: $quantities');
+                    widget.dragDropManager.handleItemDragStart(items, quantities, eventManifest.eventId);
                   },
                 );
               },

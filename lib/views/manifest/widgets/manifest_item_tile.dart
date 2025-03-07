@@ -3,6 +3,8 @@ import 'package:cateredtoyou/models/manifest_model.dart';
 import 'package:cateredtoyou/services/menu_item_service.dart';
 import 'package:provider/provider.dart';
 
+/// Widget for displaying a single manifest item that can be selected,
+/// have its quantity adjusted, and be dragged to a vehicle
 class ManifestItemTile extends StatefulWidget {
   final ManifestItem manifestItem;
   final bool selected;
@@ -13,7 +15,7 @@ class ManifestItemTile extends StatefulWidget {
   final Function() onDragEnd;
 
   const ManifestItemTile({
-    Key? key,
+    super.key,
     required this.manifestItem,
     required this.selected,
     required this.onSelected,
@@ -21,7 +23,7 @@ class ManifestItemTile extends StatefulWidget {
     required this.onQuantityChanged,
     required this.onDragStarted,
     required this.onDragEnd,
-  }) : super(key: key);
+  });
 
   @override
   State<ManifestItemTile> createState() => _ManifestItemTileState();
@@ -45,6 +47,15 @@ class _ManifestItemTileState extends State<ManifestItemTile> {
   }
 
   Future<void> _loadItemName() async {
+    // First check if the name is already in the manifest item
+    if (widget.manifestItem.name.isNotEmpty &&
+        widget.manifestItem.name != 'Unknown Item') {
+      setState(() {
+        _itemName = widget.manifestItem.name;
+      });
+      return;
+    }
+
     try {
       final menuItemService = Provider.of<MenuItemService>(context, listen: false);
       final menuItem = await menuItemService.getMenuItemById(widget.manifestItem.menuItemId);
@@ -62,17 +73,35 @@ class _ManifestItemTileState extends State<ManifestItemTile> {
     }
   }
 
+  /// Check if the item is assignable to a vehicle
+  bool _isAssignable() {
+    if (widget.manifestItem is EventManifestItem) {
+      return (widget.manifestItem as EventManifestItem).quantityRemaining > 0;
+    }
+    return false;
+  }
+
+  /// Get max quantity that can be assigned
+  int _getMaxQuantity() {
+    if (widget.manifestItem is EventManifestItem) {
+      return (widget.manifestItem as EventManifestItem).quantityRemaining;
+    } else if (widget.manifestItem is DeliveryManifestItem) {
+      return (widget.manifestItem as DeliveryManifestItem).quantity;
+    }
+    return 0;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDraggable = widget.manifestItem.vehicleId == null;
-    final statusColor = _getStatusColor(widget.manifestItem.loadingStatus);
+    final isDraggable = _isAssignable();
     final isZeroQuantity = widget.quantity <= 0;
+    final isPartialQuantity = widget.quantity > 0 && widget.quantity < _getMaxQuantity();
+    final isFullQuantity = widget.quantity == _getMaxQuantity();
 
     return Draggable<Map<String, dynamic>>(
       data: {
         'items': [widget.manifestItem],
         'quantities': [widget.quantity],
-        'eventId': widget.manifestItem.id.split('_').first, // Extract eventId
       },
       maxSimultaneousDrags: (isDraggable && !isZeroQuantity) ? 1 : 0,
       onDragStarted: widget.onDragStarted,
@@ -114,6 +143,15 @@ class _ManifestItemTileState extends State<ManifestItemTile> {
                               _itemName,
                               style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
+                            // Display readiness state
+                            Text(
+                              _getReadinessText(widget.manifestItem.readiness),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade700,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -126,10 +164,10 @@ class _ManifestItemTileState extends State<ManifestItemTile> {
                       Row(
                         children: [
                           const Text('Quantity: '),
-                          // Use StatefulBuilder to isolate quantity editing state
+                          // Use QuantityEditorWidget to isolate quantity editing state
                           _QuantityEditorWidget(
                             initialQuantity: widget.quantity,
-                            maxQuantity: widget.manifestItem.quantity,
+                            maxQuantity: _getMaxQuantity(),
                             onQuantityChanged: widget.onQuantityChanged,
                           ),
                         ],
@@ -140,14 +178,38 @@ class _ManifestItemTileState extends State<ManifestItemTile> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
-                          border: Border.all(color: statusColor),
+                          color: isZeroQuantity
+                              ? Colors.grey
+                              : isPartialQuantity
+                              ? Colors.orange.shade200
+                              : isFullQuantity
+                              ? Colors.green.shade200
+                              : Colors.grey,
+                          border: Border.all(
+                            color: isZeroQuantity
+                                ? Colors.grey
+                                : isPartialQuantity
+                                ? Colors.orange
+                                : isFullQuantity
+                                ? Colors.green
+                                : Colors.grey,
+                          ),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          _getStatusText(widget.manifestItem.loadingStatus),
+                          isZeroQuantity
+                              ? 'Not Available'
+                              : isPartialQuantity
+                              ? 'Partial'
+                              : 'Full',
                           style: TextStyle(
-                            color: statusColor,
+                            color: isZeroQuantity
+                                ? Colors.grey
+                                : isPartialQuantity
+                                ? Colors.orange
+                                : isFullQuantity
+                                ? Colors.green
+                                : Colors.grey,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -191,11 +253,11 @@ class _ManifestItemTileState extends State<ManifestItemTile> {
                 fontSize: 16,
               ),
             ),
-            Text(
-              ' x ${_itemName.length > 15 ? _itemName.substring(0, 15) + '...' : _itemName}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
+            Flexible(
+              child: Text(
+                ' x ${_itemName.length > 15 ? '${_itemName.substring(0, 15)}...' : _itemName}',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
               ),
             ),
           ],
@@ -204,27 +266,16 @@ class _ManifestItemTileState extends State<ManifestItemTile> {
     );
   }
 
-  Color _getStatusColor(LoadingStatus status) {
-    switch (status) {
-      case LoadingStatus.unassigned:
-        return Colors.grey;
-      case LoadingStatus.pending:
-        return Colors.orange;
-      case LoadingStatus.loaded:
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _getStatusText(LoadingStatus status) {
-    switch (status) {
-      case LoadingStatus.unassigned:
-        return 'Unassigned';
-      case LoadingStatus.pending:
-        return 'Pending';
-      case LoadingStatus.loaded:
-        return 'Loaded';
+  String _getReadinessText(ItemReadiness readiness) {
+    switch (readiness) {
+      case ItemReadiness.unloadable:
+        return 'Not Ready';
+      case ItemReadiness.raw:
+        return 'Raw';
+      case ItemReadiness.unassembled:
+        return 'Unassembled';
+      case ItemReadiness.dished:
+        return 'Prepared';
       default:
         return 'Unknown';
     }
@@ -238,11 +289,10 @@ class _QuantityEditorWidget extends StatefulWidget {
   final Function(int) onQuantityChanged;
 
   const _QuantityEditorWidget({
-    Key? key,
     required this.initialQuantity,
     required this.maxQuantity,
     required this.onQuantityChanged,
-  }) : super(key: key);
+  });
 
   @override
   _QuantityEditorWidgetState createState() => _QuantityEditorWidgetState();
@@ -263,96 +313,69 @@ class _QuantityEditorWidgetState extends State<_QuantityEditorWidget> {
   @override
   void didUpdateWidget(_QuantityEditorWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialQuantity != widget.initialQuantity && !_isEditing) {
-      setState(() {
-        _currentQuantity = widget.initialQuantity;
-        _controller.text = _currentQuantity.toString();
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submitQuantity() {
-    int? newQuantity;
-    try {
-      newQuantity = int.parse(_controller.text);
-    } catch (e) {
+    if (oldWidget.initialQuantity != widget.initialQuantity) {
+      _currentQuantity = widget.initialQuantity;
       _controller.text = _currentQuantity.toString();
-      return;
     }
-
-    if (newQuantity > 0 && newQuantity <= widget.maxQuantity) {
-      if (newQuantity != _currentQuantity) {
-        setState(() {
-          _currentQuantity = newQuantity ?? 0;
-        });
-        widget.onQuantityChanged(newQuantity);
-      }
-    } else {
-      _controller.text = _currentQuantity.toString();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid quantity')),
-      );
-    }
-
-    setState(() {
-      _isEditing = false;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        GestureDetector(
-          onTap: () {
+        IconButton(
+          icon: const Icon(Icons.remove),
+          onPressed: _currentQuantity > 0
+              ? () {
             setState(() {
-              _isEditing = true;
+              _currentQuantity--;
+              _controller.text = _currentQuantity.toString();
+              widget.onQuantityChanged(_currentQuantity);
             });
-          },
-          child: _isEditing
-              ? SizedBox(
-            width: 60,
+          }
+              : null,
+        ),
+        if (!_isEditing)
+          Text(
+            _currentQuantity.toString(),
+            style: TextStyle(fontWeight: FontWeight.bold),
+          )
+        else
+          SizedBox(
+            width: 40,
             child: TextField(
               controller: _controller,
+              onChanged: (value) {
+                final parsedValue = int.tryParse(value);
+                if (parsedValue != null && parsedValue <= widget.maxQuantity) {
+                  setState(() {
+                    _currentQuantity = parsedValue;
+                  });
+                }
+              },
               keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              decoration: InputDecoration(
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 0,
-                  horizontal: 8,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              onSubmitted: (_) => _submitQuantity(),
-              onEditingComplete: _submitQuantity,
-            ),
-          )
-              : Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 4,
-            ),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              _currentQuantity.toString(),
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              decoration: const InputDecoration(border: InputBorder.none),
             ),
           ),
+        IconButton(
+          icon: const Icon(Icons.add),
+          onPressed: _currentQuantity < widget.maxQuantity
+              ? () {
+            setState(() {
+              _currentQuantity++;
+              _controller.text = _currentQuantity.toString();
+              widget.onQuantityChanged(_currentQuantity);
+            });
+          }
+              : null,
         ),
-        Text(
-          ' / ${widget.maxQuantity}',
-          style: TextStyle(color: Colors.grey.shade600),
+        IconButton(
+          icon: Icon(_isEditing ? Icons.check : Icons.edit),
+          onPressed: () {
+            setState(() {
+              _isEditing = !_isEditing;
+            });
+          },
         ),
       ],
     );

@@ -10,7 +10,7 @@ import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 /// but delegates specific functionality to dedicated widget files to
 /// prevent unnecessary rebuilds.
 class ManifestScreen extends StatefulWidget {
-  const ManifestScreen({Key? key}) : super(key: key);
+  const ManifestScreen({super.key});
 
   @override
   State<ManifestScreen> createState() => _ManifestScreenState();

@@ -1,3 +1,5 @@
+// File: lib/views/manifest/widgets/vehicle_tab.dart
+
 import 'package:flutter/material.dart';
 import 'package:cateredtoyou/models/vehicle_model.dart';
 import 'package:cateredtoyou/models/manifest_model.dart';
@@ -6,26 +8,30 @@ import 'package:cateredtoyou/models/manifest_model.dart';
 /// Items can be dropped onto this vehicle, or the vehicle can be tapped to trigger an action.
 class VehicleTab extends StatelessWidget {
   final Vehicle vehicle;
-  final Function(List<ManifestItem>, List<int>) onItemsDropped;
+  final Function(List<EventManifestItem>, List<int>) onItemsDropped;
 
   const VehicleTab({
-    Key? key,
+    super.key,
     required this.vehicle,
     required this.onItemsDropped,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return DragTarget<Map<String, dynamic>>(
-      onAccept: (data) {
-        final items = data['items'] as List<ManifestItem>?;
-        final quantities = data['quantities'] as List<int>?;
+        onAcceptWithDetails: (DragTargetDetails<Map<String, dynamic>> details) {
+          final data = details.data;
+          debugPrint('data[items] is of type: ${data['items'].runtimeType}');
+          final items = (data['items'] as List<dynamic>?)
+              ?.map((item) => item as EventManifestItem)
+              .toList();
+          final quantities = data['quantities'] as List<int>?;
 
-        if (items != null && quantities != null) {
-          onItemsDropped(items, quantities);
-        }
-      },
-      builder: (context, candidateData, rejectedData) {
+          if (items != null && quantities != null) {
+            onItemsDropped(items, quantities);
+          }
+        },
+        builder: (context, candidateData, rejectedData) {
         // Whether an item is currently being dragged over this vehicle tab.
         final bool isHovering = candidateData.isNotEmpty;
 

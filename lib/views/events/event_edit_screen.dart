@@ -296,73 +296,87 @@ class _EventEditScreenState extends State<EventEditScreen> {
     }
   }
 
-// Function to manage the manifest for an event
   Future<void> _manageManifest(String eventId) async {
     try {
       final manifestService = context.read<ManifestService>();
       // Check if a manifest already exists for this event
       if (!(await manifestService.doesManifestExist(eventId))) {
-          debugPrint('No existing manifest found. Creating a new one.');
-      // Create manifest items from selected menu items
+        debugPrint('No existing manifest found. Creating a new one.');
+        // Create manifest items from selected menu items
         final manifestItems = _selectedMenuItems.map((menuItem) {
           final newItemId = FirebaseFirestore.instance.collection('manifests').doc().id;
           debugPrint('Creating manifest item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
 
-          return ManifestItem(
-              id: newItemId,
-              menuItemId: menuItem.menuItemId,
-              name: menuItem.name,
-              quantity: menuItem.quantity,
-              vehicleId: null, // Initially, no vehicle is assigned
-              loadingStatus: LoadingStatus.unassigned, // Initial status is unassigned
-            );
+          return EventManifestItem(
+            menuItemId: menuItem.menuItemId,
+            name: menuItem.name,
+            originalQuantity: menuItem.quantity,
+            quantityRemaining: menuItem.quantity,
+            readiness: ItemReadiness.unloadable, // Set default readiness status
+          );
         }).toList();
 
-          if (manifestItems.isNotEmpty) {
-            debugPrint('Saving new manifest with ${manifestItems.length} items.');
-            await manifestService.createManifest(
-              eventId: eventId,
-              items: manifestItems,
-            );
-          } else {
-            debugPrint('No menu items selected, skipping manifest creation.');
-          }
+        if (manifestItems.isNotEmpty) {
+          debugPrint('Saving new manifest with ${manifestItems.length} items.');
+          await manifestService.createManifest(
+            eventId: eventId,
+            items: manifestItems,
+            manifestType: 'event', // Specify that this is an EventManifest
+          );
+        } else {
+          debugPrint('No menu items selected, skipping manifest creation.');
+        }
       } else {
         debugPrint('Existing manifest found. Updating it.');
-        final existingPlan = await manifestService.getManifestByEventId(eventId).first;
+        final existingPlan = await manifestService.getEventManifestByEventId(eventId).first;
         // Get current menu item IDs
         final currentMenuItemIds = _selectedMenuItems.map((item) => item.menuItemId).toSet();
         debugPrint('Current menu item IDs: $currentMenuItemIds');
 
-        // Keep existing items that still exist in the menu
-        final updatedItems = (existingPlan?.items ?? <ManifestItem>[])
-            .where((item) => currentMenuItemIds.contains(item.menuItemId))
-            .toList();
-        debugPrint('Retaining ${updatedItems.length} existing manifest items.');
-
-        // Add new items that aren't in the manifest yet
-        for (final menuItem in _selectedMenuItems) {
-          final existingItem = updatedItems.any((item) => item.menuItemId == menuItem.menuItemId);
-
-          if (!existingItem) {
-            final newItemId = FirebaseFirestore.instance.collection('manifests').doc().id;
-            debugPrint('Adding new manifest item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
-
-            updatedItems.add(ManifestItem(
-              id: newItemId,
-              menuItemId: menuItem.menuItemId,
-              name: menuItem.name,
-              quantity: menuItem.quantity,
-              vehicleId: null,
-              loadingStatus: LoadingStatus.unassigned,
-            ));
-          }
-        }
-
-        debugPrint('Updating manifest with ${updatedItems.length} total items.');
         if (existingPlan != null) {
-          final updatedPlan = existingPlan.copyWith(items: updatedItems);
-          await manifestService.updateManifest(updatedPlan);
+          // Check if this is an EventManifest - we can't update DeliveryManifest here
+          if (existingPlan is EventManifest) {
+            // Convert to EventManifestItems
+            List<EventManifestItem> updatedItems = [];
+
+            // Keep existing items that still exist in the menu
+            for (var item in existingPlan.items) {
+              if (currentMenuItemIds.contains(item.menuItemId)) {
+                updatedItems.add(item);
+              }
+            }
+
+            // Add new items that aren't in the manifest yet
+            for (final menuItem in _selectedMenuItems) {
+              final existingItem = updatedItems.any((item) => item.menuItemId == menuItem.menuItemId);
+
+              if (!existingItem) {
+                final newItemId = FirebaseFirestore.instance.collection('manifests').doc().id;
+                debugPrint('Adding new manifest item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
+
+                updatedItems.add(EventManifestItem(
+                  menuItemId: menuItem.menuItemId,
+                  name: menuItem.name,
+                  originalQuantity: menuItem.quantity,
+                  quantityRemaining: menuItem.quantity,
+                  readiness: ItemReadiness.unloadable,
+                ));
+              }
+            }
+
+            debugPrint('Updating manifest with ${updatedItems.length} total items.');
+            final updatedPlan = EventManifest(
+              id: existingPlan.id,
+              eventId: existingPlan.eventId,
+              organizationId: existingPlan.organizationId,
+              items: updatedItems,
+              createdAt: existingPlan.createdAt,
+              updatedAt: DateTime.now(),
+            );
+            await manifestService.updateManifest(updatedPlan);
+          } else {
+            debugPrint('Found a DeliveryManifest - cannot update from event edit screen');
+          }
         }
       }
 
@@ -373,7 +387,6 @@ class _EventEditScreenState extends State<EventEditScreen> {
       // So we catch the error here and just log it
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MMM d, y'); // Date format for displaying dates.
