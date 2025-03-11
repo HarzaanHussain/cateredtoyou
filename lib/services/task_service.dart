@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore packa
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth package for authentication operations
 import 'package:cateredtoyou/models/task_model.dart'; // Import Task and TaskStatus classes for task data
 import 'package:cateredtoyou/services/organization_service.dart'; // Import OrganizationService for organization-related operations
+import 'package:cateredtoyou/models/manifest_task_model.dart'; // Import ManifestTask class for manifest task data
 
 class TaskService extends ChangeNotifier { // TaskService class extends ChangeNotifier to allow listeners to be notified of changes
   final FirebaseFirestore _firestore = FirebaseFirestore.instance; // Firestore instance for database operations
@@ -46,7 +47,6 @@ class TaskService extends ChangeNotifier { // TaskService class extends ChangeNo
     if (status != null) {
       query = query.where('status', isEqualTo: status.toString().split('.').last);
     }
-
     yield* query.snapshots().map((snapshot) {
       try {
         var tasks = snapshot.docs
@@ -66,6 +66,24 @@ class TaskService extends ChangeNotifier { // TaskService class extends ChangeNo
           if (priorityComp != 0) return priorityComp;
           return a.dueDate.compareTo(b.dueDate);
         });
+        for (var task in tasks) {
+          debugPrint('Task ID: ${task.id}');
+          debugPrint('Event ID: ${task.eventId}');
+          debugPrint('Name: ${task.name}');
+          debugPrint('Description: ${task.description}');
+          debugPrint('Due Date: ${task.dueDate}');
+          debugPrint('Status: ${task.status}');
+          debugPrint('Priority: ${task.priority}');
+          debugPrint('Assigned To: ${task.assignedTo}');
+          debugPrint('Department ID: ${task.departmentId}');
+          debugPrint('Organization ID: ${task.organizationId}');
+          debugPrint('Checklist: ${task.checklist}');
+          debugPrint('Comments: ${task.comments}');
+          debugPrint('Inventory Updates: ${task.inventoryUpdates}');
+          debugPrint('Created By: ${task.createdBy}');
+          debugPrint('Created At: ${task.createdAt}');
+          debugPrint('Updated At: ${task.updatedAt}');
+        }
 
         return tasks;
       } catch (e) {

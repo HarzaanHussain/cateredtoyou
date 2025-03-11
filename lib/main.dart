@@ -116,6 +116,7 @@ class MyApp extends StatelessWidget {
         Provider(
           create: (context) => TaskAutomationService(
             context.read<TaskService>(),
+            context.read<OrganizationService>(),
           ),
         ),
         // Event service depends on OrganizationService and TaskAutomationService
