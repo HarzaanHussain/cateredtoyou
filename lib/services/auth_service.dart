@@ -91,6 +91,7 @@ class AuthService {
     'view_staff',
     'manage_events',
     'view_events',
+    'manage_inventory',
     'view_inventory',
     'manage_tasks',
     'view_tasks',
@@ -100,6 +101,7 @@ class AuthService {
     'view_vehicles',
     'manage_deliveries',
     'view_deliveries',
+    'manage_manifest',
             
           ],
           'organizationId': orgId, // Organization ID
