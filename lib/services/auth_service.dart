@@ -86,16 +86,21 @@ class AuthService {
         await permissionRef.set({
           'role': 'client', // User role
           'permissions': [
-            'manage_staff', // Permission to manage staff
-            'view_staff', // Permission to view staff
-            'manage_events', // Permission to manage events
-            'view_events', // Permission to view events
-            'manage_inventory', // Permission to manage inventory
-            'view_inventory', // Permission to view inventory
-            'manage_tasks', // Permission to manage tasks
-            'view_tasks', // Permission to view tasks
-            'manage_menu', // Permission to manage menu
-            'view_menu', // Permission to view menu
+               'manage_staff',
+    'view_customers',
+    'view_staff',
+    'manage_events',
+    'view_events',
+    'view_inventory',
+    'manage_tasks',
+    'view_tasks',
+    'manage_menu',
+    'view_menu',
+    'manage_vehicles',
+    'view_vehicles',
+    'manage_deliveries',
+    'view_deliveries',
+            
           ],
           'organizationId': orgId, // Organization ID
           'createdAt': now, // Creation time
