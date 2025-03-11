@@ -16,9 +16,6 @@ import 'package:cateredtoyou/widgets/event_menu_selection.dart'; // Importing ev
 import 'package:cateredtoyou/widgets/event_supplies_selection.dart'; // Importing event supplies selection widget.
 import 'package:cateredtoyou/widgets/add_customer_dialog.dart';
 
-import '../../models/manifest_model.dart';
-import '../../services/manifest_service.dart'; // Importing add customer dialog widget.
-
 class EventEditScreen extends StatefulWidget {
   final Event? event; // Event object to edit, if null, a new event is created.
   
@@ -268,9 +265,6 @@ class _EventEditScreenState extends State<EventEditScreen> {
         eventId = widget.event!.id; // Use the ID of the existing event
       }
 
-      // Create or update the manifest for this event
-      await _manageManifest(eventId);
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -293,84 +287,6 @@ class _EventEditScreenState extends State<EventEditScreen> {
           _isLoading = false; // Clearing the loading state.
         });
       }
-    }
-  }
-
-// Function to manage the manifest for an event
-  Future<void> _manageManifest(String eventId) async {
-    try {
-      final manifestService = context.read<ManifestService>();
-      // Check if a manifest already exists for this event
-      if (!(await manifestService.doesManifestExist(eventId))) {
-          debugPrint('No existing manifest found. Creating a new one.');
-      // Create manifest items from selected menu items
-        final manifestItems = _selectedMenuItems.map((menuItem) {
-          final newItemId = FirebaseFirestore.instance.collection('manifests').doc().id;
-          debugPrint('Creating manifest item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
-
-          return ManifestItem(
-              id: newItemId,
-              menuItemId: menuItem.menuItemId,
-              name: menuItem.name,
-              quantity: menuItem.quantity,
-              vehicleId: null, // Initially, no vehicle is assigned
-              loadingStatus: LoadingStatus.unassigned, // Initial status is unassigned
-            );
-        }).toList();
-
-          if (manifestItems.isNotEmpty) {
-            debugPrint('Saving new manifest with ${manifestItems.length} items.');
-            await manifestService.createManifest(
-              eventId: eventId,
-              items: manifestItems,
-            );
-          } else {
-            debugPrint('No menu items selected, skipping manifest creation.');
-          }
-      } else {
-        debugPrint('Existing manifest found. Updating it.');
-        final existingPlan = await manifestService.getManifestByEventId(eventId).first;
-        // Get current menu item IDs
-        final currentMenuItemIds = _selectedMenuItems.map((item) => item.menuItemId).toSet();
-        debugPrint('Current menu item IDs: $currentMenuItemIds');
-
-        // Keep existing items that still exist in the menu
-        final updatedItems = (existingPlan?.items ?? <ManifestItem>[])
-            .where((item) => currentMenuItemIds.contains(item.menuItemId))
-            .toList();
-        debugPrint('Retaining ${updatedItems.length} existing manifest items.');
-
-        // Add new items that aren't in the manifest yet
-        for (final menuItem in _selectedMenuItems) {
-          final existingItem = updatedItems.any((item) => item.menuItemId == menuItem.menuItemId);
-
-          if (!existingItem) {
-            final newItemId = FirebaseFirestore.instance.collection('manifests').doc().id;
-            debugPrint('Adding new manifest item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
-
-            updatedItems.add(ManifestItem(
-              id: newItemId,
-              menuItemId: menuItem.menuItemId,
-              name: menuItem.name,
-              quantity: menuItem.quantity,
-              vehicleId: null,
-              loadingStatus: LoadingStatus.unassigned,
-            ));
-          }
-        }
-
-        debugPrint('Updating manifest with ${updatedItems.length} total items.');
-        if (existingPlan != null) {
-          final updatedPlan = existingPlan.copyWith(items: updatedItems);
-          await manifestService.updateManifest(updatedPlan);
-        }
-      }
-
-      debugPrint('Manifest management complete.');
-    } catch (e) {
-      debugPrint('Error managing manifest: $e');
-      // We don't want to fail the whole submission if just the manifest fails
-      // So we catch the error here and just log it
     }
   }
 

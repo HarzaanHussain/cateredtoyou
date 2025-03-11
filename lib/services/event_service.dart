@@ -324,7 +324,11 @@ class EventService extends ChangeNotifier {
           totalPrice: totalPrice,
           metadata: metadata?.toMap(),
         );
+        debugPrint(
+            'Event object created: $eventObj'); // Printing debug message.
         await _taskAutomationService.generateTasksForEvent(eventObj);
+        debugPrint(
+            'Tasks generated for event: $eventObj'); // Printing debug message.
         return eventObj;
         
       });

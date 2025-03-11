@@ -3,13 +3,20 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart'; // Importing Flutter's foundation library for debugging purposes
 import 'package:cateredtoyou/models/event_model.dart'; // Importing the Event model
 import 'package:cateredtoyou/models/task_model.dart'; // Importing the Task model
-import 'package:cateredtoyou/services/task_service.dart'; // Importing the TaskService
+import 'package:cateredtoyou/services/task_service.dart';
+
+import '../models/manifest_model.dart';
+import '../models/manifest_task_model.dart';
+import 'manifest_service.dart';
+import 'organization_service.dart'; // Importing the TaskService
 
 class TaskAutomationService {
   final TaskService _taskService; // Declaring a private TaskService instance
+  final OrganizationService _organizationService; // Declaring OrganizationService instance
   final FirebaseFirestore _firestore = FirebaseFirestore.instance; // Declaring a FirebaseFirestore instance
 
-  TaskAutomationService(this._taskService); // Constructor to initialize TaskService
+
+  TaskAutomationService(this._taskService, this._organizationService); // Constructor to initialize TaskService and organization service
 
   Future<void> generateTasksForEvent(Event event, {Event? originalEvent}) async {
   try {
@@ -37,6 +44,9 @@ class TaskAutomationService {
         await _createCustomTasks(event, staffByRole);
       }
     }
+
+    await manageManifest(event.id, event.menuItems);
+    await createManifestTasks(event.id, event.startDate);
   } catch (e) {
     debugPrint('Error generating tasks: $e');
     rethrow;
@@ -51,15 +61,15 @@ Future<void> _handleEventUpdate(Event newEvent, Event oldEvent, Map<String, Stri
     // Get both user role and permissions
     final userDoc = await _firestore.collection('users').doc(user.uid).get();
     if (!userDoc.exists) throw 'User not found';
-    
+
     final userRole = userDoc.data()?['role'] as String?;
     final permDoc = await _firestore.collection('permissions').doc(user.uid).get();
-    
+
     // Check if user has management role OR required permissions
     final isManager = ['admin', 'client', 'manager'].contains(userRole);
-    final permissions = permDoc.exists ? 
+    final permissions = permDoc.exists ?
         List<String>.from(permDoc.data()?['permissions'] ?? []) : [];
-    final hasRequiredPermission = permissions.contains('manage_tasks') || 
+    final hasRequiredPermission = permissions.contains('manage_tasks') ||
                                 permissions.contains('manage_events');
 
     if (!isManager && !hasRequiredPermission) {
@@ -76,6 +86,9 @@ Future<void> _handleEventUpdate(Event newEvent, Event oldEvent, Map<String, Stri
       await _processBatchUpdates(newEvent, oldEvent, staffByRole);
     }
 
+    await manageManifest(newEvent.id, newEvent.menuItems);
+    await createManifestTasks(newEvent.id, newEvent.startDate);
+
     debugPrint('Event update handler completed successfully');
   } catch (e, stack) {
     debugPrint('Error in event update handler: $e');
@@ -86,7 +99,7 @@ Future<void> _handleEventUpdate(Event newEvent, Event oldEvent, Map<String, Stri
 
 Future<void> _processBatchUpdates(Event newEvent, Event oldEvent, Map<String, String> staffByRole) async {
   debugPrint('Processing batch updates for event: ${newEvent.id}');
-  
+
   try {
     final querySnapshot = await _firestore
         .collection('tasks')
@@ -106,7 +119,7 @@ Future<void> _processBatchUpdates(Event newEvent, Event oldEvent, Map<String, St
     for (final doc in querySnapshot.docs) {
       final taskData = doc.data();
       final isInventoryTask = taskData['departmentId'] == 'inventory';
-      
+
       // Handle inventory tasks
       if (isInventoryTask && !listEquals(oldEvent.supplies, newEvent.supplies)) {
         currentBatch.delete(doc.reference);
@@ -117,13 +130,13 @@ Future<void> _processBatchUpdates(Event newEvent, Event oldEvent, Map<String, St
         bool needsUpdate = false;
 
         // Update due dates if needed
-        if (oldEvent.startDate != newEvent.startDate || 
+        if (oldEvent.startDate != newEvent.startDate ||
             oldEvent.endDate != newEvent.endDate) {
           final isPostEvent = taskData['name'].toString().contains('Post-Event');
           final newDueDate = isPostEvent
               ? newEvent.endDate.add(const Duration(hours: 2))
               : newEvent.startDate.subtract(const Duration(days: 1));
-          
+
           updates['dueDate'] = Timestamp.fromDate(newDueDate);
           updates['updatedAt'] = FieldValue.serverTimestamp();
           needsUpdate = true;
@@ -181,7 +194,212 @@ Future<void> _processBatchUpdates(Event newEvent, Event oldEvent, Map<String, St
   }
 }
 
+  Future<void> manageManifest(String eventId, List<EventMenuItem> selectedMenuItems) async {
+    try {
+      final manifestService = ManifestService(_organizationService);
 
+      // Check if a manifest already exists for this event
+      if (!(await manifestService.doesManifestExist(eventId))) {
+        debugPrint('No existing manifest found. Creating a new one.');
+        // Create manifest items from selected menu items
+        final manifestItems = selectedMenuItems.map((menuItem) {
+          final newItemId = FirebaseFirestore.instance.collection('manifests').doc().id;
+          debugPrint('Creating manifest item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
+
+          return ManifestItem(
+            id: newItemId,
+            menuItemId: menuItem.menuItemId,
+            name: menuItem.name,
+            quantity: menuItem.quantity,
+            vehicleId: null, // Initially, no vehicle is assigned
+            loadingStatus: LoadingStatus.unassigned, // Initial status is unassigned
+          );
+        }).toList();
+
+        if (manifestItems.isNotEmpty) {
+          debugPrint('Saving new manifest with ${manifestItems.length} items.');
+          await manifestService.createManifest(
+            eventId: eventId,
+            items: manifestItems,
+          );
+        } else {
+          debugPrint('No menu items selected, skipping manifest creation.');
+        }
+      } else {
+        debugPrint('Existing manifest found. Updating it.');
+        final existingPlan = await manifestService.getManifestByEventId(eventId).first;
+        // Get current menu item IDs
+        final currentMenuItemIds = selectedMenuItems.map((item) => item.menuItemId).toSet();
+        debugPrint('Current menu item IDs: $currentMenuItemIds');
+
+        // Keep existing items that still exist in the menu
+        final updatedItems = (existingPlan?.items ?? <ManifestItem>[])
+            .where((item) => currentMenuItemIds.contains(item.menuItemId))
+            .toList();
+        debugPrint('Retaining ${updatedItems.length} existing manifest items.');
+
+        // Add new items that aren't in the manifest yet
+        for (final menuItem in selectedMenuItems) {
+          final existingItem = updatedItems.any((item) => item.menuItemId == menuItem.menuItemId);
+
+          if (!existingItem) {
+            final newItemId = FirebaseFirestore.instance.collection('manifests').doc().id;
+            debugPrint('Adding new manifest item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
+
+            updatedItems.add(ManifestItem(
+              id: newItemId,
+              menuItemId: menuItem.menuItemId,
+              name: menuItem.name,
+              quantity: menuItem.quantity,
+              vehicleId: null,
+              loadingStatus: LoadingStatus.unassigned,
+            ));
+          }
+        }
+
+        debugPrint('Updating manifest with ${updatedItems.length} total items.');
+        if (existingPlan != null) {
+          final updatedPlan = existingPlan.copyWith(items: updatedItems);
+          await manifestService.updateManifest(updatedPlan);
+        }
+      }
+
+      debugPrint('Manifest management complete.');
+    } catch (e) {
+      debugPrint('Error managing manifest: $e');
+      // We don't want to fail the whole submission if just the manifest fails
+      // So we catch the error here and just log it
+    }
+  }
+
+  Future<void> createManifestTasks(String eventId, DateTime startDate) async {
+    try {
+      // Get the manifest for this event
+      final manifestService = ManifestService(_organizationService);
+      final manifest = await manifestService.getManifestByEventId(eventId).first;
+
+      if (manifest == null || manifest.items.isEmpty) {
+        debugPrint('No manifest or manifest items found. Skipping task creation.');
+        return;
+      }
+
+      debugPrint('Creating manifest tasks for ${manifest.items.length} items');
+
+      // Get a reference to the tasks collection
+      final tasksCollection = FirebaseFirestore.instance.collection('tasks');
+
+      // First, check if there are existing manifest tasks for this event
+      final existingTasksSnapshot = await tasksCollection
+          .where('eventId', isEqualTo: eventId)
+          .where('organizationId', isEqualTo: manifest.organizationId)
+          .where('menuItemId', isNotEqualTo: null)
+          .get();
+
+      // Create a map of existing tasks by menuItemId for quick lookup
+      final Map<String, DocumentSnapshot> existingTasksByMenuItemId = {};
+      for (final doc in existingTasksSnapshot.docs) {
+        final menuItemId = doc.data()['menuItemId'] as String?;
+        if (menuItemId != null) {
+          existingTasksByMenuItemId[menuItemId] = doc;
+        }
+      }
+
+      debugPrint('Found ${existingTasksByMenuItemId.length} existing manifest tasks');
+
+      // Set a due date for the tasks (1 day before event start)
+      final dueDate = startDate.subtract(const Duration(days: 1));
+
+      // Create a batch write to add/update all tasks at once
+      final batch = FirebaseFirestore.instance.batch();
+
+      // Get current user ID
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final createdBy = currentUser?.uid ?? '';
+      final organizationId = manifest.organizationId;
+      final now = DateTime.now();
+
+      // For tracking what we've processed
+      final processedMenuItemIds = <String>{};
+      int newTasksCount = 0;
+      int updatedTasksCount = 0;
+
+      // Process each manifest item
+      for (final item in manifest.items) {
+        processedMenuItemIds.add(item.menuItemId);
+
+        // Check if we already have a task for this menu item
+        if (existingTasksByMenuItemId.containsKey(item.menuItemId)) {
+          // Update existing task
+       final existingDoc = existingTasksByMenuItemId[item.menuItemId]!;
+
+       // Only update if something has changed
+       final existingData = existingDoc.data() as Map<String, dynamic>?;
+       if (existingData?['dueDate'] != Timestamp.fromDate(dueDate) ||
+           existingData?['name'] != "Prepare ${item.name}") {
+
+            batch.update(existingDoc.reference, {
+              'name': "Prepare ${item.name}",
+              'description': "Prepare ${item.name} for loading",
+              'dueDate': Timestamp.fromDate(dueDate),
+              'updatedAt': Timestamp.fromDate(now),
+            });
+
+            updatedTasksCount++;
+            debugPrint('Updated manifest task for item: ${item.name} (${item.menuItemId})');
+          }
+        } else {
+          // Create a new task
+          final taskDocRef = tasksCollection.doc();
+
+          // Create the ManifestTask
+          final manifestTask = ManifestTask(
+            id: taskDocRef.id,
+            eventId: eventId,
+            name: "Prepare ${item.name}",
+            description: "Prepare ${item.name} for loading",
+            dueDate: dueDate,
+            status: TaskStatus.pending,
+            priority: TaskPriority.medium,
+            assignedTo: '', // No specific user assigned
+            departmentId: '', // No specific department
+            organizationId: organizationId, // Using the org ID passed in
+            checklist: ["Prep for loading"],
+            createdBy: createdBy,
+            createdAt: now,
+            updatedAt: now,
+            menuItemId: item.menuItemId,
+            readiness: ItemReadiness.unloadable, // Default readiness is unloadable
+          );
+
+          // Add to batch
+          batch.set(taskDocRef, manifestTask.toMap());
+          newTasksCount++;
+          debugPrint('Created new manifest task for item: ${item.name} (${item.menuItemId})');
+        }
+      }
+
+      // Delete tasks for menu items that are no longer in the manifest
+      for (final entry in existingTasksByMenuItemId.entries) {
+        if (!processedMenuItemIds.contains(entry.key)) {
+          batch.delete(entry.value.reference);
+          debugPrint('Deleting manifest task for removed menu item: ${entry.key}');
+        }
+      }
+
+      // Commit the batch if there are any operations
+      if (newTasksCount > 0 || updatedTasksCount > 0 || existingTasksByMenuItemId.length != processedMenuItemIds.length) {
+        await batch.commit();
+        debugPrint('Manifest tasks update completed: $newTasksCount created, $updatedTasksCount updated, ${existingTasksByMenuItemId.length - processedMenuItemIds.length} deleted');
+      } else {
+        debugPrint('No manifest task changes needed');
+      }
+
+    } catch (e) {
+      debugPrint('Error managing manifest tasks: $e');
+      // We don't want to fail the whole submission if just the task creation fails
+      // So we catch the error here and just log it
+    }
+  }
 
 
 
@@ -339,7 +557,7 @@ Future<void> _processBatchUpdates(Event newEvent, Event oldEvent, Map<String, St
 
   Future<void> _createInventoryTasks(Event event, Map<String, String> staffByRole) async {
   debugPrint('Creating inventory tasks for event: ${event.id}');
-  
+
   for (final supply in event.supplies) {
     // Create preparation task (taking items from inventory)
     await _taskService.createTask(
