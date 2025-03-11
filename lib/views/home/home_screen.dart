@@ -8,6 +8,7 @@ import 'package:cateredtoyou/widgets/permission_widget.dart';
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:cateredtoyou/widgets/custom_app_bar.dart';
 import 'package:cateredtoyou/widgets/custom_drawer.dart';
+import 'package:cateredtoyou/widgets/urgent_tasks_widget.dart'; // Import the new widget
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -48,6 +49,11 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 24),
+
+              // Urgent Tasks Widget - Added here
+              const UrgentTasksWidget(),
+
               const SizedBox(height: 24),
 
               // Buttons without the 'Management' section
