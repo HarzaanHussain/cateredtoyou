@@ -4,6 +4,7 @@ import 'package:cateredtoyou/models/inventory_item_model.dart'; // Importing Inv
 import 'package:cateredtoyou/models/menu_item_model.dart'; // Importing MenuItem model
 import 'package:cateredtoyou/models/user_model.dart'; // Importing User model
 import 'package:cateredtoyou/models/vehicle_model.dart'; // Importing Vehicle model
+import 'package:cateredtoyou/services/notification_service.dart';
 import 'package:cateredtoyou/views/customers/add_customer_screen.dart';
 import 'package:cateredtoyou/views/customers/customer_list_screen.dart';
 import 'package:cateredtoyou/views/customers/edit_customer_screen.dart';
@@ -18,6 +19,7 @@ import 'package:cateredtoyou/views/inventory/inventory_edit_screen.dart'; // Imp
 import 'package:cateredtoyou/views/inventory/inventory_list_screen.dart'; // Importing InventoryListScreen widget
 import 'package:cateredtoyou/views/menu_item/menu_item_edit_screen.dart'; // Importing MenuItemEditScreen widget
 import 'package:cateredtoyou/views/menu_item/menu_item_list_screen.dart'; // Importing MenuItemListScreen widget
+import 'package:cateredtoyou/views/notifications/add_noti_testing.dart';
 import 'package:cateredtoyou/views/notifications/notification_screen.dart';
 import 'package:cateredtoyou/views/staff/add_staff_screen.dart'; // Importing AddStaffScreen widget
 import 'package:cateredtoyou/views/staff/edit_staff_screen.dart'; // Importing EditStaffScreen widget
@@ -45,8 +47,9 @@ class AppRouter {
   AppRouter(this.authModel); // Constructor to initialize authModel
 
   late final GoRouter router = GoRouter(
+    navigatorKey: navigatorKey,
     refreshListenable:
-    authModel, // Listening to changes in authModel for refreshing routes
+        authModel, // Listening to changes in authModel for refreshing routes
     debugLogDiagnostics: true, // Enabling debug logs for diagnostics
     initialLocation: '/login', // Setting initial route to '/login'
     routes: [
@@ -54,7 +57,7 @@ class AppRouter {
         path: '/login', // Path for login route
         name: 'login', // Name for login route
         builder: (context, state) =>
-        const LoginScreen(), // Building LoginScreen widget
+            const LoginScreen(), // Building LoginScreen widget
         redirect: (context, state) {
           if (authModel.isAuthenticated) {
             // If user is authenticated
@@ -67,7 +70,7 @@ class AppRouter {
         path: '/register', // Path for register route
         name: 'register', // Name for register route
         builder: (context, state) =>
-        const RegisterScreen(), // Building RegisterScreen widget
+            const RegisterScreen(), // Building RegisterScreen widget
         redirect: (context, state) {
           if (authModel.isAuthenticated) {
             // If user is authenticated
@@ -80,7 +83,7 @@ class AppRouter {
         path: '/home', // Path for home route
         name: 'home', // Name for home route
         builder: (context, state) =>
-        const HomeScreen(), // Building HomeScreen widget
+            const HomeScreen(), // Building HomeScreen widget
         redirect: (context, state) {
           if (!authModel.isAuthenticated) {
             // If user is not authenticated
@@ -92,35 +95,33 @@ class AppRouter {
       GoRoute(
         path: '/staff', // Path for staff list route
         builder: (context, state) =>
-        const StaffListScreen(), // Building StaffListScreen widget
+            const StaffListScreen(), // Building StaffListScreen widget
       ),
       GoRoute(
         path: '/add-staff', // Path for add staff route
         builder: (context, state) =>
-        const AddStaffScreen(), // Building AddStaffScreen widget
+            const AddStaffScreen(), // Building AddStaffScreen widget
       ),
       GoRoute(
         path: '/edit-staff', // Path for edit staff route
         builder: (context, state) {
           final staff =
-          state.extra as UserModel; // Extracting UserModel from state
+              state.extra as UserModel; // Extracting UserModel from state
           return EditStaffScreen(
               staff: staff); // Building EditStaffScreen widget with staff data
         },
       ),
       GoRoute(
         path: '/customers',
-        builder: (context, state) =>
-        const CustomerListScreen(),
+        builder: (context, state) => const CustomerListScreen(),
       ),
       GoRoute(
         path: '/add_customer',
-        builder: (context, state) =>
-        const AddCustomerScreen(),
+        builder: (context, state) => const AddCustomerScreen(),
       ),
       GoRoute(
         path: '/edit_customer',
-        builder: (context, state){
+        builder: (context, state) {
           final customer = state.extra as CustomerModel;
           return EditCustomerScreen(customer: customer);
         },
@@ -128,25 +129,28 @@ class AppRouter {
       GoRoute(
         path: '/staff/:id/permissions',
         builder: (context, state) {
-          final user = state.extra as UserModel; // Extracting UserModel from state
-          return UserPermissionsScreen(user: user); // Building UserPermissionsScreen widget with user data
+          final user =
+              state.extra as UserModel; // Extracting UserModel from state
+          return UserPermissionsScreen(
+              user:
+                  user); // Building UserPermissionsScreen widget with user data
         },
       ),
       GoRoute(
         path: '/inventory', // Path for inventory list route
         builder: (context, state) =>
-        const InventoryListScreen(), // Building InventoryListScreen widget
+            const InventoryListScreen(), // Building InventoryListScreen widget
       ),
       GoRoute(
         path: '/add-inventory', // Path for add inventory route
         builder: (context, state) =>
-        const InventoryEditScreen(), // Building InventoryEditScreen widget
+            const InventoryEditScreen(), // Building InventoryEditScreen widget
       ),
       GoRoute(
         path: '/edit-inventory', // Path for edit inventory route
         builder: (context, state) {
           final item = state.extra
-          as InventoryItem; // Extracting InventoryItem from state
+              as InventoryItem; // Extracting InventoryItem from state
           return InventoryEditScreen(
               item: item); // Building InventoryEditScreen widget with item data
         },
@@ -154,7 +158,7 @@ class AppRouter {
       GoRoute(
         path: '/events', // Path for event list route
         builder: (context, state) =>
-        const EventListScreen(), // Building EventListScreen widget
+            const EventListScreen(), // Building EventListScreen widget
         redirect: (context, state) {
           if (!authModel.isAuthenticated) {
             // If user is not authenticated
@@ -166,7 +170,7 @@ class AppRouter {
       GoRoute(
         path: '/add-event', // Path for add event route
         builder: (context, state) =>
-        const EventEditScreen(), // Building EventEditScreen widget
+            const EventEditScreen(), // Building EventEditScreen widget
         redirect: (context, state) {
           if (!authModel.isAuthenticated) {
             // If user is not authenticated
@@ -196,7 +200,7 @@ class AppRouter {
           final event = state.extra as Event; // Extracting Event from state
           return EventDetailsScreen(
               event:
-              event); // Building EventDetailsScreen widget with event data
+                  event); // Building EventDetailsScreen widget with event data
         },
         redirect: (context, state) {
           if (!authModel.isAuthenticated) {
@@ -209,33 +213,36 @@ class AppRouter {
       GoRoute(
         path: '/menu-items', // Path for menu items list route
         builder: (context, state) =>
-        const MenuItemListScreen(), // Building MenuItemListScreen widget
+            const MenuItemListScreen(), // Building MenuItemListScreen widget
       ),
       GoRoute(
         path: '/add-menu-item', // Path for add menu item route
         builder: (context, state) =>
-        const MenuItemEditScreen(), // Building MenuItemEditScreen widget
+            const MenuItemEditScreen(), // Building MenuItemEditScreen widget
       ),
       GoRoute(
         path: '/edit-menu-item', // Path for edit menu item route
         builder: (context, state) {
           final menuItem =
-          state.extra as MenuItem; // Extracting MenuItem from state
+              state.extra as MenuItem; // Extracting MenuItem from state
           return MenuItemEditScreen(
               menuItem:
-              menuItem); // Building MenuItemEditScreen widget with menuItem data
+                  menuItem); // Building MenuItemEditScreen widget with menuItem data
         },
       ),
       GoRoute(
         path: '/notifications',
-        builder: (context, state) => 
-          const NotificationScreen(),
+        builder: (context, state) => const NotificationScreen(),
+      ),
+      GoRoute(
+        path: '/add_notification',
+        builder: (context, state) => const CreateNotificationPage(),
       ),
       GoRoute(
         // Route for tasks list
         path: '/tasks',
         builder: (context, state) =>
-        const TaskListScreen(), // Building TaskListScreen widget
+            const TaskListScreen(), // Building TaskListScreen widget
         redirect: (context, state) {
           // Redirecting to login if not authenticated
           if (!authModel.isAuthenticated) {
@@ -248,7 +255,7 @@ class AppRouter {
         // Route for manage tasks
         path: '/manage-tasks',
         builder: (context, state) =>
-        const ManageTasksScreen(), // Building ManageTasksScreen widget
+            const ManageTasksScreen(), // Building ManageTasksScreen widget
         redirect: (context, state) {
           // Redirecting to login if not authenticated
           if (!authModel.isAuthenticated) {
@@ -260,51 +267,57 @@ class AppRouter {
       GoRoute(
         path: '/vehicles', // Path for vehicle list route
         builder: (context, state) =>
-        const VehicleListScreen(), // Building VehicleListScreen widget
+            const VehicleListScreen(), // Building VehicleListScreen widget
       ),
       GoRoute(
         path: '/add-vehicle', // Path for add vehicle route
         builder: (context, state) =>
-        const VehicleFormScreen(), // Building VehicleFormScreen widget
+            const VehicleFormScreen(), // Building VehicleFormScreen widget
       ),
       GoRoute(
         path: '/edit-vehicle', // Path for edit vehicle route
         builder: (context, state) {
-          final vehicle = state.extra as Vehicle; // Extracting Vehicle from state
+          final vehicle =
+              state.extra as Vehicle; // Extracting Vehicle from state
           return VehicleFormScreen(
-              vehicle: vehicle); // Building VehicleFormScreen widget with vehicle data
+              vehicle:
+                  vehicle); // Building VehicleFormScreen widget with vehicle data
         },
       ),
       GoRoute(
         path: '/vehicle-details', // Path for vehicle details route
         builder: (context, state) {
-          final vehicle = state.extra as Vehicle; // Extracting Vehicle from state
+          final vehicle =
+              state.extra as Vehicle; // Extracting Vehicle from state
           return VehicleDetailsScreen(
-              vehicle: vehicle); // Building VehicleDetailsScreen widget with vehicle data
+              vehicle:
+                  vehicle); // Building VehicleDetailsScreen widget with vehicle data
         },
       ),
       GoRoute(
         path: '/track-delivery', // Path for track delivery route
         builder: (context, state) {
-          final route = state.extra as DeliveryRoute; // Extracting DeliveryRoute from state
+          final route = state.extra
+              as DeliveryRoute; // Extracting DeliveryRoute from state
           return TrackDeliveryScreen(
-              route: route); // Building TrackDeliveryScreen widget with route data
+              route:
+                  route); // Building TrackDeliveryScreen widget with route data
         },
       ),
       GoRoute(
         path: '/deliveries', // Path for deliveries list route
         builder: (context, state) =>
-        const DeliveryListScreen(), // Building DeliveryListScreen widget
+            const DeliveryListScreen(), // Building DeliveryListScreen widget
       ),
       GoRoute(
         path: '/add-delivery', // Path for add delivery route
         builder: (context, state) =>
-        const DeliveryFormScreen(), // Building DeliveryFormScreen widget
+            const DeliveryFormScreen(), // Building DeliveryFormScreen widget
       ),
       GoRoute(
         path: '/driver-deliveries', // Path for driver deliveries route
         builder: (context, state) =>
-        const DriverDeliveriesScreen(), // Building DriverDeliveriesScreen widget
+            const DriverDeliveriesScreen(), // Building DriverDeliveriesScreen widget
       ),
       GoRoute(
         path: '/calendar',
