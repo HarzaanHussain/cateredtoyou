@@ -50,44 +50,24 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // Management Section
+              // Buttons without the 'Management' section
               FutureBuilder<bool>(
-                future: Future.wait([
-                  rolePermissions.hasPermission('view_customers'),
-                  rolePermissions.hasPermission('manage_manifest'),
-                ]).then((permissions) => permissions.any((p) => p)),
+                future: rolePermissions.hasPermission('view_customers'),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData || !snapshot.data!) {
                     return const SizedBox.shrink();
                   }
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Management',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                  return Card(
+                    child: PermissionWidget(
+                      permissionId: 'view_customers',
+                      child: ListTile(
+                        leading: const Icon(Icons.handshake),
+                        title: const Text('Customer Management'),
+                        subtitle: const Text('View and edit customer information'),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: () => context.push('/customers'),
                       ),
-                      const SizedBox(height: 16),
-                      Card(
-                        child: Column(
-                          children: [
-                            PermissionWidget(
-                              permissionId: 'view_customers',
-                              child: ListTile(
-                                leading: const Icon(Icons.handshake),
-                                title: const Text('Customer Management'),
-                                subtitle: const Text('View and edit customer information'),
-                                trailing: const Icon(Icons.arrow_forward_ios),
-                                onTap: () => context.push('/customers'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                    ),
                   );
                 },
               ),
