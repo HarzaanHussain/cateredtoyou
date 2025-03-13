@@ -25,6 +25,10 @@ class EventDetailsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Event Details'), // AppBar title
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/events'),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit), // Edit icon button
@@ -578,7 +582,7 @@ class EventDetailsScreen extends StatelessWidget {
                           const SizedBox(
                               height:
                                   16), // Adds vertical spacing between sections
-                                  // Displays event requirements
+                          // Displays event requirements
                           if (event.metadata != null)
                             Card(
                               child: Padding(
@@ -642,7 +646,8 @@ class EventDetailsScreen extends StatelessWidget {
                                                   ),
                                                   backgroundColor: theme
                                                       .colorScheme.primary
-                                                      .withAlpha((0.1 * 255).toInt()),
+                                                      .withAlpha(
+                                                          (0.1 * 255).toInt()),
                                                 ))
                                             .toList(),
                                       ),
@@ -687,7 +692,8 @@ class EventDetailsScreen extends StatelessWidget {
                                                   ),
                                                   backgroundColor: theme
                                                       .colorScheme.primary
-                                                      .withAlpha((0.1 * 255).toInt()),
+                                                      .withAlpha(
+                                                          (0.1 * 255).toInt()),
                                                 ))
                                             .toList(),
                                       ),
@@ -1023,6 +1029,7 @@ class _InfoRow extends StatelessWidget {
 extension StatusFormatting on EventStatus {
   String get formatted => toString().split('.').last.toUpperCase();
 }
+
 /// Formats the bar service type for display
 String _formatBarServiceType(String? type) {
   if (type == null) return 'Standard Service';

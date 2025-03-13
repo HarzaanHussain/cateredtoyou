@@ -4,6 +4,7 @@ import 'package:cateredtoyou/models/inventory_item_model.dart'; // Importing Inv
 import 'package:cateredtoyou/models/menu_item_model.dart'; // Importing MenuItem model
 import 'package:cateredtoyou/models/user_model.dart'; // Importing User model
 import 'package:cateredtoyou/models/vehicle_model.dart'; // Importing Vehicle model
+import 'package:cateredtoyou/routes/EventLoaderScreen.dart';
 import 'package:cateredtoyou/services/notification_service.dart';
 import 'package:cateredtoyou/views/customers/add_customer_screen.dart';
 import 'package:cateredtoyou/views/customers/customer_list_screen.dart';
@@ -167,6 +168,17 @@ class AppRouter {
           return null; // No redirection if authenticated
         },
       ),
+      GoRoute(
+          path: '/events/:eventId',
+          builder: (context, state) {
+            return EventLoaderScreen(eventId: state.pathParameters['eventId']!);
+          },
+          redirect: (context, state) {
+            if (!authModel.isAuthenticated) {
+              return '/login';
+            }
+            return null;
+          }),
       GoRoute(
         path: '/add-event', // Path for add event route
         builder: (context, state) =>

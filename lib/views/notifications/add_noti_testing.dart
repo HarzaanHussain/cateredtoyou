@@ -15,6 +15,8 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
   final _bodyController = TextEditingController();
   final _screenController = TextEditingController(text: 'home');
   final _extraDataController = TextEditingController();
+  final _eventIdController =
+      TextEditingController(); // New controller for event ID
 
   DateTime _scheduledDate = DateTime.now().add(const Duration(minutes: 1));
   bool _isScheduled = false;
@@ -45,7 +47,33 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
     _bodyController.dispose();
     _screenController.dispose();
     _extraDataController.dispose();
+    _eventIdController.dispose(); // Dispose the new controller
     super.dispose();
+  }
+
+  // Handle screen selection change
+  void _onScreenChanged(String? newValue) {
+    if (newValue != null) {
+      setState(() {
+        _screenController.text = newValue;
+
+        // Clear event ID if not events screen
+        if (newValue != 'events') {
+          _eventIdController.clear();
+        }
+
+        // Update extra data field based on current values
+        _updateExtraDataField();
+      });
+    }
+  }
+
+  // Update the extra data field based on selected screen and IDs
+  void _updateExtraDataField() {
+    if (_screenController.text == 'events' &&
+        _eventIdController.text.isNotEmpty) {
+      _extraDataController.text = 'eventId:${_eventIdController.text}';
+    }
   }
 
   Future<void> _selectDateTime(BuildContext context) async {
@@ -143,6 +171,8 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isEventsScreen = _screenController.text == 'events';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Notification'),
@@ -194,21 +224,44 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
                     child: Text(screen),
                   );
                 }).toList(),
-                onChanged: (String? newValue) {
-                  if (newValue != null) {
-                    setState(() {
-                      _screenController.text = newValue;
-                    });
-                  }
-                },
+                onChanged: _onScreenChanged,
               ),
+
+              // Show Event ID field only when Events is selected
+              if (isEventsScreen) ...[
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _eventIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Event ID',
+                    border: OutlineInputBorder(),
+                    hintText: 'Enter the Firestore document ID of the event',
+                    helperText:
+                        'This will be used to navigate to the specific event',
+                  ),
+                  onChanged: (value) {
+                    // Update the extra data field whenever event ID changes
+                    setState(() {
+                      _updateExtraDataField();
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Tip: You can find the Event ID in the Firestore console or by accessing event.id in your code.',
+                  style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+                ),
+              ],
+
               const SizedBox(height: 16),
               TextFormField(
                 controller: _extraDataController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Extra Data (key1:value1;key2:value2)',
-                  border: OutlineInputBorder(),
-                  hintText: 'Optional: id:123;type:reminder',
+                  border: const OutlineInputBorder(),
+                  hintText: isEventsScreen
+                      ? 'This will be auto-filled with the Event ID above'
+                      : 'Optional: id:123;type:reminder',
                 ),
               ),
               const SizedBox(height: 24),
