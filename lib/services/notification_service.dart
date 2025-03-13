@@ -103,7 +103,7 @@ class NotificationService {
         print('Attempting to navigate to: $screen');
 
         // get route from screen name
-        final String route = _getRouteFromScreen(screen);
+        final String route = _enhanceRouteWithParams(screen, payloadData);
 
         if (route.isNotEmpty) {
           // navigate using the context
@@ -161,13 +161,27 @@ class NotificationService {
       final pairs = payload.split(';');
 
       for (final pair in pairs) {
-        final keyValue = pair.split(';');
+        final keyValue = pair.split(':');
         if (keyValue.length == 2) {
           result[keyValue[0].trim()] = keyValue[1].trim();
         }
       }
       return result;
     }
+  }
+
+  String _enhanceRouteWithParams(
+      String screen, Map<String, dynamic> payloadData) {
+    // Start with the base route
+    String route = _getRouteFromScreen(screen);
+
+    // Handle specific screens with ID parameters
+    if (screen == 'events' && payloadData.containsKey('eventId')) {
+      return '/events/${payloadData['eventId']}';
+    }
+
+    // Return the unmodified route for other screens
+    return route;
   }
 
   //NOTIFICATION DETAILS
