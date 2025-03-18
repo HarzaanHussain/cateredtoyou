@@ -61,36 +61,47 @@ class _NotificationScreenState extends State<NotificationScreen> {
     // Navigate if there's a payload
     if (notification.payload != null && notification.payload!.isNotEmpty) {
       try {
-        Map<String, dynamic> payloadData;
+        // Instead of parsing the payload ourselves and only navigating to base screens,
+        // use the NotificationService which has logic for enhanced routes with IDs
+        _notificationService.handleNotificationPayload(
+            notification.payload!, context);
+        return; // Exit early since we're navigating away
+      } catch (e) {
+        print('Error handling notification payload: $e');
 
-        // Try to parse as JSON first
+        // Fallback to original logic if the notification service fails
         try {
-          payloadData = json.decode(notification.payload!);
-        } catch (_) {
-          // Fall back to semicolon format
-          payloadData = {};
-          final pairs = notification.payload!.split(';');
-          for (final pair in pairs) {
-            final parts = pair.split(':');
-            if (parts.length == 2) {
-              payloadData[parts[0].trim()] = parts[1].trim();
+          Map<String, dynamic> payloadData;
+
+          // Try to parse as JSON first
+          try {
+            payloadData = json.decode(notification.payload!);
+          } catch (_) {
+            // Fall back to semicolon format
+            payloadData = {};
+            final pairs = notification.payload!.split(';');
+            for (final pair in pairs) {
+              final parts = pair.split(':');
+              if (parts.length == 2) {
+                payloadData[parts[0].trim()] = parts[1].trim();
+              }
             }
           }
-        }
 
-        // If there's a screen, proceed with navigation
-        if (payloadData.containsKey('screen')) {
-          final String screenName = payloadData['screen'].toString();
-          final String route = _getRouteFromScreen(screenName);
+          // If there's a screen, proceed with navigation
+          if (payloadData.containsKey('screen')) {
+            final String screenName = payloadData['screen'].toString();
+            final String route = _getRouteFromScreen(screenName);
 
-          if (route.isNotEmpty) {
-            print('Navigating to: $route from notification tap');
-            GoRouter.of(context).go(route);
-            return; // Exit early since we're navigating away
+            if (route.isNotEmpty) {
+              print('Navigating to: $route from notification tap');
+              GoRouter.of(context).go(route);
+              return; // Exit early since we're navigating away
+            }
           }
+        } catch (e) {
+          print('Error parsing notification payload: $e');
         }
-      } catch (e) {
-        print('Error parsing notification payload: $e');
       }
     }
 
