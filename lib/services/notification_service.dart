@@ -94,7 +94,7 @@ class NotificationService {
 
   void handleNotificationPayload(String payload, BuildContext context) {
     try {
-      //parse the payload
+      // Parse the payload
       final Map<String, dynamic> payloadData = _parsePayload(payload);
       print('Parsed payload: $payloadData');
 
@@ -102,15 +102,15 @@ class NotificationService {
         final String screen = payloadData['screen'].toString();
         print('Attempting to navigate to: $screen');
 
-        // get route from screen name
+        // Get enhanced route that includes any ID parameters
         final String route = _enhanceRouteWithParams(screen, payloadData);
 
         if (route.isNotEmpty) {
-          // navigate using the context
+          // Navigate using the context
           print('Navigating to route: $route');
           GoRouter.of(context).go(route);
         } else {
-          print('Unknown screen in payload $screen');
+          print('Unknown screen in payload: $screen');
         }
       } else {
         print('Payload does not contain screen information');
@@ -173,15 +173,40 @@ class NotificationService {
   String _enhanceRouteWithParams(
       String screen, Map<String, dynamic> payloadData) {
     // Start with the base route
-    String route = _getRouteFromScreen(screen);
+    switch (screen) {
+      case 'events':
+        if (payloadData.containsKey('eventId')) {
+          return '/events/${payloadData['eventId']}';
+        }
+        break;
 
-    // Handle specific screens with ID parameters
-    if (screen == 'events' && payloadData.containsKey('eventId')) {
-      return '/events/${payloadData['eventId']}';
+      case 'inventory':
+        if (payloadData.containsKey('itemId')) {
+          return '/inventory/${payloadData['itemId']}';
+        }
+        break;
+
+      case 'tasks':
+        if (payloadData.containsKey('taskId')) {
+          return '/tasks/${payloadData['taskId']}';
+        }
+        break;
+
+      case 'vehicles':
+        if (payloadData.containsKey('vehicleId')) {
+          return '/vehicles/${payloadData['vehicleId']}';
+        }
+        break;
+
+      case 'staff':
+        if (payloadData.containsKey('staffId')) {
+          return '/staff/${payloadData['staffId']}';
+        }
+        break;
     }
 
-    // Return the unmodified route for other screens
-    return route;
+    // If no specific ID found, return the base route
+    return _getRouteFromScreen(screen);
   }
 
   //NOTIFICATION DETAILS

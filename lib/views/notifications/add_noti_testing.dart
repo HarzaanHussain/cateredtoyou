@@ -15,12 +15,22 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
   final _bodyController = TextEditingController();
   final _screenController = TextEditingController(text: 'home');
   final _extraDataController = TextEditingController();
-  final _eventIdController =
-      TextEditingController(); // New controller for event ID
+  final _contentIdController = TextEditingController();
 
   DateTime _scheduledDate = DateTime.now().add(const Duration(minutes: 1));
   bool _isScheduled = false;
   final NotificationService _notificationService = NotificationService();
+
+  // Content type and parameter name mapping
+  final Map<String, String> _contentTypeMapping = {
+    'events': 'eventId',
+    'inventory': 'itemId',
+    'tasks': 'taskId',
+    'vehicles': 'vehicleId',
+    'staff': 'staffId',
+    'customers': 'customerId',
+  };
+
   final List<String> _availableScreens = [
     'home',
     'events',
@@ -47,8 +57,13 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
     _bodyController.dispose();
     _screenController.dispose();
     _extraDataController.dispose();
-    _eventIdController.dispose(); // Dispose the new controller
+    _contentIdController.dispose();
     super.dispose();
+  }
+
+  // Get parameter name for the current content type
+  String? get _contentIdParamName {
+    return _contentTypeMapping[_screenController.text];
   }
 
   // Handle screen selection change
@@ -57,22 +72,23 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
       setState(() {
         _screenController.text = newValue;
 
-        // Clear event ID if not events screen
-        if (newValue != 'events') {
-          _eventIdController.clear();
-        }
+        // Clear content ID if screen changes
+        _contentIdController.clear();
 
-        // Update extra data field based on current values
+        // Update extra data field
         _updateExtraDataField();
       });
     }
   }
 
-  // Update the extra data field based on selected screen and IDs
+  // Update the extra data field based on selected screen and content ID
   void _updateExtraDataField() {
-    if (_screenController.text == 'events' &&
-        _eventIdController.text.isNotEmpty) {
-      _extraDataController.text = 'eventId:${_eventIdController.text}';
+    final paramName = _contentIdParamName;
+
+    if (paramName != null && _contentIdController.text.isNotEmpty) {
+      _extraDataController.text = '$paramName:${_contentIdController.text}';
+    } else {
+      _extraDataController.text = '';
     }
   }
 
@@ -171,7 +187,8 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isEventsScreen = _screenController.text == 'events';
+    final bool hasContentIdParam = _contentIdParamName != null;
+    final String contentType = _screenController.text.replaceAll('-', ' ');
 
     return Scaffold(
       appBar: AppBar(
@@ -227,29 +244,28 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
                 onChanged: _onScreenChanged,
               ),
 
-              // Show Event ID field only when Events is selected
-              if (isEventsScreen) ...[
+              // Show content ID field when applicable
+              if (hasContentIdParam) ...[
                 const SizedBox(height: 16),
                 TextFormField(
-                  controller: _eventIdController,
-                  decoration: const InputDecoration(
-                    labelText: 'Event ID',
-                    border: OutlineInputBorder(),
-                    hintText: 'Enter the Firestore document ID of the event',
-                    helperText:
-                        'This will be used to navigate to the specific event',
+                  controller: _contentIdController,
+                  decoration: InputDecoration(
+                    labelText: '${contentType.capitalize()} ID',
+                    border: const OutlineInputBorder(),
+                    hintText: 'Enter the Firestore document ID',
+                    helperText: 'This will be used for direct navigation',
                   ),
                   onChanged: (value) {
-                    // Update the extra data field whenever event ID changes
                     setState(() {
                       _updateExtraDataField();
                     });
                   },
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Tip: You can find the Event ID in the Firestore console or by accessing event.id in your code.',
-                  style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+                Text(
+                  'Tip: You can find the ${contentType.capitalize()} ID in the Firestore console',
+                  style: const TextStyle(
+                      fontStyle: FontStyle.italic, fontSize: 12),
                 ),
               ],
 
@@ -259,8 +275,8 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
                 decoration: InputDecoration(
                   labelText: 'Extra Data (key1:value1;key2:value2)',
                   border: const OutlineInputBorder(),
-                  hintText: isEventsScreen
-                      ? 'This will be auto-filled with the Event ID above'
+                  hintText: hasContentIdParam
+                      ? 'Auto-filled based on content ID'
                       : 'Optional: id:123;type:reminder',
                 ),
               ),
@@ -301,5 +317,12 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
         ),
       ),
     );
+  }
+}
+
+// Extension method to capitalize strings
+extension StringExtension on String {
+  String capitalize() {
+    return "${this[0].toUpperCase()}${substring(1)}";
   }
 }
