@@ -2,16 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cateredtoyou/models/auth_model.dart';
-import 'package:cateredtoyou/models/user_model.dart';
-import 'package:cateredtoyou/services/role_permissions.dart';
 import 'package:cateredtoyou/widgets/permission_widget.dart';
-
-// This is the hamburger menu, to use it in views you also need the top bar :
-  // import 'package:cateredtoyou/widgets/custom_app_bar.dart';
-  // import 'package:cateredtoyou/widgets/custom_drawer.dart';
-  // Place these two in the scaffold:
-    //appBar: const CustomAppBar(title: 'CateredToYou'),
-    //drawer: const CustomDrawer(),
 
 class CustomDrawer extends StatelessWidget {
   const CustomDrawer({super.key});
@@ -23,13 +14,12 @@ class CustomDrawer extends StatelessWidget {
     return Drawer(
       child: Column(
         children: [
-          // Header Section
           SizedBox(
             height: 150,
             width: double.infinity,
             child: DrawerHeader(
               decoration: const BoxDecoration(
-                color: Color(0xFFFFC533), // Header background color
+                color: Color(0xFFFFC533),
               ),
               child: Align(
                 alignment: Alignment.centerLeft,
@@ -44,9 +34,18 @@ class CustomDrawer extends StatelessWidget {
             ),
           ),
 
+          // New Customer Management option
+          PermissionWidget(
+            permissionId: 'view_customers',
+            child: ListTile(
+              leading: const Icon(Icons.handshake),
+              title: const Text('Customer Management'),
+              subtitle: const Text('View and edit customer information'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () => context.push('/customers'),
+            ),
+          ),
 
-
-          // Inventory Section
           PermissionWidget(
             permissionId: 'manage_inventory',
             child: ListTile(
@@ -58,7 +57,6 @@ class CustomDrawer extends StatelessWidget {
             ),
           ),
 
-          // Staff Management Section
           PermissionWidget(
             permissionId: 'manage_staff',
             child: ListTile(
@@ -70,7 +68,6 @@ class CustomDrawer extends StatelessWidget {
             ),
           ),
 
-          // Task Management Section
           PermissionWidget(
             permissionId: 'view_tasks',
             child: ListTile(
@@ -82,19 +79,17 @@ class CustomDrawer extends StatelessWidget {
             ),
           ),
 
-          // Vehicle Loading System Section
-        // Vehicle Loading System Section (Moved to Sidebar)
-        PermissionWidget(
-          permissionId: 'manage_manifest',
-          child: ListTile(
-            leading: const Icon(Icons.local_shipping),
-            title: const Text('Vehicle Loading'),
-            subtitle: const Text('Manage vehicle loading manifests'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () => context.push('/manifest'),
+          PermissionWidget(
+            permissionId: 'manage_manifest',
+            child: ListTile(
+              leading: const Icon(Icons.local_shipping),
+              title: const Text('Vehicle Loading'),
+              subtitle: const Text('Manage vehicle loading manifests'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () => context.push('/manifest'),
+            ),
           ),
-        ),
-          // Menu Management Section
+
           PermissionWidget(
             permissionId: 'manage_menu',
             child: ListTile(
@@ -106,8 +101,18 @@ class CustomDrawer extends StatelessWidget {
             ),
           ),
 
-
           const Spacer(),
+
+          PermissionWidget(
+            permissionId: 'view_tasks', // Ensure this permission ID is correct
+            child: ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Settings'),
+              subtitle: const Text('Configure app preferences'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () => context.push('/app_settings'),
+            ),
+          ),
         ],
       ),
     );
