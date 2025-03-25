@@ -19,57 +19,78 @@ class _LoadedItemsSectionState extends State<LoadedItemsSection> {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: ExpansionPanelList(
-        dividerColor: Colors.white.withAlpha((0.9 * 255).toInt()),
-        elevation: 3,
-        expandedHeaderPadding: EdgeInsets.zero,
-        expansionCallback: (int index, bool isExpanded) {
-          setState(() {
-            _isExpanded = !isExpanded;
-          });
-        },
+    return Card(
+      elevation: 4,
+      margin: EdgeInsets.zero,
+      color: Colors.white,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          ExpansionPanel(
-            headerBuilder: (context, isExpanded) {
-              return ListTile(
-                leading: Icon(
-                  widget.allItemsLoaded
-                      ? Icons.check_circle
-                      : Icons.info_outline,
-                  color: widget.allItemsLoaded ? Colors.green : Colors.orange,
-                ),
-                title: Text(
-                  'Delivery Contents (${widget.items.length} items)',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                subtitle: Text(
-                  widget.allItemsLoaded
-                      ? 'All items loaded and ready for delivery'
-                      : 'Some items may not be loaded yet',
-                  style: TextStyle(
-                    color: widget.allItemsLoaded ? Colors.green : Colors.orange,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              );
+          // Custom header with tap handling
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isExpanded = !_isExpanded;
+              });
             },
-            body: Container(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Icon(
+                    widget.allItemsLoaded 
+                      ? Icons.check_circle 
+                      : Icons.info_outline,
+                    color: widget.allItemsLoaded 
+                      ? Colors.green 
+                      : Colors.orange,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Delivery Contents (${widget.items.length} items)',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        Text(
+                          widget.allItemsLoaded
+                            ? 'All items loaded and ready for delivery'
+                            : 'Some items may not be loaded yet',
+                          style: TextStyle(
+                            color: widget.allItemsLoaded ? Colors.green : Colors.orange,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _isExpanded ? Icons.expand_less : Icons.expand_more,
+                    color: Colors.grey[600],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Content (shows only when expanded)
+          if (_isExpanded)
+            Container(
               color: Colors.white,
               child: ListView.builder(
                 shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
+                physics: const NeverScrollableScrollPhysics(),
                 itemCount: widget.items.length,
                 itemBuilder: (context, index) {
                   final item = widget.items[index];
                   return ListTile(
-                    leading: Icon(Icons.inventory_2, color: Colors.green),
+                    leading: const Icon(Icons.inventory_2, color: Colors.green),
                     title: Text(item['name'] ?? 'Unknown Item'),
                     subtitle: Text('Quantity: ${item['quantity'] ?? 0}'),
                     trailing: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.green.shade100,
                         borderRadius: BorderRadius.circular(12),
@@ -87,8 +108,6 @@ class _LoadedItemsSectionState extends State<LoadedItemsSection> {
                 },
               ),
             ),
-            isExpanded: _isExpanded,
-          ),
         ],
       ),
     );
