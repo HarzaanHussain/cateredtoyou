@@ -913,176 +913,172 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
       ),
     );
   }
+
   // Build the vehicle dropdown for selecting the vehicle.
   Widget _buildLoadedItemsSection() {
-  return Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                _vehicleHasAllItems 
-                  ? Icons.check_circle 
-                  : Icons.info_outline,
-                color: _vehicleHasAllItems 
-                  ? Colors.green 
-                  : Colors.orange,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Manifest Items for Delivery',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _vehicleHasAllItems
-              ? 'All items are loaded and ready for delivery'
-              : 'Some items may not be loaded yet',
-            style: TextStyle(
-              color: _vehicleHasAllItems ? Colors.green : Colors.orange,
-              fontStyle: FontStyle.italic,
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  _vehicleHasAllItems ? Icons.check_circle : Icons.info_outline,
+                  color: _vehicleHasAllItems ? Colors.green : Colors.orange,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Manifest Items for Delivery',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _loadedItems.length,
-            itemBuilder: (context, index) {
-              final item = _loadedItems[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: const Icon(Icons.inventory_2, color: Colors.green),
-                  title: Text(item.name),
-                  subtitle: Text('Quantity: ${item.quantity}'),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green.shade700),
-                    ),
-                    child: const Text(
-                      'LOADED',
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontWeight: FontWeight.bold,
+            const SizedBox(height: 8),
+            Text(
+              _vehicleHasAllItems
+                  ? 'All items are loaded and ready for delivery'
+                  : 'Some items may not be loaded yet',
+              style: TextStyle(
+                color: _vehicleHasAllItems ? Colors.green : Colors.orange,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _loadedItems.length,
+              itemBuilder: (context, index) {
+                final item = _loadedItems[index];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const Icon(Icons.inventory_2, color: Colors.green),
+                    title: Text(item.name),
+                    subtitle: Text('Quantity: ${item.quantity}'),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.green.shade700),
+                      ),
+                      child: const Text(
+                        'LOADED',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-            },
-          ),
-        ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildEventSection() {
-  final orgService = context.read<OrganizationService>();
-  return FutureBuilder<String?>(
-    future: orgService
-        .getCurrentUserOrganization()
-        .then((org) => org?.id),
-    builder: (context, orgSnapshot) {
-      if (!orgSnapshot.hasData) {
-        return const Center(child: CircularProgressIndicator());
-      }
+    final orgService = context.read<OrganizationService>(); // Access the OrganizationService to fetch the current user's organization.
 
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('events')
-                .where('organizationId', isEqualTo: orgSnapshot.data)
-                .where('status', whereIn: ['confirmed', 'in_progress'])
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Text('Error: ${snapshot.error}');
-              }
+    return FutureBuilder<String?>(
+      future: orgService.getCurrentUserOrganization().then((org) => org?.id), // Fetch the current user's organization ID asynchronously.
+      builder: (context, orgSnapshot) {
+        if (!orgSnapshot.hasData) {
+          return const Center(child: CircularProgressIndicator()); // Show a loading indicator while the organization data is being fetched.
+        }
 
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start of the column.
+          children: [
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('events') // Access the 'events' collection in Firestore.
+                  .where('organizationId', isEqualTo: orgSnapshot.data) // Filter events by the current user's organization ID.
+                  .where('status', whereIn: ['confirmed', 'in_progress']).snapshots(), // Filter events with statuses 'confirmed' or 'in_progress'.
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Text('Error: ${snapshot.error}'); // Display an error message if there's an issue with the Firestore query.
+                }
 
-              final events = snapshot.data!.docs;
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator()); // Show a loading indicator while event data is being fetched.
+                }
 
-              return DropdownButtonFormField<String>(
-                value: _selectedEventId,
-                decoration: const InputDecoration(
-                  labelText: 'Select Event',
-                  hintText: 'Choose an event for delivery',
-                  prefixIcon: Icon(Icons.event),
-                ),
-                items: events.map((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  return DropdownMenuItem(
-                    value: doc.id,
-                    child: Text(data['name'] ?? 'Unnamed Event'),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    _handleEventSelection(value);
-                  }
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please select an event';
-                  }
-                  return null;
-                },
-              );
-            },
-          ),
-          
-          // Display manifest status - moved outside the dropdown
-          if (_isLoadingManifest)
-            Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: Row(
-                children: const [
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                final events = snapshot.data!.docs; // Retrieve the list of event documents.
+
+                return DropdownButtonFormField<String>(
+                  value: _selectedEventId, // Set the currently selected event ID.
+                  decoration: const InputDecoration(
+                    labelText: 'Select Event', // Label for the dropdown.
+                    hintText: 'Choose an event for delivery', // Hint text for the dropdown.
+                    prefixIcon: Icon(Icons.event), // Icon to indicate the dropdown is for events.
                   ),
-                  SizedBox(width: 8),
-                  Text('Loading manifest...'),
-                ],
-              ),
-            )
-          else if (_manifestError != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: Text(
-                _manifestError!,
-                style: TextStyle(color: Colors.red.shade700),
-              ),
-            )
-          else if (_manifest != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: Text(
-                'Manifest loaded: ${_manifest!.items.length} items',
-                style: const TextStyle(color: Colors.green),
-              ),
+                  items: events.map((doc) {
+                    final data = doc.data() as Map<String, dynamic>; // Extract the event data from the document.
+                    return DropdownMenuItem(
+                      value: doc.id, // Set the event ID as the value.
+                      child: Text(data['name'] ?? 'Unnamed Event'), // Display the event name or a fallback if it's unnamed.
+                    );
+                  }).toList(), // Convert the list of events into dropdown menu items.
+                  onChanged: (value) {
+                    if (value != null) {
+                      _handleEventSelection(value); // Handle the event selection and fetch its details.
+                    }
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select an event'; // Validate that an event is selected.
+                    }
+                    return null;
+                  },
+                );
+              },
             ),
-        ],
-      );
-    },
-  );
-}
+
+            // Display manifest status - moved outside the dropdown
+            if (_isLoadingManifest)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0), // Add spacing above the loading indicator.
+                child: Row(
+                  children: const [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2), // Show a small loading indicator for manifest loading.
+                    ),
+                    SizedBox(width: 8), // Add spacing between the indicator and the text.
+                    Text('Loading manifest...'), // Inform the user that the manifest is being loaded.
+                  ],
+                ),
+              )
+            else if (_manifestError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0), // Add spacing above the error message.
+                child: Text(
+                  _manifestError!, // Display the manifest error message.
+                  style: TextStyle(color: Colors.red.shade700), // Style the error message in red.
+                ),
+              )
+            else if (_manifest != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0), // Add spacing above the manifest status.
+                child: Text(
+                  'Manifest loaded: ${_manifest!.items.length} items', // Display the number of items in the loaded manifest.
+                  style: const TextStyle(color: Colors.green), // Style the message in green to indicate success.
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
 
   /// Handles the selection of an event from the dropdown and fetches its details.
   Future<void> _handleEventSelection(String value) async {
