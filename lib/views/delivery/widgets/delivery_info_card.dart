@@ -5,12 +5,14 @@ import 'package:intl/intl.dart'; // Importing the intl package for date formatti
 import 'package:cateredtoyou/models/delivery_route_model.dart'; // Importing the delivery route model
 import 'package:cateredtoyou/views/delivery/widgets/status_chip.dart'; // Importing a custom widget for status chip
 
-class DeliveryInfoCard extends StatefulWidget { // Defining a stateful widget
+class DeliveryInfoCard extends StatefulWidget {
+  // Defining a stateful widget
   final DeliveryRoute route; // Delivery route data
   final VoidCallback onDriverInfoTap; // Callback for driver info tap
   final VoidCallback onContactDriverTap; // Callback for contact driver tap
 
-  const DeliveryInfoCard({ // Constructor for the widget
+  const DeliveryInfoCard({
+    // Constructor for the widget
     super.key,
     required this.route,
     required this.onDriverInfoTap,
@@ -18,83 +20,104 @@ class DeliveryInfoCard extends StatefulWidget { // Defining a stateful widget
   });
 
   @override
-  State<DeliveryInfoCard> createState() => _DeliveryInfoCardState(); // Creating the state for the widget
+  State<DeliveryInfoCard> createState() =>
+      _DeliveryInfoCardState(); // Creating the state for the widget
 }
 
-class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class for DeliveryInfoCard
+class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
+  // State class for DeliveryInfoCard
   late Timer _updateTimer; // Timer to periodically update time left
   String _timeLeft = ''; // String to store time left
   bool _isDelayed = false; // Boolean to check if delivery is delayed
 
   @override
-  void initState() { // Initializing state
+  void initState() {
+    // Initializing state
     super.initState();
     _updateTimeLeft(); // Initial update of time left
-    _updateTimer = Timer.periodic(const Duration(minutes: 1), (_) { // Setting up a timer to update time left every minute
+    _updateTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      // Setting up a timer to update time left every minute
       _updateTimeLeft();
     });
   }
 
   @override
-  void dispose() { // Disposing the timer when widget is removed
+  void dispose() {
+    // Disposing the timer when widget is removed
     _updateTimer.cancel();
     super.dispose();
   }
 
-  void _updateTimeLeft() { // Function to update the time left
+  void _updateTimeLeft() {
+    // Function to update the time left
     if (!mounted) return; // Check if the widget is still mounted
-    
+
     final now = DateTime.now(); // Current time
-    final difference = widget.route.estimatedEndTime.difference(now); // Difference between estimated end time and now
-    
-    setState(() { // Updating the state
+    final difference = widget.route.estimatedEndTime
+        .difference(now); // Difference between estimated end time and now
+
+    setState(() {
+      // Updating the state
       _isDelayed = difference.isNegative; // Check if the delivery is delayed
       if (_isDelayed) {
         final delayedBy = difference.abs(); // Calculate delay duration
-        _timeLeft = 'Delayed by ${_formatDuration(delayedBy)}'; // Set time left as delayed
+        _timeLeft =
+            'Delayed by ${_formatDuration(delayedBy)}'; // Set time left as delayed
       } else {
         _timeLeft = _formatDuration(difference); // Set time left
       }
     });
   }
 
-  String _formatDuration(Duration duration) { // Function to format duration
+  String _formatDuration(Duration duration) {
+    // Function to format duration
     if (duration.inHours > 0) {
       return '${duration.inHours}h ${duration.inMinutes.remainder(60)}m'; // Format hours and minutes
     }
     return '${duration.inMinutes}m'; // Format minutes
   }
 
-  String _formatTotalDistance() { // Function to format total distance
-    final distance = widget.route.metadata?['routeDetails']?['totalDistance']; // Get total distance from metadata
+  String _formatTotalDistance() {
+    // Function to format total distance
+    final distance = widget.route.metadata?['routeDetails']
+        ?['totalDistance']; // Get total distance from metadata
     if (distance == null) return 'Calculating...'; // Return if distance is null
-    final distanceInMiles = (distance / 1609.34).toStringAsFixed(1); // Convert distance to miles
+    final distanceInMiles =
+        (distance / 1609.34).toStringAsFixed(1); // Convert distance to miles
     return '$distanceInMiles mi total'; // Return formatted distance
   }
 
-  String _formatRemainingDistance() { // Function to format remaining distance
-    final totalDistance = widget.route.metadata?['routeDetails']?['totalDistance'] ?? 0.0; // Get total distance from metadata
+  String _formatRemainingDistance() {
+    // Function to format remaining distance
+    final totalDistance = widget.route.metadata?['routeDetails']
+            ?['totalDistance'] ??
+        0.0; // Get total distance from metadata
     final progress = widget.route.calculateProgress(); // Calculate progress
-    final remainingDistance = totalDistance * (1 - progress); // Calculate remaining distance
-    final remainingMiles = (remainingDistance / 1609.34).toStringAsFixed(1); // Convert remaining distance to miles
+    final remainingDistance =
+        totalDistance * (1 - progress); // Calculate remaining distance
+    final remainingMiles = (remainingDistance / 1609.34)
+        .toStringAsFixed(1); // Convert remaining distance to miles
     return '$remainingMiles mi left'; // Return formatted remaining distance
   }
 
-  String _formatTotalDuration() { // Function to format total duration
+  String _formatTotalDuration() {
+    // Function to format total duration
     final startTime = widget.route.startTime; // Get start time
     final endTime = widget.route.estimatedEndTime; // Get end time
     final duration = endTime.difference(startTime); // Calculate duration
     return 'Total: ${_formatDuration(duration)}'; // Return formatted duration
   }
 
-  String _formatElapsedTime() { // Function to format elapsed time
+  String _formatElapsedTime() {
+    // Function to format elapsed time
     final now = DateTime.now(); // Current time
     final startTime = widget.route.startTime; // Get start time
     final elapsed = now.difference(startTime); // Calculate elapsed time
     return 'Elapsed: ${_formatDuration(elapsed)}'; // Return formatted elapsed time
   }
 
-  Widget _buildAddressSection(BuildContext context) { // Function to build address section
+  Widget _buildAddressSection(BuildContext context) {
+    // Function to build address section
     final theme = Theme.of(context); // Get theme
     return Container(
       padding: const EdgeInsets.all(16), // Padding for the container
@@ -108,7 +131,8 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
             context,
             Icons.store, // Icon for pickup
             'Pickup', // Label for pickup
-            widget.route.metadata?['pickupAddress'] ?? 'Restaurant Location', // Pickup address
+            widget.route.metadata?['pickupAddress'] ??
+                'Restaurant Location', // Pickup address
             theme.colorScheme.primary, // Icon color
           ),
           const SizedBox(height: 16), // Spacing between rows
@@ -116,7 +140,8 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
             context,
             Icons.location_on, // Icon for delivery
             'Delivery', // Label for delivery
-            widget.route.metadata?['deliveryAddress'] ?? 'Delivery Location', // Delivery address
+            widget.route.metadata?['deliveryAddress'] ??
+                'Delivery Location', // Delivery address
             theme.colorScheme.error, // Icon color
           ),
         ],
@@ -137,7 +162,8 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
         Container(
           padding: const EdgeInsets.all(8), // Padding for the icon container
           decoration: BoxDecoration(
-            color: color.withAlpha((0.1 * 255).toInt()), // Background color with opacity
+            color: color.withAlpha(
+                (0.1 * 255).toInt()), // Background color with opacity
             borderRadius: BorderRadius.circular(8), // Border radius
           ),
           child: Icon(icon, color: color, size: 20), // Icon
@@ -168,7 +194,8 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
     );
   }
 
-  Widget _buildProgressDetails(BuildContext context) { // Function to build progress details
+  Widget _buildProgressDetails(BuildContext context) {
+    // Function to build progress details
     final theme = Theme.of(context); // Get theme
     return Container(
       padding: const EdgeInsets.all(16), // Padding for the container
@@ -203,7 +230,8 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
               ),
             ],
           ),
-          if (widget.route.metadata?['routeDetails']?['traffic'] != null) ...[ // Check if traffic data is available
+          if (widget.route.metadata?['routeDetails']?['traffic'] != null) ...[
+            // Check if traffic data is available
             const SizedBox(height: 12), // Spacing
             Divider(color: theme.colorScheme.outlineVariant), // Divider
             const SizedBox(height: 12), // Spacing
@@ -239,7 +267,8 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
   ) {
     final theme = Theme.of(context); // Get theme
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16), // Padding for the detail
+      padding:
+          const EdgeInsets.symmetric(horizontal: 16), // Padding for the detail
       child: Column(
         children: [
           Text(
@@ -267,8 +296,59 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
     );
   }
 
+  Widget _buildManifestSummary(BuildContext context) {
+    final itemsData = widget.route.metadata?['loadedItems'];
+    if (itemsData == null) return const SizedBox.shrink();
+
+    final items = itemsData as List;
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    final allItemsLoaded =
+        widget.route.metadata?['vehicleHasAllItems'] ?? false;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                allItemsLoaded ? Icons.check_circle : Icons.info_outline,
+                color: allItemsLoaded ? Colors.green : Colors.orange,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Manifest Items (${items.length})',
+                style: theme.textTheme.titleSmall,
+              ),
+              const Spacer(),
+              Text(
+                allItemsLoaded
+                    ? 'All items loaded'
+                    : 'Some items may be missing',
+                style: TextStyle(
+                  color: allItemsLoaded ? Colors.green : Colors.orange,
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) { // Build method for the widget
+  Widget build(BuildContext context) {
+    // Build method for the widget
     final theme = Theme.of(context); // Get theme
 
     return Container(
@@ -293,18 +373,22 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
             Container(
               width: 40, // Width of the handle
               height: 4, // Height of the handle
-              margin: const EdgeInsets.only(bottom: 16), // Margin for the handle
+              margin:
+                  const EdgeInsets.only(bottom: 16), // Margin for the handle
               decoration: BoxDecoration(
-                color: theme.colorScheme.onSurfaceVariant.withAlpha((0.4 * 255).toInt()), // Handle color
+                color: theme.colorScheme.onSurfaceVariant
+                    .withAlpha((0.4 * 255).toInt()), // Handle color
                 borderRadius: BorderRadius.circular(2), // Border radius
               ),
             ),
-            
+
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween, // Space between elements
+              mainAxisAlignment:
+                  MainAxisAlignment.spaceBetween, // Space between elements
               children: [
                 Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, // Align text to start
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start, // Align text to start
                   children: [
                     Row(
                       children: [
@@ -312,7 +396,7 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
                           _timeLeft, // Time left text
                           style: theme.textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold, // Text weight
-                            color: _isDelayed 
+                            color: _isDelayed
                                 ? theme.colorScheme.error // Color if delayed
                                 : theme.colorScheme.onSurface, // Default color
                           ),
@@ -325,13 +409,16 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
                               vertical: 4, // Vertical padding
                             ),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.primaryContainer, // Background color
-                              borderRadius: BorderRadius.circular(12), // Border radius
+                              color: theme.colorScheme
+                                  .primaryContainer, // Background color
+                              borderRadius:
+                                  BorderRadius.circular(12), // Border radius
                             ),
                             child: Text(
                               'On time', // On time text
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onPrimaryContainer, // Text color
+                                color: theme.colorScheme
+                                    .onPrimaryContainer, // Text color
                                 fontWeight: FontWeight.w600, // Text weight
                               ),
                             ),
@@ -350,33 +437,40 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
                 StatusChip(status: widget.route.status), // Status chip
               ],
             ),
-            
+
             const SizedBox(height: 24), // Spacing
-            
-            if (widget.route.status == 'in_progress') ...[ // Check if route is in progress
+
+            if (widget.route.status == 'in_progress') ...[
+              // Check if route is in progress
               LinearProgressIndicator(
                 value: widget.route.calculateProgress(), // Progress value
-                backgroundColor: theme.colorScheme.surfaceContainerHighest, // Background color
+                backgroundColor: theme
+                    .colorScheme.surfaceContainerHighest, // Background color
                 valueColor: AlwaysStoppedAnimation(
-                  _isDelayed ? theme.colorScheme.error : theme.colorScheme.primary, // Progress color
+                  _isDelayed
+                      ? theme.colorScheme.error
+                      : theme.colorScheme.primary, // Progress color
                 ),
               ),
               const SizedBox(height: 16), // Spacing
-              
+
               _buildAddressSection(context), // Address section
-              
+
               const SizedBox(height: 16), // Spacing
-              
+
               _buildProgressDetails(context), // Progress details
+              const SizedBox(height: 16),
+              _buildManifestSummary(context), // Manifest summary
             ],
-            
+
             const SizedBox(height: 24), // Spacing
-            
+
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: widget.onDriverInfoTap, // Driver info tap callback
+                    onPressed:
+                        widget.onDriverInfoTap, // Driver info tap callback
                     icon: const Icon(Icons.person_outline), // Icon for button
                     label: const Text('Driver Info'), // Label for button
                   ),
@@ -384,7 +478,8 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> { // State class fo
                 const SizedBox(width: 16), // Spacing
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: widget.onContactDriverTap, // Contact driver tap callback
+                    onPressed: widget
+                        .onContactDriverTap, // Contact driver tap callback
                     icon: const Icon(Icons.phone), // Icon for button
                     label: const Text('Contact'), // Label for button
                   ),
