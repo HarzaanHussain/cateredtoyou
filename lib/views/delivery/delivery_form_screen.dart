@@ -552,71 +552,73 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
   }
 
   Future<void> _fetchManifestForEvent(String eventId) async {
-  setState(() {
-    _isLoadingManifest = true;
-    _manifestError = null;
-    _loadedItems = [];
-  });
+    setState(() {
+      _isLoadingManifest = true;
+      _manifestError = null;
+      _loadedItems = [];
+    });
 
-  try {
-    final manifestService = Provider.of<ManifestService>(context, listen: false);
-    
-    // Check if manifest exists for this event
-    final exists = await manifestService.doesManifestExist(eventId);
-    if (!exists) {
+    try {
+      final manifestService =
+          Provider.of<ManifestService>(context, listen: false);
+
+      // Check if manifest exists for this event
+      final exists = await manifestService.doesManifestExist(eventId);
+      if (!exists) {
+        setState(() {
+          _isLoadingManifest = false;
+          _manifestError = 'No manifest found for this event';
+          _manifest = null;
+        });
+        return;
+      }
+
+      // Get manifest stream for the event
+      final manifestStream = manifestService.getManifestByEventId(eventId);
+      final manifest = await manifestStream.first;
+
+      setState(() {
+        _manifest = manifest;
+        _isLoadingManifest = false;
+
+        if (manifest == null) {
+          _manifestError = 'Error loading manifest';
+        }
+      });
+
+      // If both manifest and vehicle are selected, check loaded items
+      if (_manifest != null && _selectedVehicleId != null) {
+        _checkLoadedItems();
+      }
+    } catch (e) {
       setState(() {
         _isLoadingManifest = false;
-        _manifestError = 'No manifest found for this event';
+        _manifestError = 'Error: ${e.toString()}';
         _manifest = null;
       });
-      return;
     }
-    
-    // Get manifest stream for the event
-    final manifestStream = manifestService.getManifestByEventId(eventId);
-    final manifest = await manifestStream.first;
-    
+  }
+
+  void _checkLoadedItems() {
+    if (_manifest == null || _selectedVehicleId == null) return;
+
+    final vehicleId = _selectedVehicleId!;
+
+    // Filter items assigned to this vehicle and loaded
+    final itemsForVehicle =
+        _manifest!.items.where((item) => item.vehicleId == vehicleId).toList();
+
+    final loadedItems = itemsForVehicle
+        .where((item) => item.loadingStatus == LoadingStatus.loaded)
+        .toList();
+
     setState(() {
-      _manifest = manifest;
-      _isLoadingManifest = false;
-      
-      if (manifest == null) {
-        _manifestError = 'Error loading manifest';
-      }
-    });
-    
-    // If both manifest and vehicle are selected, check loaded items
-    if (_manifest != null && _selectedVehicleId != null) {
-      _checkLoadedItems();
-    }
-    
-  } catch (e) {
-    setState(() {
-      _isLoadingManifest = false;
-      _manifestError = 'Error: ${e.toString()}';
-      _manifest = null;
+      _loadedItems = loadedItems;
+      // Check if all assigned items are loaded
+      _vehicleHasAllItems = loadedItems.length == itemsForVehicle.length &&
+          itemsForVehicle.isNotEmpty;
     });
   }
-}
-void _checkLoadedItems() {
-  if (_manifest == null || _selectedVehicleId == null) return;
-  
-  final vehicleId = _selectedVehicleId!;
-  
-  // Filter items assigned to this vehicle and loaded
-  final itemsForVehicle = _manifest!.items.where((item) => 
-    item.vehicleId == vehicleId).toList();
-    
-  final loadedItems = itemsForVehicle.where((item) => 
-    item.loadingStatus == LoadingStatus.loaded).toList();
-  
-  setState(() {
-    _loadedItems = loadedItems;
-    // Check if all assigned items are loaded
-    _vehicleHasAllItems = loadedItems.length == itemsForVehicle.length &&
-                         itemsForVehicle.isNotEmpty;
-  });
-}
 
   @override
   Widget build(BuildContext context) {
@@ -982,55 +984,57 @@ void _checkLoadedItems() {
     );
   }
 
+  /// Handles the selection of an event from the dropdown and fetches its details.
   Future<void> _handleEventSelection(String value) async {
+    // Ensure the selected value is not null or empty.
     try {
-      setState(() => _isLoading = true); // Set the loading state to true.
+      setState(() => _isLoading = true);
 
       final eventDoc = await FirebaseFirestore.instance
           .collection('events')
           .doc(value)
-          .get(); // Get the event document.
+          .get();
 
       if (eventDoc.exists && mounted) {
-        final data = eventDoc.data()!; // Get the event data.
-        final startDate = (data['startDate'] as Timestamp)
-            .toDate(); // Get the event start date.
-        final endDate =
-            (data['endDate'] as Timestamp).toDate(); // Get the event end date.
+        final data = eventDoc.data()!;
+        final startDate = (data['startDate'] as Timestamp).toDate();
+        final endDate = (data['endDate'] as Timestamp).toDate();
 
         setState(() {
-          _selectedEventId = value; // Set the selected event ID.
-          _selectedEventName = data['name']; // Set the selected event name.
-          _eventStartDate = startDate; // Set the event start date.
-          _eventEndDate = endDate; // Set the event end date.
+          _selectedEventId = value;
+          _selectedEventName = data['name'];
+          _eventStartDate = startDate;
+          _eventEndDate = endDate;
 
           // Reset time selections when event changes
-          _startTime = null; // Reset the start time.
-          _estimatedEndTime = null; // Reset the estimated end time.
+          _startTime = null;
+          _estimatedEndTime = null;
+
+          // Reset manifest data
+          _manifest = null;
+          _loadedItems = [];
         });
 
-        // Show event duration to user
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
                   'Event duration: ${DateFormat('MMM d, h:mm a').format(startDate)} - '
-                  '${DateFormat('MMM d, h:mm a').format(endDate)}' // Show the event duration.
-                  ),
-              behavior:
-                  SnackBarBehavior.floating, // Set the snack bar behavior.
-              duration:
-                  const Duration(seconds: 3), // Set the snack bar duration.
+                  '${DateFormat('MMM d, h:mm a').format(endDate)}'),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
             ),
           );
         }
+
+        // Fetch manifest for this event
+        await _fetchManifestForEvent(value);
       }
     } catch (e) {
-      _handleError('Error loading event details',
-          e); // Handle error if loading event details fails.
+      _handleError('Error loading event details', e);
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false); // Set the loading state to false.
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -1077,8 +1081,15 @@ void _checkLoadedItems() {
                       '${vehicle.make} ${vehicle.model} - ${vehicle.licensePlate}'), // Set the vehicle details.
                 );
               }).toList(),
-              onChanged: (value) => setState(() =>
-                  _selectedVehicleId = value), // Handle vehicle selection.
+              onChanged: (value) {
+                setState(() {
+                  _selectedVehicleId = value;
+                  // Check for loaded items in this vehicle if manifest is available
+                  if (_manifest != null && _selectedVehicleId != null) {
+                    _checkLoadedItems();
+                  }
+                });
+              }, // Handle vehicle selection.
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please select a vehicle'; // Validate the input.
