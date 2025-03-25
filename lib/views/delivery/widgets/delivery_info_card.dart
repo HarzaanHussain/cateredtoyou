@@ -297,54 +297,53 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
   }
 
   Widget _buildManifestSummary(BuildContext context) {
-    final itemsData = widget.route.metadata?['loadedItems'];
-    if (itemsData == null) return const SizedBox.shrink();
+  final itemsData = widget.route.metadata?['loadedItems'];
+  if (itemsData == null) return const SizedBox.shrink();
 
-    final items = itemsData as List;
-    if (items.isEmpty) return const SizedBox.shrink();
+  final items = itemsData as List;
+  if (items.isEmpty) return const SizedBox.shrink();
 
-    final theme = Theme.of(context);
-    final allItemsLoaded =
-        widget.route.metadata?['vehicleHasAllItems'] ?? false;
+  final theme = Theme.of(context);
+  final allItemsLoaded = widget.route.metadata?['vehicleHasAllItems'] ?? false;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                allItemsLoaded ? Icons.check_circle : Icons.info_outline,
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: theme.colorScheme.surfaceContainerLowest,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              allItemsLoaded ? Icons.check_circle : Icons.info_outline,
+              color: allItemsLoaded ? Colors.green : Colors.orange,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Manifest Items (${items.length})',
+              style: theme.textTheme.titleSmall,
+            ),
+            const Spacer(),
+            Text(
+              allItemsLoaded
+                  ? 'All items loaded'
+                  : 'Some items may be missing',
+              style: TextStyle(
                 color: allItemsLoaded ? Colors.green : Colors.orange,
-                size: 20,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
               ),
-              const SizedBox(width: 8),
-              Text(
-                'Manifest Items (${items.length})',
-                style: theme.textTheme.titleSmall,
-              ),
-              const Spacer(),
-              Text(
-                allItemsLoaded
-                    ? 'All items loaded'
-                    : 'Some items may be missing',
-                style: TextStyle(
-                  color: allItemsLoaded ? Colors.green : Colors.orange,
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
