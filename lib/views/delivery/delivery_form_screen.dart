@@ -533,8 +533,9 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
   }
 
   void _updateMapBounds() {
-    if (_pickupLocation == null || _deliveryLocation == null)
+    if (_pickupLocation == null || _deliveryLocation == null) {
       return; // Return if either location is null.
+    }
 
     final points = [
       _pickupLocation!,
@@ -638,6 +639,8 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
             const SizedBox(height: 16), // Add vertical spacing.
             _buildLocationSection(), // Build the location section.
             _buildDeliveryDetailsSection(), // Build the delivery details section.
+            if (_manifest != null && _loadedItems.isNotEmpty)
+              _buildLoadedItemsSection(),
             _buildNotesSection(), // Build the notes section.
             const SizedBox(height: 24), // Add vertical spacing.
             _buildSubmitButton(), // Build the submit button.
@@ -910,79 +913,176 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
       ),
     );
   }
+  // Build the vehicle dropdown for selecting the vehicle.
+  Widget _buildLoadedItemsSection() {
+  return Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                _vehicleHasAllItems 
+                  ? Icons.check_circle 
+                  : Icons.info_outline,
+                color: _vehicleHasAllItems 
+                  ? Colors.green 
+                  : Colors.orange,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Manifest Items for Delivery',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _vehicleHasAllItems
+              ? 'All items are loaded and ready for delivery'
+              : 'Some items may not be loaded yet',
+            style: TextStyle(
+              color: _vehicleHasAllItems ? Colors.green : Colors.orange,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _loadedItems.length,
+            itemBuilder: (context, index) {
+              final item = _loadedItems[index];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: const Icon(Icons.inventory_2, color: Colors.green),
+                  title: Text(item.name),
+                  subtitle: Text('Quantity: ${item.quantity}'),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green.shade700),
+                    ),
+                    child: const Text(
+                      'LOADED',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _buildEventSection() {
-    final orgService =
-        context.read<OrganizationService>(); // Get the organization service.
-    return FutureBuilder<String?>(
-      future: orgService
-          .getCurrentUserOrganization()
-          .then((org) => org?.id), // Get the current user's organization ID.
-      builder: (context, orgSnapshot) {
-        if (!orgSnapshot.hasData) {
-          return const Center(
-              child:
-                  CircularProgressIndicator()); // Show a loading indicator if the organization ID is not available.
-        }
+  final orgService = context.read<OrganizationService>();
+  return FutureBuilder<String?>(
+    future: orgService
+        .getCurrentUserOrganization()
+        .then((org) => org?.id),
+    builder: (context, orgSnapshot) {
+      if (!orgSnapshot.hasData) {
+        return const Center(child: CircularProgressIndicator());
+      }
 
-        return StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('events')
-              .where('organizationId',
-                  isEqualTo:
-                      orgSnapshot.data) // Filter events by organization ID.
-              .where('status', whereIn: [
-            'confirmed',
-            'in_progress'
-          ]) // Filter events by status.
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Text(
-                  'Error: ${snapshot.error}'); // Show an error message if there's an error.
-            }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('events')
+                .where('organizationId', isEqualTo: orgSnapshot.data)
+                .where('status', whereIn: ['confirmed', 'in_progress'])
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Text('Error: ${snapshot.error}');
+              }
 
-            if (!snapshot.hasData) {
-              return const Center(
-                  child:
-                      CircularProgressIndicator()); // Show a loading indicator if the events are not available.
-            }
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-            final events = snapshot.data!.docs; // Get the list of events.
+              final events = snapshot.data!.docs;
 
-            return DropdownButtonFormField<String>(
-              value: _selectedEventId, // Set the selected event ID.
-              decoration: const InputDecoration(
-                labelText: 'Select Event', // Set the label text.
-                hintText: 'Choose an event for delivery', // Set the hint text.
-                prefixIcon: Icon(Icons.event), // Set the prefix icon.
+              return DropdownButtonFormField<String>(
+                value: _selectedEventId,
+                decoration: const InputDecoration(
+                  labelText: 'Select Event',
+                  hintText: 'Choose an event for delivery',
+                  prefixIcon: Icon(Icons.event),
+                ),
+                items: events.map((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  return DropdownMenuItem(
+                    value: doc.id,
+                    child: Text(data['name'] ?? 'Unnamed Event'),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    _handleEventSelection(value);
+                  }
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please select an event';
+                  }
+                  return null;
+                },
+              );
+            },
+          ),
+          
+          // Display manifest status - moved outside the dropdown
+          if (_isLoadingManifest)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Row(
+                children: const [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 8),
+                  Text('Loading manifest...'),
+                ],
               ),
-              items: events.map((doc) {
-                final data =
-                    doc.data() as Map<String, dynamic>; // Get the event data.
-                return DropdownMenuItem(
-                  value: doc.id, // Set the event ID.
-                  child: Text(
-                      data['name'] ?? 'Unnamed Event'), // Set the event name.
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  _handleEventSelection(value); // Handle event selection.
-                }
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please select an event'; // Validate the input.
-                }
-                return null;
-              },
-            );
-          },
-        );
-      },
-    );
-  }
+            )
+          else if (_manifestError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(
+                _manifestError!,
+                style: TextStyle(color: Colors.red.shade700),
+              ),
+            )
+          else if (_manifest != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(
+                'Manifest loaded: ${_manifest!.items.length} items',
+                style: const TextStyle(color: Colors.green),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+}
 
   /// Handles the selection of an event from the dropdown and fetches its details.
   Future<void> _handleEventSelection(String value) async {
