@@ -1488,6 +1488,16 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
             _eventEndDate?.millisecondsSinceEpoch, // Add event end date.
         'lastUpdated':
             FieldValue.serverTimestamp(), // Add last updated timestamp.
+        'vehicleHasAllItems': _vehicleHasAllItems, // Add vehicle items status.
+        'loadedItemsCount': _loadedItems.length, // Add loaded items count.
+        'loadedItems': _loadedItems // Add loaded items details.
+            .map((item) => {
+                  'id': item.id, // Add item ID.
+                  'name': item.name, // Add item name.
+                  'quantity': item.quantity, // Add item quantity.
+                  'menuItemId': item.menuItemId, // Add menu item ID.
+                })
+            .toList(), // Convert loaded items to a list of maps.
       };
 
       // Create delivery route
