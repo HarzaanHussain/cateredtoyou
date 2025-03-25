@@ -551,6 +551,54 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
     );
   }
 
+  Future<void> _fetchManifestForEvent(String eventId) async {
+  setState(() {
+    _isLoadingManifest = true;
+    _manifestError = null;
+    _loadedItems = [];
+  });
+
+  try {
+    final manifestService = Provider.of<ManifestService>(context, listen: false);
+    
+    // Check if manifest exists for this event
+    final exists = await manifestService.doesManifestExist(eventId);
+    if (!exists) {
+      setState(() {
+        _isLoadingManifest = false;
+        _manifestError = 'No manifest found for this event';
+        _manifest = null;
+      });
+      return;
+    }
+    
+    // Get manifest stream for the event
+    final manifestStream = manifestService.getManifestByEventId(eventId);
+    final manifest = await manifestStream.first;
+    
+    setState(() {
+      _manifest = manifest;
+      _isLoadingManifest = false;
+      
+      if (manifest == null) {
+        _manifestError = 'Error loading manifest';
+      }
+    });
+    
+    // If both manifest and vehicle are selected, check loaded items
+    if (_manifest != null && _selectedVehicleId != null) {
+      _checkLoadedItems();
+    }
+    
+  } catch (e) {
+    setState(() {
+      _isLoadingManifest = false;
+      _manifestError = 'Error: ${e.toString()}';
+      _manifest = null;
+    });
+  }
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
