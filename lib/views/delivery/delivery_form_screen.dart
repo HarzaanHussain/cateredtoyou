@@ -598,6 +598,25 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
     });
   }
 }
+void _checkLoadedItems() {
+  if (_manifest == null || _selectedVehicleId == null) return;
+  
+  final vehicleId = _selectedVehicleId!;
+  
+  // Filter items assigned to this vehicle and loaded
+  final itemsForVehicle = _manifest!.items.where((item) => 
+    item.vehicleId == vehicleId).toList();
+    
+  final loadedItems = itemsForVehicle.where((item) => 
+    item.loadingStatus == LoadingStatus.loaded).toList();
+  
+  setState(() {
+    _loadedItems = loadedItems;
+    // Check if all assigned items are loaded
+    _vehicleHasAllItems = loadedItems.length == itemsForVehicle.length &&
+                         itemsForVehicle.isNotEmpty;
+  });
+}
 
   @override
   Widget build(BuildContext context) {
