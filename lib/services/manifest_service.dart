@@ -37,6 +37,117 @@ class ManifestService extends ChangeNotifier { // Defining manifestService class
       yield []; // Yield an empty list
     }
   }
+  Stream<Manifest?> getManifestById(String manifestId) async* {
+  try {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      yield null;
+      return;
+    }
+
+    final organization = await _organizationService.getCurrentUserOrganization();
+    if (organization == null) {
+      yield null;
+      return;
+    }
+
+    yield* _firestore
+        .collection('manifests')
+        .doc(manifestId)
+        .snapshots()
+        .map((snapshot) {
+      if (snapshot.exists) {
+        try {
+          final data = snapshot.data()!;
+          // Validate that this manifest belongs to the user's organization
+          if (data['organizationId'] == organization.id) {
+            return Manifest.fromMap(data, snapshot.id);
+          } else {
+            debugPrint('Manifest belongs to a different organization');
+            return null;
+          }
+        } catch (e) {
+          debugPrint('Error parsing manifest: $e');
+          return null;
+        }
+      } else {
+        debugPrint('Manifest not found: $manifestId');
+        return null;
+      }
+    });
+  } catch (e) {
+    debugPrint('Error in getManifestById: $e');
+    yield null;
+  }
+}
+  Future<void> updateManifestItem(
+  String itemId, {
+  String? vehicleId,
+  int? quantity,
+  LoadingStatus? loadingStatus,
+}) async {
+  try {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) throw 'Not authenticated';
+
+    final organization = await _organizationService.getCurrentUserOrganization();
+    if (organization == null) throw 'Organization not found';
+
+    // Find which manifest contains this item
+    final manifestsQuery = await _firestore
+      .collection('manifests')
+      .where('organizationId', isEqualTo: organization.id)
+      .get();
+
+    // Track if we found and updated the item
+    bool itemFound = false;
+    String? manifestId;
+    
+    // Iterate through manifests to find the item
+    for (final manifestDoc in manifestsQuery.docs) {
+      final manifestData = manifestDoc.data();
+      final List<dynamic> items = manifestData['items'] as List<dynamic>;
+      
+      for (int i = 0; i < items.length; i++) {
+        if (items[i]['id'] == itemId) {
+          // Found the item, update fields based on parameters
+          if (vehicleId != null) {
+            items[i]['vehicleId'] = vehicleId;
+          }
+          
+          if (quantity != null) {
+            items[i]['quantity'] = quantity;
+          }
+          
+          if (loadingStatus != null) {
+            items[i]['loadingStatus'] = loadingStatus.toString().split('.').last;
+          }
+          
+          // Update the manifest with modified items
+          await manifestDoc.reference.update({
+            'items': items,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+          
+          itemFound = true;
+          manifestId = manifestDoc.id;
+          break;
+        }
+      }
+      
+      if (itemFound) break;
+    }
+
+    if (!itemFound) {
+      throw 'Item not found in any manifest';
+    }
+
+    notifyListeners();
+  } catch (e) {
+    debugPrint('Error updating manifest item: $e');
+    rethrow;
+  }
+}
 
   Stream<Manifest?> getManifestByEventId(String eventId) async* {
     try {

@@ -8,7 +8,7 @@ import 'package:cateredtoyou/models/task/event_task.dart'; // Import EventTask c
 import 'package:cateredtoyou/models/task/delivery_task.dart'; // Import DeliveryTask class for delivery-related tasks
 import 'package:cateredtoyou/models/task/menu_item_task.dart'; // Import MenuItemTask class for menu item-related tasks
 import 'package:cateredtoyou/services/organization_service.dart'; // Import OrganizationService for organization-related operations
-import 'package:cateredtoyou/models/manifest_task_model.dart'; // Import ManifestTask class for manifest task data
+// Import ManifestTask class for manifest task data
 
 class TaskService extends ChangeNotifier { // TaskService class extends ChangeNotifier to allow listeners to be notified of changes
   final FirebaseFirestore _firestore; // Firestore instance for database operations
