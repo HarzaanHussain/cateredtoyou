@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/views/manifest/widgets/partial_quantity_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -21,7 +22,7 @@ import 'package:cateredtoyou/views/manifest/widgets/drag_item_indicator.dart';
 /// - See vehicle assignments and status
 class ManifestDetailScreen extends StatefulWidget {
   final String manifestId;
-  
+
   const ManifestDetailScreen({
     super.key,
     required this.manifestId,
@@ -121,6 +122,117 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen>
     }
   }
 
+  void _showItemContextMenu(
+      BuildContext context, ManifestItem item, Offset position) {
+    final RenderBox overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+
+    showMenu(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromPoints(position, position),
+        Rect.fromPoints(
+          Offset.zero,
+          overlay.size.bottomRight(Offset.zero),
+        ),
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'select',
+          child: Row(
+            children: [
+              Icon(
+                (_selectedItems[item.id] ?? false)
+                    ? Icons.check_box
+                    : Icons.check_box_outline_blank,
+                color: Colors.blue,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              const Text('Select Item'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'partial',
+          child: Row(
+            children: const [
+              Icon(
+                Icons.splitscreen,
+                color: Colors.green,
+                size: 18,
+              ),
+              SizedBox(width: 8),
+              Text('Partial Loading'),
+            ],
+          ),
+        ),
+      ],
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+    ).then((value) {
+      if (value == 'select') {
+        _handleItemSelected(item.id, !(_selectedItems[item.id] ?? false));
+      } else if (value == 'partial') {
+        _showPartialLoadingDialog(item);
+      }
+    });
+  }
+
+  void _showPartialLoadingDialog(ManifestItem item) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        int selectedQuantity = _itemQuantities[item.id] ?? item.quantity;
+
+        return AlertDialog(
+          title: const Text('Partial Loading'),
+          content: SizedBox(
+            width: 400,
+            child: PartialQuantitySelector(
+              itemName: item.name,
+              totalQuantity: item.quantity,
+              currentQuantity: selectedQuantity,
+              onQuantityChanged: (value) {
+                selectedQuantity = value;
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+
+                // Update the item quantity in state
+                setState(() {
+                  _itemQuantities[item.id] = selectedQuantity;
+
+                  // If not already selected, select the item
+                  if (!(_selectedItems[item.id] ?? false)) {
+                    _selectedItems[item.id] = true;
+                  }
+
+                  // Show vehicle selector
+                  _showVehicleSelectorOverlay = true;
+                });
+              },
+              child: const Text('Continue'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // Handle selecting an item
   void _handleItemSelected(String itemId, bool selected) {
     setState(() {
@@ -138,8 +250,6 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen>
       }
     });
   }
-
-  
 
   // Handle select all items
   void _handleSelectAll(bool selected, List<ManifestItem> items) {
@@ -669,6 +779,8 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen>
                               _handleSelectAll(selected, manifest.items),
                           onQuantityChanged: _handleQuantityChanged,
                           onDragStart: _handleDragStart,
+                          onShowContextMenu: (context, item, position) =>
+                              _showItemContextMenu(context, item, position),
                           isSmallScreen: isSmallScreen,
                         ),
 
