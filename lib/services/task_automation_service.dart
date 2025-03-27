@@ -195,56 +195,107 @@ Future<void> _processBatchUpdates(Event newEvent, Event oldEvent, Map<String, St
 }
 
   Future<void> manageManifest(String eventId, List<EventMenuItem> selectedMenuItems) async {
-    try {
-      final manifestService = ManifestService(_organizationService);
+  try {
+    if (eventId.isEmpty) {
+      debugPrint('Error: Empty event ID provided to manageManifest');
+      return;
+    }
 
-      // Check if a manifest already exists for this event
-      if (!(await manifestService.doesManifestExist(eventId))) {
-        debugPrint('No existing manifest found. Creating a new one.');
-        // Create manifest items from selected menu items
-        final manifestItems = selectedMenuItems.map((menuItem) {
-          final newItemId = FirebaseFirestore.instance.collection('manifests').doc().id;
-          debugPrint('Creating manifest item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
+    if (selectedMenuItems.isEmpty) {
+      debugPrint('No menu items provided to manageManifest for event: $eventId');
+      // We'll continue anyway to create an empty manifest if needed
+    }
 
-          return ManifestItem(
-            id: newItemId,
-            menuItemId: menuItem.menuItemId,
-            name: menuItem.name,
-            quantity: menuItem.quantity,
-            vehicleId: null, // Initially, no vehicle is assigned
-            loadingStatus: LoadingStatus.unassigned, // Initial status is unassigned
-          );
-        }).toList();
+    final manifestService = ManifestService(_organizationService);
+    debugPrint('Starting manifest management for event: $eventId');
 
-        if (manifestItems.isNotEmpty) {
-          debugPrint('Saving new manifest with ${manifestItems.length} items.');
+    // Check if a manifest already exists for this event
+    final exists = await manifestService.doesManifestExist(eventId);
+    debugPrint('Manifest exists for event $eventId: $exists');
+
+    if (!exists) {
+      debugPrint('No existing manifest found. Creating a new one for event: $eventId');
+      // Create manifest items from selected menu items
+      final manifestItems = selectedMenuItems.map((menuItem) {
+        // Generate unique ID for manifest item
+        final newItemId = '${DateTime.now().millisecondsSinceEpoch}_${menuItem.menuItemId}';
+        debugPrint('Creating manifest item: name=${menuItem.name}, menuItemId=${menuItem.menuItemId}, id=$newItemId');
+
+        return ManifestItem(
+          id: newItemId,
+          menuItemId: menuItem.menuItemId,
+          name: menuItem.name,
+          quantity: menuItem.quantity,
+          vehicleId: null, // Initially, no vehicle is assigned
+          loadingStatus: LoadingStatus.unassigned, // Initial status is unassigned
+        );
+      }).toList();
+
+      debugPrint('Created ${manifestItems.length} manifest items');
+      
+      try {
+        await manifestService.createManifest(
+          eventId: eventId,
+          items: manifestItems,
+        );
+        debugPrint('Successfully created new manifest for event: $eventId');
+      } catch (e) {
+        debugPrint('Error creating manifest in Firestore: $e');
+        // Don't rethrow - we want to continue with task creation even if manifest fails
+      }
+    } else {
+      debugPrint('Existing manifest found. Updating it for event: $eventId');
+      
+      try {
+        final existingManifest = await manifestService.getManifestByEventId(eventId).first;
+        
+        if (existingManifest == null) {
+          debugPrint('Strange - manifest exists but could not be retrieved. Creating new one.');
+          // Try to create a new manifest instead
+          final newManifestItems = selectedMenuItems.map((menuItem) {
+            final newItemId = '${DateTime.now().millisecondsSinceEpoch}_${menuItem.menuItemId}';
+            return ManifestItem(
+              id: newItemId,
+              menuItemId: menuItem.menuItemId,
+              name: menuItem.name,
+              quantity: menuItem.quantity,
+              vehicleId: null,
+              loadingStatus: LoadingStatus.unassigned,
+            );
+          }).toList();
+          
           await manifestService.createManifest(
             eventId: eventId,
-            items: manifestItems,
+            items: newManifestItems,
           );
-        } else {
-          debugPrint('No menu items selected, skipping manifest creation.');
+          debugPrint('Created new manifest for event: $eventId');
+          return;
         }
-      } else {
-        debugPrint('Existing manifest found. Updating it.');
-        final existingPlan = await manifestService.getManifestByEventId(eventId).first;
+        
         // Get current menu item IDs
         final currentMenuItemIds = selectedMenuItems.map((item) => item.menuItemId).toSet();
         debugPrint('Current menu item IDs: $currentMenuItemIds');
 
         // Keep existing items that still exist in the menu
-        final updatedItems = (existingPlan?.items ?? <ManifestItem>[])
-            .where((item) => currentMenuItemIds.contains(item.menuItemId))
-            .toList();
-        debugPrint('Retaining ${updatedItems.length} existing manifest items.');
+        final updatedItems = <ManifestItem>[];
+        
+        // Keep existing items that are still in the menu
+        for (final item in existingManifest.items) {
+          if (currentMenuItemIds.contains(item.menuItemId)) {
+            updatedItems.add(item);
+            debugPrint('Keeping existing manifest item: ${item.name} (${item.menuItemId})');
+          } else {
+            debugPrint('Removing manifest item no longer in menu: ${item.name} (${item.menuItemId})');
+          }
+        }
 
         // Add new items that aren't in the manifest yet
         for (final menuItem in selectedMenuItems) {
-          final existingItem = updatedItems.any((item) => item.menuItemId == menuItem.menuItemId);
+          final alreadyExists = updatedItems.any((item) => item.menuItemId == menuItem.menuItemId);
 
-          if (!existingItem) {
-            final newItemId = FirebaseFirestore.instance.collection('manifests').doc().id;
-            debugPrint('Adding new manifest item: menuItemId=${menuItem.menuItemId}, id=$newItemId');
+          if (!alreadyExists) {
+            final newItemId = '${DateTime.now().millisecondsSinceEpoch}_${menuItem.menuItemId}';
+            debugPrint('Adding new manifest item: ${menuItem.name} (${menuItem.menuItemId}), id=$newItemId');
 
             updatedItems.add(ManifestItem(
               id: newItemId,
@@ -258,19 +309,20 @@ Future<void> _processBatchUpdates(Event newEvent, Event oldEvent, Map<String, St
         }
 
         debugPrint('Updating manifest with ${updatedItems.length} total items.');
-        if (existingPlan != null) {
-          final updatedPlan = existingPlan.copyWith(items: updatedItems);
-          await manifestService.updateManifest(updatedPlan);
-        }
+        final updatedManifest = existingManifest.copyWith(items: updatedItems);
+        await manifestService.updateManifest(updatedManifest);
+        debugPrint('Successfully updated manifest for event: $eventId');
+      } catch (e) {
+        debugPrint('Error updating manifest: $e');
+        // Don't rethrow - we want to continue with task creation even if manifest fails
       }
-
-      debugPrint('Manifest management complete.');
-    } catch (e) {
-      debugPrint('Error managing manifest: $e');
-      // We don't want to fail the whole submission if just the manifest fails
-      // So we catch the error here and just log it
     }
+  } catch (e) {
+    debugPrint('Error managing manifest: $e');
+    // We don't want to fail the whole submission if just the manifest fails
+    // So we catch the error here and just log it
   }
+}
 
   Future<void> createManifestTasks(String eventId, DateTime startDate) async {
     try {

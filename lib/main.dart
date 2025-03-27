@@ -8,7 +8,6 @@ import 'package:cateredtoyou/services/task_automation_service.dart'; // Import T
 import 'package:cateredtoyou/services/task_service.dart'; // Import TaskService for task-related operations
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth package for Firebase authentication
 import 'package:firebase_core/firebase_core.dart'; // Import Firebase core package for Firebase initialization
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart'; // Import Flutter material package for UI components
 import 'package:provider/provider.dart'; // Import provider package for state management
 import 'package:cateredtoyou/models/auth_model.dart'; // Import AuthModel for authentication state
