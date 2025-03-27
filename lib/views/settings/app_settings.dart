@@ -307,7 +307,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
         style: const TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: Colors.green,
+          color: Colors.black,
         ),
       ),
     );
@@ -328,7 +328,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
       secondary: Icon(icon),
       value: enabled ? value : false,
       onChanged: enabled ? onChanged : null,
-      activeColor: Colors.green,
     );
   }
 
