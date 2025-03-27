@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/views/manifest/widgets/partial_loading_item_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -26,7 +27,9 @@ class VehicleLoadingScreen extends StatefulWidget {
 class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
   Vehicle? _vehicle;
   bool _isLoading = true;
-  final Map<String, dynamic> _eventDetails = {};
+  final Map<String, Map<String, dynamic>> _eventDetails = {};
+  final Set<String> _failedEventIds = {}; // Track failed event ID lookups
+  String _selectedFilter = 'All Items';
 
   @override
   void initState() {
@@ -36,70 +39,126 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
 
   Future<void> _loadVehicleDetails() async {
     try {
-      final vehicleService = Provider.of<VehicleService>(context, listen: false);
-      
+      final vehicleService =
+          Provider.of<VehicleService>(context, listen: false);
+
       // Get all vehicles and find the one we're looking for
       final vehicles = await vehicleService.getVehicles().first;
-      
+
       if (!mounted) return;
-      
+
       setState(() {
         _vehicle = vehicles.firstWhere(
           (v) => v.id == widget.vehicleId,
-          orElse: () => throw Exception('Vehicle not found'), // Throw an exception if not found
+          orElse: () => throw Exception(
+              'Vehicle not found'), // Throw an exception if not found
         );
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      
+
       setState(() {
         _isLoading = false;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading vehicle details: $e')),
       );
     }
   }
 
-  Future<Map<String, dynamic>> _getEventDetails(String eventId) async {
-    // Check cache first
-    if (_eventDetails.containsKey(eventId)) {
-      return _eventDetails[eventId];
+  Future<Map<String, dynamic>> _getEventDetails(String manifestId) async {
+    // Try to extract eventId from manifestId if needed
+    String eventId;
+    
+    // Check if this is a direct manifestId or an item id with format timestamp_menuItemId
+    if (manifestId.contains('_')) {
+      // Extract the first part as eventId or manifestId
+      eventId = manifestId.split('_').first;
+    } else {
+      eventId = manifestId;
     }
     
+    // Return from cache if available
+    if (_eventDetails.containsKey(eventId)) {
+      return _eventDetails[eventId]!;
+    }
+
+    // If we previously failed to fetch this event, don't try again
+    if (_failedEventIds.contains(eventId)) {
+      return {
+        'name': 'Event #${eventId.substring(0, min(6, eventId.length))}',
+        'date': 'Date unknown',
+      };
+    }
+
     try {
       final eventService = Provider.of<EventService>(context, listen: false);
-      final event = await eventService.getEventById(eventId);
       
+      // Log attempt to fetch event
+      debugPrint('Fetching event details for ID: $eventId');
+      
+      // First try to get by manifest id
+      var event = await eventService.getEventById(manifestId);
+      
+      // If that failed, try with the extracted eventId
+      if (event == null && eventId != manifestId) {
+        event = await eventService.getEventById(eventId);
+      }
+
       if (event != null) {
+        // Safely format the date with null check
+        String formattedDate;
+        try {
+          formattedDate = DateFormat('MMM d, yyyy').format(event.startDate);
+        } catch (e) {
+          formattedDate = 'Date unknown';
+        }
+
         final details = {
           'name': event.name,
-          'date': DateFormat('MMM d, yyyy').format(event.startDate),
+          'date': formattedDate,
+          'id': event.id,
         };
-        
+
         // Cache for future use
         _eventDetails[eventId] = details;
         return details;
       }
       
+      // If we get here, event was null but no exception was thrown
+      debugPrint('Event not found: $eventId');
+      _failedEventIds.add(eventId);
       return {
-        'name': 'Unknown Event',
-        'date': 'Unknown date',
+        'name': 'Event #${eventId.substring(0, min(6, eventId.length))}',
+        'date': 'Date unknown',
       };
     } catch (e) {
+      debugPrint('Error fetching event details: $e');
+      _failedEventIds.add(eventId);
+      
+      // Return graceful fallback
       return {
-        'name': 'Error loading event',
-        'date': '',
+        'name': 'Event #${eventId.substring(0, min(6, eventId.length))}',
+        'date': 'Unknown date',
       };
     }
+  }
+
+  // Helper function for min value
+  int min(int a, int b) => a < b ? a : b;
+
+  void _setFilter(String filter) {
+    setState(() {
+      _selectedFilter = filter;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
@@ -143,20 +202,14 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
         title: Text('${_vehicle!.make} ${_vehicle!.model} Loading'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.print),
-            tooltip: 'Print Loading List',
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh data',
             onPressed: () {
-              // Would implement printing functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Printing not implemented')),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            tooltip: 'More options',
-            onPressed: () {
-              // Show more options
+              setState(() {
+                // Clear caches to force refresh
+                _eventDetails.clear();
+                _failedEventIds.clear();
+              });
             },
           ),
         ],
@@ -179,11 +232,12 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
                       width: 60,
                       height: 60,
                       decoration: BoxDecoration(
-                        color: theme.primaryColor.withAlpha((0.1 * 255).toInt()),
+                        color:
+                            theme.primaryColor.withAlpha((0.1 * 255).toInt()),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
-                        Icons.local_shipping,
+                        _getVehicleIcon(_vehicle!.type),
                         color: theme.primaryColor,
                         size: 32,
                       ),
@@ -232,35 +286,41 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
               ),
             ),
           ),
-          
+
           // Tabs for All Items and Filter options
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              children: [
-                _buildTab(true, 'All Items', Icons.list),
-                const SizedBox(width: 8),
-                _buildTab(false, 'Pending', Icons.pending_actions),
-                const SizedBox(width: 8),
-                _buildTab(false, 'Loaded', Icons.check_circle_outline),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.filter_list),
-                  tooltip: 'Filter',
-                  onPressed: () {
-                    // Would implement filter functionality
-                  },
-                ),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildTab(_selectedFilter == 'All Items', 'All Items', Icons.list, () => _setFilter('All Items')),
+                  const SizedBox(width: 8),
+                  _buildTab(_selectedFilter == 'Pending', 'Pending', Icons.pending_actions, () => _setFilter('Pending')),
+                  const SizedBox(width: 8),
+                  _buildTab(_selectedFilter == 'Loaded', 'Loaded', Icons.check_circle_outline, () => _setFilter('Loaded')),
+                  const SizedBox(width: 8),
+                  _buildTab(_selectedFilter == 'Partial', 'Partial', Icons.splitscreen, () => _setFilter('Partial')),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.filter_list),
+                    tooltip: 'Filter',
+                    onPressed: () {
+                      // Would implement filter functionality
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
-          
+
           // Items list grouped by event
           Expanded(
             child: Consumer<ManifestService>(
               builder: (context, manifestService, child) {
                 return StreamBuilder<List<ManifestItem>>(
-                  stream: manifestService.getManifestItemsByVehicleId(widget.vehicleId),
+                  stream: manifestService
+                      .getManifestItemsByVehicleId(widget.vehicleId),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(
@@ -273,7 +333,8 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                            const Icon(Icons.error_outline,
+                                size: 48, color: Colors.red),
                             const SizedBox(height: 16),
                             Text('Error: ${snapshot.error}'),
                           ],
@@ -282,7 +343,7 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
                     }
 
                     final items = snapshot.data ?? [];
-                    
+
                     if (items.isEmpty) {
                       return Center(
                         child: Column(
@@ -311,10 +372,33 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
                       );
                     }
 
+                    // Filter items based on selected filter
+                    var filteredItems = items;
+                    if (_selectedFilter == 'Pending') {
+                      filteredItems = items.where((item) => item.loadingStatus == LoadingStatus.pending).toList();
+                    } else if (_selectedFilter == 'Loaded') {
+                      filteredItems = items.where((item) => item.loadingStatus == LoadingStatus.loaded).toList();
+                    } else if (_selectedFilter == 'Partial') {
+                      // This would require us to know the total quantity across all vehicles
+                      // For now, just show all items - in real implementation, you'd check partial loading
+                      filteredItems = items;
+                    }
+
                     // Group items by manifest/event
                     final groupedItems = <String, List<ManifestItem>>{};
-                    for (final item in items) {
-                      final manifestId = item.id.split('_').first;
+                    for (final item in filteredItems) {
+                      // Extract the manifestId from the item id format
+                      String manifestId;
+                      
+                      // Try to identify the manifest ID from the item ID
+                      if (item.id.contains('_')) {
+                        manifestId = item.id.split('_').first;
+                      } else {
+                        // If item ID doesn't have the expected format, use menuItemId as fallback
+                        manifestId = item.menuItemId;
+                      }
+
+                      // This is the fix: get the manifestId correctly
                       if (!groupedItems.containsKey(manifestId)) {
                         groupedItems[manifestId] = [];
                       }
@@ -324,102 +408,59 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
                     // Convert to list for ListView
                     final groupedList = groupedItems.entries.toList();
                     
+                    if (groupedList.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.filter_list,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No items match the selected filter',
+                              style: theme.textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              icon: const Icon(Icons.clear_all),
+                              label: const Text('Clear Filter'),
+                              onPressed: () {
+                                setState(() {
+                                  _selectedFilter = 'All Items';
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
                     // Build list with headers for each event
                     return ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: groupedList.length,
                       itemBuilder: (context, index) {
                         final entry = groupedList[index];
+                        final eventId = entry.key;
                         final manifestItems = entry.value;
-                        
-                        // Calculate loading statistics
-                        final totalItems = manifestItems.length;
-                        final loadedCount = manifestItems
-                            .where((item) => item.loadingStatus == LoadingStatus.loaded)
-                            .length;
-                        final loadedPercentage = (loadedCount / totalItems * 100).toInt();
-                        
+
                         return FutureBuilder<Map<String, dynamic>>(
-                          future: _getEventDetails(manifestItems.first.id.split('_').first),
+                          future: _getEventDetails(eventId),
                           builder: (context, eventSnapshot) {
+                            // Default values if data isn't loaded yet
                             final eventName = eventSnapshot.data?['name'] ?? 'Loading...';
                             final eventDate = eventSnapshot.data?['date'] ?? '';
-                            
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Event header
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    left: 4,
-                                    right: 4,
-                                    top: 16,
-                                    bottom: 8,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              eventName,
-                                              style: theme.textTheme.titleMedium?.copyWith(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            if (eventDate.isNotEmpty)
-                                              Text(
-                                                eventDate,
-                                                style: TextStyle(
-                                                  color: Colors.grey[600],
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: theme.primaryColor.withAlpha((0.1 * 255).toInt()),
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                        child: Text(
-                                          '$loadedCount/$totalItems items loaded',
-                                          style: TextStyle(
-                                            color: theme.primaryColor,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      SizedBox(
-                                        width: 30,
-                                        height: 30,
-                                        child: CircularProgressIndicator(
-                                          value: loadedPercentage / 100,
-                                          strokeWidth: 4,
-                                          backgroundColor: Colors.grey[300],
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                            loadedPercentage == 100 ? Colors.green : theme.primaryColor,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                
-                                // Items for this event
-                                ...manifestItems.map((item) => _buildItemTile(item)),
-                                
-                                if (index < groupedList.length - 1)
-                                  Divider(color: Colors.grey[300], height: 32),
-                              ],
+
+                            // Build event section
+                            return _buildEventSection(
+                              context,
+                              eventName,
+                              eventDate,
+                              manifestItems,
+                              theme,
                             );
                           },
                         );
@@ -434,62 +475,208 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
       ),
     );
   }
-  
-  Widget _buildTab(bool isSelected, String label, IconData icon) {
-    final theme = Theme.of(context);
-    
-    return InkWell(
-      onTap: () {
-        // Would implement tab selection
-      },
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 6,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.primaryColor
-              : theme.cardColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected
-                ? theme.primaryColor
-                : Colors.grey[300]!,
+
+  Widget _buildEventSection(
+    BuildContext context,
+    String eventName,
+    String eventDate,
+    List<ManifestItem> manifestItems,
+    ThemeData theme,
+  ) {
+    // Calculate loading statistics
+    final totalItems = manifestItems.length;
+    final loadedCount = manifestItems
+        .where((item) => item.loadingStatus == LoadingStatus.loaded)
+        .length;
+    final loadedPercentage = (loadedCount / totalItems * 100).toInt();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Event header
+        Padding(
+          padding: const EdgeInsets.only(
+            left: 4,
+            right: 4,
+            top: 16,
+            bottom: 8,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      eventName,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (eventDate.isNotEmpty)
+                      Text(
+                        eventDate,
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.primaryColor.withAlpha((0.1 * 255).toInt()),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  '$loadedCount/$totalItems items loaded',
+                  style: TextStyle(
+                    color: theme.primaryColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 30,
+                height: 30,
+                child: CircularProgressIndicator(
+                  value: loadedPercentage / 100,
+                  strokeWidth: 4,
+                  backgroundColor: Colors.grey[300],
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    loadedPercentage == 100 ? Colors.green : theme.primaryColor,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isSelected
-                  ? Colors.white
-                  : Colors.grey[700],
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected
-                    ? Colors.white
-                    : Colors.grey[700],
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      ),
+
+        // Group items by type for partial loading display
+        ..._buildGroupedItemTiles(manifestItems, theme),
+
+        const Divider(height: 32),
+      ],
     );
   }
-  
+
+  List<Widget> _buildGroupedItemTiles(List<ManifestItem> items, ThemeData theme) {
+    // Group by menu item ID to identify items of the same type
+    final groupedByMenuItem = <String, List<ManifestItem>>{};
+    
+    for (final item in items) {
+      if (!groupedByMenuItem.containsKey(item.menuItemId)) {
+        groupedByMenuItem[item.menuItemId] = [];
+      }
+      groupedByMenuItem[item.menuItemId]!.add(item);
+    }
+    
+    final itemWidgets = <Widget>[];
+    
+    groupedByMenuItem.forEach((menuItemId, menuItems) {
+      // If there's only one item of this type, display normally
+      if (menuItems.length == 1) {
+        itemWidgets.add(_buildItemTile(menuItems.first));
+        return;
+      }
+      
+      // Multiple items of the same type - potential partial loading
+      // Count total quantity across all instances
+      final totalQuantity = menuItems.fold<int>(
+        0, (sum, item) => sum + item.quantity);
+      
+      // Count loaded quantity
+      final loadedCount = menuItems
+        .where((item) => item.loadingStatus == LoadingStatus.loaded)
+        .fold<int>(0, (sum, item) => sum + item.quantity);
+      
+      // Use the first item as reference
+      final referenceItem = menuItems.first;
+      
+      // Create a partial loading item tile
+      itemWidgets.add(
+        PartialLoadingItemTile(
+          item: referenceItem,
+          totalQuantity: totalQuantity,
+          loadedQuantity: loadedCount,
+          pendingQuantity: totalQuantity - loadedCount,
+          onTap: () {
+            // Show details about each instance of this item
+            _showItemInstances(context, menuItems, theme);
+          },
+        ),
+      );
+    });
+    
+    return itemWidgets;
+  }
+
+  void _showItemInstances(BuildContext context, List<ManifestItem> items, ThemeData theme) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.splitscreen,
+                    color: theme.primaryColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Item Instances: ${items.first.name}',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const Divider(),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return _buildItemTile(item);
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildItemTile(ManifestItem item) {
     Color statusColor;
     IconData statusIcon;
-    
+
     switch (item.loadingStatus) {
       case LoadingStatus.unassigned:
         statusColor = Colors.grey;
@@ -504,7 +691,7 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
         statusIcon = Icons.check_circle_outline;
         break;
     }
-    
+
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 8),
@@ -534,7 +721,7 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              
+
               // Item details
               Expanded(
                 child: Column(
@@ -560,7 +747,7 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
                   ],
                 ),
               ),
-              
+
               // Status label
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -597,7 +784,48 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
       ),
     );
   }
-  
+
+  Widget _buildTab(bool isSelected, String label, IconData icon, VoidCallback onTap) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected ? theme.primaryColor : theme.cardColor,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? theme.primaryColor : Colors.grey[300]!,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.white : Colors.grey[700],
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.grey[700],
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   String _getVehicleTypeLabel(VehicleType type) {
     switch (type) {
       case VehicleType.van:
@@ -610,7 +838,20 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
         return 'Unknown';
     }
   }
-  
+
+  IconData _getVehicleIcon(VehicleType type) {
+    switch (type) {
+      case VehicleType.van:
+        return Icons.airport_shuttle;
+      case VehicleType.truck:
+        return Icons.local_shipping;
+      case VehicleType.car:
+        return Icons.directions_car;
+      default:
+        return Icons.local_shipping;
+    }
+  }
+
   String _getStatusLabel(VehicleStatus status) {
     switch (status) {
       case VehicleStatus.available:
@@ -621,9 +862,9 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
         return 'Maintenance';
       case VehicleStatus.outOfService:
         return 'Out of Service';
-      }
+    }
   }
-  
+
   Color _getStatusColor(VehicleStatus status) {
     switch (status) {
       case VehicleStatus.available:
@@ -634,9 +875,9 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
         return Colors.orange;
       case VehicleStatus.outOfService:
         return Colors.red;
-      }
+    }
   }
-  
+
   String _getLoadingStatusLabel(LoadingStatus status) {
     switch (status) {
       case LoadingStatus.unassigned:
@@ -645,6 +886,6 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
         return 'Pending';
       case LoadingStatus.loaded:
         return 'Loaded';
-      }
+    }
   }
 }

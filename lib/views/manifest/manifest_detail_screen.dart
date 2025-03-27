@@ -21,7 +21,7 @@ import 'package:cateredtoyou/views/manifest/widgets/drag_item_indicator.dart';
 /// - See vehicle assignments and status
 class ManifestDetailScreen extends StatefulWidget {
   final String manifestId;
-
+  
   const ManifestDetailScreen({
     super.key,
     required this.manifestId,
@@ -31,26 +31,27 @@ class ManifestDetailScreen extends StatefulWidget {
   State<ManifestDetailScreen> createState() => _ManifestDetailScreenState();
 }
 
-class _ManifestDetailScreenState extends State<ManifestDetailScreen> with SingleTickerProviderStateMixin {
+class _ManifestDetailScreenState extends State<ManifestDetailScreen>
+    with SingleTickerProviderStateMixin {
   // Tab controller
   late TabController _tabController;
-  
+
   // Drag Drop Manager
   late DragDropManager _dragDropManager;
-  
+
   // Event information
   String _eventName = 'Loading...';
   String _eventDate = '';
-  
+
   // Selection and quantities
   final Map<String, bool> _selectedItems = {};
   final Map<String, int> _itemQuantities = {};
-  
+
   // Search & filtering
-  String _searchQuery = '';
+  final String _searchQuery = '';
   String _sortOption = 'Name (A-Z)';
   bool _filterLoaded = false;
-  
+
   // UI state
   bool _showVehicleSelectorOverlay = false;
 
@@ -58,11 +59,11 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    
+
     // Listen for tab changes to update UI
     _tabController.addListener(_handleTabChange);
   }
-  
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -76,7 +77,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
     _tabController.dispose();
     super.dispose();
   }
-  
+
   void _handleTabChange() {
     // When changing tabs, if items are selected, we can show a hint
     if (_tabController.indexIsChanging) {
@@ -89,13 +90,13 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
       });
     }
   }
-  
+
   // Check for wider screens to show split view
   bool get _canShowSplitView {
     final width = MediaQuery.of(context).size.width;
     return width >= 1200; // Only for very wide screens
   }
-  
+
   // Load event details
   Future<void> _loadEventDetails(String eventId) async {
     try {
@@ -103,7 +104,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
       final event = await eventService.getEventById(eventId);
 
       if (!mounted) return;
-      
+
       setState(() {
         _eventName = event?.name ?? 'Unknown Event';
         _eventDate = event?.startDate != null
@@ -112,31 +113,33 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
       });
     } catch (e) {
       if (!mounted) return;
-      
+
       setState(() {
         _eventName = 'Error loading event';
         _eventDate = '';
       });
     }
   }
-  
+
   // Handle selecting an item
   void _handleItemSelected(String itemId, bool selected) {
     setState(() {
       _selectedItems[itemId] = selected;
-      
+
       // If we selected an item and we're on the items tab,
       // show the floating action button
       if (selected && _tabController.index == 0) {
         _showVehicleSelectorOverlay = true;
       }
-      
+
       // If we deselected all items, hide the selector
       if (!_selectedItems.values.contains(true)) {
         _showVehicleSelectorOverlay = false;
       }
     });
   }
+
+  
 
   // Handle select all items
   void _handleSelectAll(bool selected, List<ManifestItem> items) {
@@ -146,7 +149,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
           _selectedItems[item.id] = selected;
         }
       }
-      
+
       // Show vehicle selector if items are selected
       _showVehicleSelectorOverlay = selected && items.isNotEmpty;
     });
@@ -158,33 +161,33 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
       _itemQuantities[itemId] = quantity;
     });
   }
-  
+
   // Handle drag start for selected items
   void _handleDragStart(List<ManifestItem> items, List<int> quantities) {
     // Use drag drop manager to start the drag
     _dragDropManager.startDrag(items, quantities, widget.manifestId);
-    
+
     // Switch to the vehicles tab if we're not already there
     if (_tabController.index != 1) {
       _tabController.animateTo(1);
     }
-    
+
     // Force UI update
     setState(() {});
   }
-  
+
   // Handle drop on a vehicle
   Future<void> _handleDropOnVehicle(String vehicleId, Manifest manifest) async {
     // Use drag drop manager to handle the drop
     final success = await _dragDropManager.dropOnVehicle(vehicleId);
-    
+
     if (success && mounted) {
       // Update UI state
       setState(() {
         _selectedItems.clear();
         _showVehicleSelectorOverlay = false;
       });
-      
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -195,11 +198,11 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
       );
     }
   }
-  
+
   // Remove an item from a vehicle
   Future<void> _handleRemoveFromVehicle(ManifestItem item) async {
     await _dragDropManager.removeFromVehicle(item);
-    
+
     // Show feedback
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -211,11 +214,12 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
       );
     }
   }
-  
+
   // Update item loading status
-  Future<void> _handleUpdateStatus(ManifestItem item, LoadingStatus status) async {
+  Future<void> _handleUpdateStatus(
+      ManifestItem item, LoadingStatus status) async {
     await _dragDropManager.updateItemStatus(item, status);
-    
+
     // Show feedback when item is loaded
     if (status == LoadingStatus.loaded && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -227,7 +231,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
       );
     }
   }
-  
+
   // Show vehicle selection dialog
   void _showVehicleSelection() {
     showDialog(
@@ -248,7 +252,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
                     }
 
                     final vehicles = snapshot.data ?? [];
-                    
+
                     if (vehicles.isEmpty) {
                       return const Center(
                         child: Text('No vehicles available'),
@@ -272,24 +276,25 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
                           ),
                           onTap: () {
                             Navigator.pop(context);
-                            
+
                             // Get the manifest and handle assignment
                             Provider.of<ManifestService>(context, listen: false)
                                 .getManifestById(widget.manifestId)
                                 .first
                                 .then((manifest) {
-                                  if (!mounted || manifest == null) return;
-                                  
-                                  // Get the selected items
-                                  final selectedItems = _getSelectedItems(manifest);
-                                  final quantities = selectedItems
-                                      .map((item) => _itemQuantities[item.id] ?? item.quantity)
-                                      .toList();
-                                  
-                                  // Handle drag and drop
-                                  _handleDragStart(selectedItems, quantities);
-                                  _handleDropOnVehicle(vehicle.id, manifest);
-                                });
+                              if (!mounted || manifest == null) return;
+
+                              // Get the selected items
+                              final selectedItems = _getSelectedItems(manifest);
+                              final quantities = selectedItems
+                                  .map((item) =>
+                                      _itemQuantities[item.id] ?? item.quantity)
+                                  .toList();
+
+                              // Handle drag and drop
+                              _handleDragStart(selectedItems, quantities);
+                              _handleDropOnVehicle(vehicle.id, manifest);
+                            });
                           },
                         );
                       },
@@ -309,7 +314,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
       },
     );
   }
-  
+
   void _showSortAndFilterOptions() {
     showModalBottomSheet(
       context: context,
@@ -348,7 +353,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
                     dense: true,
                     leading: const Icon(Icons.sort_by_alpha),
                     title: const Text('Name (A-Z)'),
-                    trailing: _sortOption == 'Name (A-Z)' 
+                    trailing: _sortOption == 'Name (A-Z)'
                         ? const Icon(Icons.check, color: Colors.green)
                         : null,
                     onTap: () {
@@ -362,7 +367,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
                     dense: true,
                     leading: const Icon(Icons.sort_by_alpha),
                     title: const Text('Name (Z-A)'),
-                    trailing: _sortOption == 'Name (Z-A)' 
+                    trailing: _sortOption == 'Name (Z-A)'
                         ? const Icon(Icons.check, color: Colors.green)
                         : null,
                     onTap: () {
@@ -376,7 +381,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
                     dense: true,
                     leading: const Icon(Icons.numbers),
                     title: const Text('Quantity (High to Low)'),
-                    trailing: _sortOption == 'Quantity (High to Low)' 
+                    trailing: _sortOption == 'Quantity (High to Low)'
                         ? const Icon(Icons.check, color: Colors.green)
                         : null,
                     onTap: () {
@@ -390,7 +395,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
                     dense: true,
                     leading: const Icon(Icons.numbers),
                     title: const Text('Quantity (Low to High)'),
-                    trailing: _sortOption == 'Quantity (Low to High)' 
+                    trailing: _sortOption == 'Quantity (Low to High)'
                         ? const Icon(Icons.check, color: Colors.green)
                         : null,
                     onTap: () {
@@ -446,33 +451,37 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
       },
     );
   }
-  
+
   // Get selected manifest items
   List<ManifestItem> _getSelectedItems(Manifest manifest) {
     return manifest.items
-        .where((item) => item.vehicleId == null && (_selectedItems[item.id] ?? false))
+        .where((item) =>
+            item.vehicleId == null && (_selectedItems[item.id] ?? false))
         .toList();
   }
-  
+
   // Apply sort and filter
   List<ManifestItem> _applySortAndFilter(List<ManifestItem> items) {
     var filteredItems = items;
-    
+
     // Apply search filter
     if (_searchQuery.isNotEmpty) {
-      filteredItems = filteredItems.where((item) => 
-        item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-        item.menuItemId.toLowerCase().contains(_searchQuery.toLowerCase())
-      ).toList();
+      filteredItems = filteredItems
+          .where((item) =>
+              item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              item.menuItemId
+                  .toLowerCase()
+                  .contains(_searchQuery.toLowerCase()))
+          .toList();
     }
-    
+
     // Filter out loaded items if enabled
     if (_filterLoaded) {
-      filteredItems = filteredItems.where((item) => 
-        item.loadingStatus != LoadingStatus.loaded
-      ).toList();
+      filteredItems = filteredItems
+          .where((item) => item.loadingStatus != LoadingStatus.loaded)
+          .toList();
     }
-    
+
     // Apply sorting
     switch (_sortOption) {
       case 'Name (A-Z)':
@@ -488,25 +497,25 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
         filteredItems.sort((a, b) => a.quantity.compareTo(b.quantity));
         break;
     }
-    
+
     return filteredItems;
   }
-  
+
   // Count selected items
   int _countSelectedItems(Manifest manifest) {
     return _getSelectedItems(manifest).length;
   }
-  
+
   @override
   Widget build(BuildContext context) {
     // For very wide screens, use the split view
     if (_canShowSplitView) {
       return SplitViewManifestScreen(manifestId: widget.manifestId);
     }
-    
+
     final theme = Theme.of(context);
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -520,7 +529,8 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.normal,
-                  color: theme.appBarTheme.foregroundColor?.withAlpha((0.8 * 255).toInt()),
+                  color: theme.appBarTheme.foregroundColor
+                      ?.withAlpha((0.8 * 255).toInt()),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -531,7 +541,8 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.normal,
-                  color: theme.appBarTheme.foregroundColor?.withAlpha((0.7 * 255).toInt()),
+                  color: theme.appBarTheme.foregroundColor
+                      ?.withAlpha((0.7 * 255).toInt()),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -575,8 +586,8 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
           ),
           IconButton(
             icon: Icon(
-              _filterLoaded || _sortOption != 'Name (A-Z)' 
-                  ? Icons.filter_list_alt 
+              _filterLoaded || _sortOption != 'Name (A-Z)'
+                  ? Icons.filter_list_alt
                   : Icons.filter_list,
               color: _filterLoaded || _sortOption != 'Name (A-Z)'
                   ? Colors.blue
@@ -590,18 +601,20 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
       body: Stack(
         children: [
           StreamBuilder<Manifest?>(
-            stream: Provider.of<ManifestService>(context).getManifestById(widget.manifestId),
+            stream: Provider.of<ManifestService>(context)
+                .getManifestById(widget.manifestId),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
-    
+
               if (snapshot.hasError) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                      const Icon(Icons.error_outline,
+                          size: 48, color: Colors.red),
                       const SizedBox(height: 16),
                       Text('Error: ${snapshot.error}'),
                       TextButton.icon(
@@ -615,19 +628,19 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
                   ),
                 );
               }
-    
+
               final manifest = snapshot.data;
               if (manifest == null) {
                 return const Center(
                   child: Text('Manifest not found'),
                 );
               }
-    
+
               // Load event details if needed
               if (_eventName == 'Loading...') {
                 _loadEventDetails(manifest.eventId);
               }
-    
+
               // Initialize quantities
               for (var item in manifest.items) {
                 if (!_itemQuantities.containsKey(item.id)) {
@@ -637,9 +650,9 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
 
               // Apply sorting and filtering to manifest items
               final filteredItems = _applySortAndFilter(manifest.items);
-    
+
               return Column(
-                children: [                  
+                children: [
                   // Tab content
                   Expanded(
                     child: TabBarView(
@@ -652,16 +665,18 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
                           selectedItems: _selectedItems,
                           itemQuantities: _itemQuantities,
                           onItemSelected: _handleItemSelected,
-                          onSelectAll: (selected) => _handleSelectAll(selected, manifest.items),
+                          onSelectAll: (selected) =>
+                              _handleSelectAll(selected, manifest.items),
                           onQuantityChanged: _handleQuantityChanged,
                           onDragStart: _handleDragStart,
                           isSmallScreen: isSmallScreen,
                         ),
-                        
+
                         // Vehicle assignments tab
                         VehiclesTab(
                           manifest: manifest,
-                          onDrop: (vehicleId) => _handleDropOnVehicle(vehicleId, manifest),
+                          onDrop: (vehicleId) =>
+                              _handleDropOnVehicle(vehicleId, manifest),
                           onRemoveItem: _handleRemoveFromVehicle,
                           onUpdateStatus: _handleUpdateStatus,
                           isSmallScreen: isSmallScreen,
@@ -673,22 +688,23 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
               );
             },
           ),
-          
-          // Vehicle selector overlay
+
+          // Vehicle selector overlay - now correctly inside a Stack widget
           if (_showVehicleSelectorOverlay)
             Positioned(
               right: 16,
               bottom: 76, // Above the bottom bar
               child: StreamBuilder<Manifest?>(
-                stream: Provider.of<ManifestService>(context).getManifestById(widget.manifestId),
+                stream: Provider.of<ManifestService>(context)
+                    .getManifestById(widget.manifestId),
                 builder: (context, snapshot) {
                   final manifest = snapshot.data;
                   if (manifest == null) return const SizedBox.shrink();
-                  
+
                   // Get selected count
                   final count = _countSelectedItems(manifest);
                   if (count == 0) return const SizedBox.shrink();
-                  
+
                   return DragItemIndicator(
                     itemCount: count,
                     onAssign: _showVehicleSelection,
@@ -701,7 +717,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
       bottomNavigationBar: _buildBottomBar(isSmallScreen),
     );
   }
-  
+
   Widget _buildBottomBar(bool isSmallScreen) {
     return BottomAppBar(
       elevation: 8,
@@ -720,18 +736,20 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
                     builder: (context, snapshot) {
                       final manifest = snapshot.data;
                       if (manifest == null) return const SizedBox.shrink();
-                      
+
                       // Count selected items
                       final selectedCount = _selectedItems.entries
                           .where((entry) => entry.value)
                           .length;
-                          
+
                       return Text(
                         selectedCount == 0
                             ? 'No items selected'
                             : '$selectedCount items selected',
                         style: TextStyle(
-                          fontWeight: selectedCount > 0 ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: selectedCount > 0
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                           fontSize: 14,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -741,10 +759,10 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
                 },
               ),
             ),
-            
+
             // Fixed size spacer
             const SizedBox(width: 8),
-            
+
             // Action buttons with fixed width
             if (_selectedItems.values.contains(true))
               Row(
@@ -768,7 +786,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
                         backgroundColor: Colors.green,
                       ),
                       icon: Icon(
-                        Icons.local_shipping, 
+                        Icons.local_shipping,
                         size: isSmallScreen ? 14 : 18,
                       ),
                       label: Text(
@@ -785,7 +803,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
       ),
     );
   }
-  
+
   // Helper methods for vehicle display
   IconData _getVehicleIcon(VehicleType type) {
     switch (type) {
@@ -799,7 +817,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
         return Icons.local_shipping;
     }
   }
-  
+
   String _getStatusLabel(VehicleStatus status) {
     switch (status) {
       case VehicleStatus.available:
@@ -812,7 +830,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
         return 'Out of Service';
     }
   }
-  
+
   Color _getStatusColor(VehicleStatus status) {
     switch (status) {
       case VehicleStatus.available:
@@ -831,12 +849,12 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen> with Single
 class ManifestSearchDelegate extends SearchDelegate<ManifestItem?> {
   final Stream<Manifest?> manifest;
   final Function(ManifestItem) onItemSelected;
-  
+
   ManifestSearchDelegate({
     required this.manifest,
     required this.onItemSelected,
   });
-  
+
   @override
   List<Widget> buildActions(BuildContext context) {
     return [
@@ -869,7 +887,7 @@ class ManifestSearchDelegate extends SearchDelegate<ManifestItem?> {
   Widget buildSuggestions(BuildContext context) {
     return _buildSearchResults(context);
   }
-  
+
   Widget _buildSearchResults(BuildContext context) {
     return StreamBuilder<Manifest?>(
       stream: manifest,
@@ -877,29 +895,28 @@ class ManifestSearchDelegate extends SearchDelegate<ManifestItem?> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        
+
         if (snapshot.hasError || snapshot.data == null) {
           return const Center(
             child: Text('Error loading items'),
           );
         }
-        
+
         final manifest = snapshot.data!;
         final items = manifest.items
             .where((item) => item.vehicleId == null)
-            .where((item) => 
+            .where((item) =>
                 query.isEmpty ||
                 item.name.toLowerCase().contains(query.toLowerCase()) ||
-                item.menuItemId.toLowerCase().contains(query.toLowerCase())
-            )
+                item.menuItemId.toLowerCase().contains(query.toLowerCase()))
             .toList();
-        
+
         if (items.isEmpty) {
           return const Center(
             child: Text('No matching items found'),
           );
         }
-        
+
         return ListView.builder(
           itemCount: items.length,
           itemBuilder: (context, index) {

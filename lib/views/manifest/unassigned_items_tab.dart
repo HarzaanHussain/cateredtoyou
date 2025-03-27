@@ -42,6 +42,11 @@ class UnassignedItemsTab extends StatelessWidget {
     return selectedItems.values.contains(true);
   }
 
+  // Helper method to count selected items
+  int _countSelectedItems(List<ManifestItem> items) {
+    return items.where((item) => selectedItems[item.id] == true).length;
+  }
+
   @override
   Widget build(BuildContext context) {
     // Get unassigned items

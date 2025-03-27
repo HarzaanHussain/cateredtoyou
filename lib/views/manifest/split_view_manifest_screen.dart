@@ -44,8 +44,6 @@ class _SplitViewManifestScreenState extends State<SplitViewManifestScreen> {
   String _sortOption = 'Name (A-Z)';
   bool _filterLoadedItems = false;
   
-  // UI state
-  
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -369,6 +367,18 @@ class _SplitViewManifestScreenState extends State<SplitViewManifestScreen> {
     
     return filteredItems;
   }
+
+  bool _areAllItemsSelected(List<ManifestItem> items) {
+    if (items.isEmpty) {
+      return false;
+    }
+
+    return items.every((item) => _selectedItems[item.id] == true);
+  }
+  
+  int _countSelectedItems(List<ManifestItem> items) {
+    return items.where((item) => _selectedItems[item.id] ?? false).length;
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -438,64 +448,9 @@ class _SplitViewManifestScreenState extends State<SplitViewManifestScreen> {
           ),
         ],
       ),
-      body: StreamBuilder<Manifest?>(
-        stream: Provider.of<ManifestService>(context).getManifestById(widget.manifestId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text('Error: ${snapshot.error}'),
-                  TextButton.icon(
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                    onPressed: () {
-                      setState(() {});
-                    },
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final manifest = snapshot.data;
-          if (manifest == null) {
-            return const Center(
-              child: Text('Manifest not found'),
-            );
-          }
-
-          // Load event details if needed
-          if (_eventName == 'Loading...') {
-            _loadEventDetails(manifest.eventId);
-          }
-
-          // Initialize quantities
-          for (var item in manifest.items) {
-            if (!_itemQuantities.containsKey(item.id)) {
-              _itemQuantities[item.id] = item.quantity;
-            }
-          }
-
-          // Get unassigned items
-          final unassignedItems = manifest.items
-              .where((item) => item.vehicleId == null)
-              .toList();
-              
-          // Apply sort and filter
-          final filteredUnassignedItems = _applySortAndFilter(unassignedItems);
-          
-          // Check if any items are selected
-          final anyItemsSelected = _selectedItems.values.contains(true);
-
-          return Column(
+      body: Stack(
+        children: [
+          Column(
             children: [
               // Search bar
               Padding(
@@ -529,245 +484,299 @@ class _SplitViewManifestScreenState extends State<SplitViewManifestScreen> {
               
               // Main content - split view
               Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Left panel - Unassigned items
-                    Expanded(
-                      flex: 1,
-                      child: Column(
-                        children: [
-                          // Header with actions
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            color: theme.cardColor,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    '${filteredUnassignedItems.length} Items to Load',
-                                    style: theme.textTheme.titleMedium,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    _areAllItemsSelected(filteredUnassignedItems)
-                                        ? Icons.select_all
-                                        : Icons.check_box_outline_blank,
-                                    color: theme.primaryColor,
-                                  ),
-                                  tooltip: _areAllItemsSelected(filteredUnassignedItems)
-                                      ? 'Deselect All'
-                                      : 'Select All',
-                                  onPressed: () {
-                                    _handleSelectAll(!_areAllItemsSelected(filteredUnassignedItems), manifest.items);
-                                  },
-                                ),
-                              ],
+                child: StreamBuilder<Manifest?>(
+                  stream: Provider.of<ManifestService>(context).getManifestById(widget.manifestId),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                            const SizedBox(height: 16),
+                            Text('Error: ${snapshot.error}'),
+                            TextButton.icon(
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                              onPressed: () {
+                                setState(() {});
+                              },
                             ),
-                          ),
-                          
-                          // Items list
-                          Expanded(
-                            child: filteredUnassignedItems.isEmpty
-                                ? Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.check_circle_outline,
-                                          size: 64,
-                                          color: Colors.green[300],
-                                        ),
-                                        const SizedBox(height: 16),
-                                        const Text(
-                                          'All items loaded',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          _searchQuery.isNotEmpty || _filterLoadedItems
-                                              ? 'Try changing your search or filters'
-                                              : 'No items need to be loaded',
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                : _buildDraggableItemsList(filteredUnassignedItems),
-                          ),
-                          
-                          // Bottom bar with actions for items
-                          if (filteredUnassignedItems.isNotEmpty)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              color: theme.cardColor,
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      _countSelectedItems(filteredUnassignedItems) == 0
-                                          ? 'No items selected'
-                                          : '${_countSelectedItems(filteredUnassignedItems)} items selected',
-                                      style: TextStyle(
-                                        fontWeight: _countSelectedItems(filteredUnassignedItems) > 0
-                                            ? FontWeight.bold
-                                            : FontWeight.normal,
-                                        fontSize: 14,
+                          ],
+                        ),
+                      );
+                    }
+
+                    final manifest = snapshot.data;
+                    if (manifest == null) {
+                      return const Center(
+                        child: Text('Manifest not found'),
+                      );
+                    }
+
+                    // Load event details if needed
+                    if (_eventName == 'Loading...') {
+                      _loadEventDetails(manifest.eventId);
+                    }
+
+                    // Initialize quantities
+                    for (var item in manifest.items) {
+                      if (!_itemQuantities.containsKey(item.id)) {
+                        _itemQuantities[item.id] = item.quantity;
+                      }
+                    }
+
+                    // Get unassigned items
+                    final unassignedItems = manifest.items
+                        .where((item) => item.vehicleId == null)
+                        .toList();
+                        
+                    // Apply sort and filter
+                    final filteredUnassignedItems = _applySortAndFilter(unassignedItems);
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Left panel - Unassigned items
+                        Expanded(
+                          flex: 1,
+                          child: Column(
+                            children: [
+                              // Header with actions
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                color: theme.cardColor,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '${filteredUnassignedItems.length} Items to Load',
+                                        style: theme.textTheme.titleMedium,
                                       ),
                                     ),
-                                  ),
-                                  if (_countSelectedItems(filteredUnassignedItems) > 0)
-                                    TextButton(
-                                      child: const Text('Clear'),
+                                    IconButton(
+                                      icon: Icon(
+                                        _areAllItemsSelected(filteredUnassignedItems)
+                                            ? Icons.select_all
+                                            : Icons.check_box_outline_blank,
+                                        color: theme.primaryColor,
+                                      ),
+                                      tooltip: _areAllItemsSelected(filteredUnassignedItems)
+                                          ? 'Deselect All'
+                                          : 'Select All',
                                       onPressed: () {
-                                        setState(() {
-                                          _selectedItems.clear();
-                                        });
+                                        _handleSelectAll(!_areAllItemsSelected(filteredUnassignedItems), manifest.items);
                                       },
                                     ),
-                                  const SizedBox(width: 8),
-                                  SizedBox(
-                                    width: 150, // FIX: Fixed width prevents overflow
-                                    child: ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.green,
-                                      ),
-                                      icon: const Icon(Icons.local_shipping, size: 18),
-                                      label: const Text('Load to Vehicle'),
-                                      onPressed: _countSelectedItems(filteredUnassignedItems) > 0
-                                          ? _showVehicleSelection
-                                          : null,
-                                    ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    
-                    // Divider
-                    Container(
-                      width: 1,
-                      color: Colors.grey[300],
-                    ),
-                    
-                    // Right panel - Vehicles
-                    Expanded(
-                      flex: 1,
-                      child: Consumer<VehicleService>(
-                        builder: (context, vehicleService, child) {
-                          return StreamBuilder<List<Vehicle>>(
-                            stream: vehicleService.getVehicles(),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return const Center(child: CircularProgressIndicator());
-                              }
-
-                              final vehicles = snapshot.data ?? [];
                               
-                              if (vehicles.isEmpty) {
-                                return Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                              // Items list
+                              Expanded(
+                                child: filteredUnassignedItems.isEmpty
+                                    ? Center(
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.check_circle_outline,
+                                              size: 64,
+                                              color: Colors.green[300],
+                                            ),
+                                            const SizedBox(height: 16),
+                                            const Text(
+                                              'All items loaded',
+                                              style: TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              _searchQuery.isNotEmpty || _filterLoadedItems
+                                                  ? 'Try changing your search or filters'
+                                                  : 'No items need to be loaded',
+                                              style: TextStyle(
+                                                color: Colors.grey[600],
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : _buildDraggableItemsList(filteredUnassignedItems),
+                              ),
+                              
+                              // Bottom bar with actions for items
+                              if (filteredUnassignedItems.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  color: theme.cardColor,
+                                  child: Row(
                                     children: [
-                                      Icon(Icons.local_shipping_outlined, size: 64, color: Colors.grey[400]),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'No vehicles available',
-                                        style: Theme.of(context).textTheme.titleMedium,
+                                      Expanded(
+                                        child: Text(
+                                          _countSelectedItems(filteredUnassignedItems) == 0
+                                              ? 'No items selected'
+                                              : '${_countSelectedItems(filteredUnassignedItems)} items selected',
+                                          style: TextStyle(
+                                            fontWeight: _countSelectedItems(filteredUnassignedItems) > 0
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                            fontSize: 14,
+                                          ),
+                                        ),
                                       ),
-                                      const SizedBox(height: 8),
-                                      ElevatedButton.icon(
-                                        icon: const Icon(Icons.add),
-                                        label: const Text('Add Vehicle'),
-                                        onPressed: () {
-                                          // Would open vehicle creation screen
-                                        },
-                                      ),
+                                      if (_countSelectedItems(filteredUnassignedItems) > 0)
+                                        TextButton(
+                                          child: const Text('Clear'),
+                                          onPressed: () {
+                                            setState(() {
+                                              _selectedItems.clear();
+                                            });
+                                          },
+                                        ),
                                     ],
                                   ),
-                                );
-                              }
+                                ),
+                            ],
+                          ),
+                        ),
+                        
+                        // Divider
+                        Container(
+                          width: 1,
+                          color: Colors.grey[300],
+                        ),
+                        
+                        // Right panel - Vehicles
+                        Expanded(
+                          flex: 1,
+                          child: Consumer<VehicleService>(
+                            builder: (context, vehicleService, child) {
+                              return StreamBuilder<List<Vehicle>>(
+                                stream: vehicleService.getVehicles(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                    return const Center(child: CircularProgressIndicator());
+                                  }
 
-                              return Column(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                    color: theme.cardColor,
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            '${vehicles.length} Vehicles',
-                                            style: theme.textTheme.titleMedium,
+                                  final vehicles = snapshot.data ?? [];
+                                  
+                                  if (vehicles.isEmpty) {
+                                    return Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.local_shipping_outlined, size: 64, color: Colors.grey[400]),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            'No vehicles available',
+                                            style: Theme.of(context).textTheme.titleMedium,
                                           ),
+                                          const SizedBox(height: 8),
+                                          ElevatedButton.icon(
+                                            icon: const Icon(Icons.add),
+                                            label: const Text('Add Vehicle'),
+                                            onPressed: () {
+                                              // Would open vehicle creation screen
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+
+                                  return Column(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        color: theme.cardColor,
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                '${vehicles.length} Vehicles',
+                                                style: theme.textTheme.titleMedium,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: ListView.builder(
-                                      padding: const EdgeInsets.all(16),
-                                      itemCount: vehicles.length,
-                                      itemBuilder: (context, index) {
-                                        final vehicle = vehicles[index];
-                                        return VehicleCard(
-                                          vehicle: vehicle,
-                                          manifest: manifest,
-                                          onDrop: (vehicleId) => _handleDropOnVehicle(vehicleId, manifest),
-                                          onRemoveItem: _handleRemoveFromVehicle,
-                                          onUpdateStatus: _handleUpdateStatus,
-                                          isSmallScreen: false,
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ],
+                                      ),
+                                      Expanded(
+                                        child: ListView.builder(
+                                          padding: const EdgeInsets.all(16),
+                                          itemCount: vehicles.length,
+                                          itemBuilder: (context, index) {
+                                            final vehicle = vehicles[index];
+                                            return VehicleCard(
+                                              vehicle: vehicle,
+                                              manifest: manifest,
+                                              onDrop: (vehicleId) => _handleDropOnVehicle(vehicleId, manifest),
+                                              onRemoveItem: _handleRemoveFromVehicle,
+                                              onUpdateStatus: _handleUpdateStatus,
+                                              isSmallScreen: false,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
                               );
                             },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
-              
-              // Floating indicator for selected items
-              if (anyItemsSelected)
-                Positioned(
-                  bottom: 16,
-                  right: 16,
-                  child: DragItemIndicator(
-                    itemCount: _countSelectedItems(unassignedItems),
-                    onAssign: _showVehicleSelection,
-                  ),
-                ),
             ],
-          );
-        },
+          ),
+          
+          // Floating indicator for selected items - Now correctly in a Stack
+          Consumer<ManifestService>(
+            builder: (context, manifestService, _) {
+              return StreamBuilder<Manifest?>(
+                stream: manifestService.getManifestById(widget.manifestId),
+                builder: (context, snapshot) {
+                  // Only show if we have data and selected items
+                  if (!snapshot.hasData || !_selectedItems.values.contains(true)) {
+                    return const SizedBox.shrink();
+                  }
+                  
+                  final manifest = snapshot.data!;
+                  final selectedCount = _countSelectedItems(
+                    manifest.items.where((item) => item.vehicleId == null).toList()
+                  );
+                  
+                  if (selectedCount == 0) {
+                    return const SizedBox.shrink();
+                  }
+                  
+                  return Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: DragItemIndicator(
+                      itemCount: selectedCount,
+                      onAssign: _showVehicleSelection,
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ],
       ),
     );
   }
-  
-  bool _areAllItemsSelected(List<ManifestItem> items) {
-    if (items.isEmpty) return false;
-    
-    return items.every((item) => _selectedItems[item.id] == true);
-  }
-  
-  int _countSelectedItems(List<ManifestItem> items) {
-    return items.where((item) => _selectedItems[item.id] ?? false).length;
-  }
-  
+
   Widget _buildDraggableItemsList(List<ManifestItem> items) {
     final itemsListView = ListView.builder(
       padding: const EdgeInsets.all(8),
