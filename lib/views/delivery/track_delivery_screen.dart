@@ -364,77 +364,76 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
       }
     });
   }
-  
-
-
 
   @override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      title: Text(_currentRoute?.metadata?['eventName'] ?? 'Track Delivery'),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.my_location),
-          onPressed: _performInitialMapPreview,
-          tooltip: 'View entire route',
-        ),
-      ],
-    ),
-    body: _isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : Stack(
-            children: [
-              DeliveryMap(
-                mapController: _mapController,
-                markers: _markers,
-                polylines: [
-                  if (_routePoints.isNotEmpty)
-                    MapMarkerHelper.createRoute(
-                      points: _routePoints,
-                      color: Theme.of(context).colorScheme.primary,
-                      width: 5.0,
-                    ),
-                ],
-                initialPosition: LatLng(
-                  _currentRoute!.waypoints.first.latitude,
-                  _currentRoute!.waypoints.first.longitude,
-                ),
-                isLoading: _isLoading,
-              ),
-              
-              // Position the loaded items section at the top with proper padding
-              if (_currentRoute != null &&
-                  _currentRoute!.metadata != null &&
-                  _currentRoute!.metadata!['loadedItems'] != null)
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  top: 16,
-                  child: LoadedItemsSection(
-                    items: List<Map<String, dynamic>>.from(
-                        _currentRoute!.metadata!['loadedItems']),
-                    allItemsLoaded:
-                        _currentRoute!.metadata!['vehicleHasAllItems'] ?? false,
-                  ),
-                ),
-                
-              // DeliveryInfoCard at the bottom
-              if (_currentRoute != null)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: DeliveryInfoCard(
-                    route: _currentRoute!,
-                    onDriverInfoTap: () => _showDriverContactSheet(context),
-                    onContactDriverTap: () => _showDriverContactSheet(context),
-                  ),
-                ),
-            ],
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_currentRoute?.metadata?['eventName'] ?? 'Track Delivery'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.my_location),
+            onPressed: _performInitialMapPreview,
+            tooltip: 'View entire route',
           ),
-  );
-}
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Stack(
+              children: [
+                DeliveryMap(
+                  mapController: _mapController,
+                  markers: _markers,
+                  polylines: [
+                    if (_routePoints.isNotEmpty)
+                      MapMarkerHelper.createRoute(
+                        points: _routePoints,
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 5.0,
+                      ),
+                  ],
+                  initialPosition: LatLng(
+                    _currentRoute!.waypoints.first.latitude,
+                    _currentRoute!.waypoints.first.longitude,
+                  ),
+                  isLoading: _isLoading,
+                ),
+
+                // Position the loaded items section at the top with proper padding
+                if (_currentRoute != null &&
+                    _currentRoute!.metadata != null &&
+                    _currentRoute!.metadata!['loadedItems'] != null)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    top: 16,
+                    child: LoadedItemsSection(
+                      items: List<Map<String, dynamic>>.from(
+                          _currentRoute!.metadata!['loadedItems']),
+                      allItemsLoaded:
+                          _currentRoute!.metadata!['vehicleHasAllItems'] ??
+                              false,
+                    ),
+                  ),
+
+                // DeliveryInfoCard at the bottom
+                if (_currentRoute != null)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: DeliveryInfoCard(
+                      route: _currentRoute!,
+                      onDriverInfoTap: () => _showDriverContactSheet(context),
+                      onContactDriverTap: () =>
+                          _showDriverContactSheet(context),
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
 
   void _showDriverContactSheet(BuildContext context) {
     if (_currentRoute == null) return; // Return if the current route is null.
