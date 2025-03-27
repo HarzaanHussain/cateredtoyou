@@ -22,7 +22,7 @@ class _LoadedItemsSectionState extends State<LoadedItemsSection> { // State clas
     return Card( // A card widget to provide a container with elevation and styling.
       elevation: 4, // Elevation for shadow effect.
       margin: EdgeInsets.zero, // No margin around the card.
-      color: Colors.white.withOpacity(0.9), // Slightly transparent white background.
+      color: Colors.white.withAlpha((0.9 * 255).toInt()), // Slightly transparent white background.
       child: Column( // A column to stack child widgets vertically.
         mainAxisSize: MainAxisSize.min, // Adjusts the column size to fit its children.
         children: [
