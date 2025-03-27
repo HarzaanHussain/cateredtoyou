@@ -1,4 +1,3 @@
-import 'package:cateredtoyou/views/manifest/widgets/partial_loading_item_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +6,8 @@ import 'package:cateredtoyou/models/vehicle_model.dart';
 import 'package:cateredtoyou/services/manifest_service.dart';
 import 'package:cateredtoyou/services/vehicle_service.dart';
 import 'package:cateredtoyou/services/event_service.dart';
+import 'package:cateredtoyou/views/manifest/widgets/partial_loading_item_tile.dart';
+import 'package:cateredtoyou/views/manifest/widgets/drag_item_indicator.dart';
 
 /// A screen that shows all items loaded in a specific vehicle across all events
 ///
@@ -30,6 +31,8 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
   final Map<String, Map<String, dynamic>> _eventDetails = {};
   final Set<String> _failedEventIds = {}; // Track failed event ID lookups
   String _selectedFilter = 'All Items';
+  final Map<String, bool> _selectedItems = {};
+  int _selectedCount = 0;
 
   @override
   void initState() {
@@ -155,6 +158,48 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
     });
   }
 
+  void _toggleItemSelection(ManifestItem item) {
+    setState(() {
+      if (_selectedItems.containsKey(item.id) && _selectedItems[item.id] == true) {
+        _selectedItems[item.id] = false;
+        _selectedCount--;
+      } else {
+        _selectedItems[item.id] = true;
+        _selectedCount++;
+      }
+    });
+  }
+
+  void _assignSelectedItemsToVehicle() {
+    // This is a placeholder - implement vehicle assignment logic
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Assign Items'),
+        content: Text('Would assign $_selectedCount selected items to another vehicle'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              
+              // Clear selection after assignment
+              setState(() {
+                _selectedItems.clear();
+                _selectedCount = 0;
+              });
+              
+              // Show success message
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Items assigned successfully')),
+              );
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -214,263 +259,282 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // Vehicle details card
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
+          Column(
+            children: [
+              // Vehicle details card
+              Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color:
-                            theme.primaryColor.withAlpha((0.1 * 255).toInt()),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        _getVehicleIcon(_vehicle!.type),
-                        color: theme.primaryColor,
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${_vehicle!.make} ${_vehicle!.model}',
-                            style: theme.textTheme.titleLarge,
+                child: Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color:
+                                theme.primaryColor.withAlpha((0.1 * 255).toInt()),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'License: ${_vehicle!.licensePlate}',
-                            style: theme.textTheme.bodyMedium,
+                          child: Icon(
+                            _getVehicleIcon(_vehicle!.type),
+                            color: theme.primaryColor,
+                            size: 32,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Type: ${_getVehicleTypeLabel(_vehicle!.type)}',
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(_vehicle!.status),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        _getStatusLabel(_vehicle!.status),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
                         ),
-                      ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_vehicle!.make} ${_vehicle!.model}',
+                                style: theme.textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'License: ${_vehicle!.licensePlate}',
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Type: ${_getVehicleTypeLabel(_vehicle!.type)}',
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(_vehicle!.status),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            _getStatusLabel(_vehicle!.status),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
 
-          // Tabs for All Items and Filter options
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildTab(_selectedFilter == 'All Items', 'All Items', Icons.list, () => _setFilter('All Items')),
-                  const SizedBox(width: 8),
-                  _buildTab(_selectedFilter == 'Pending', 'Pending', Icons.pending_actions, () => _setFilter('Pending')),
-                  const SizedBox(width: 8),
-                  _buildTab(_selectedFilter == 'Loaded', 'Loaded', Icons.check_circle_outline, () => _setFilter('Loaded')),
-                  const SizedBox(width: 8),
-                  _buildTab(_selectedFilter == 'Partial', 'Partial', Icons.splitscreen, () => _setFilter('Partial')),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.filter_list),
-                    tooltip: 'Filter',
-                    onPressed: () {
-                      // Would implement filter functionality
-                    },
+              // Tabs for All Items and Filter options
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SizedBox(
+                  height: 40,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min, // This prevents overflow
+                      children: [
+                        _buildTab(_selectedFilter == 'All Items', 'All Items', Icons.list, () => _setFilter('All Items')),
+                        const SizedBox(width: 8),
+                        _buildTab(_selectedFilter == 'Pending', 'Pending', Icons.pending_actions, () => _setFilter('Pending')),
+                        const SizedBox(width: 8),
+                        _buildTab(_selectedFilter == 'Loaded', 'Loaded', Icons.check_circle_outline, () => _setFilter('Loaded')),
+                        const SizedBox(width: 8),
+                        _buildTab(_selectedFilter == 'Partial', 'Partial', Icons.splitscreen, () => _setFilter('Partial')),
+                        const SizedBox(width: 16), // Fixed width instead of Spacer
+                        IconButton(
+                          icon: const Icon(Icons.filter_list),
+                          tooltip: 'Filter',
+                          onPressed: () {
+                            // Would implement filter functionality
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
 
-          // Items list grouped by event
-          Expanded(
-            child: Consumer<ManifestService>(
-              builder: (context, manifestService, child) {
-                return StreamBuilder<List<ManifestItem>>(
-                  stream: manifestService
-                      .getManifestItemsByVehicleId(widget.vehicleId),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
-                    }
+              // Items list grouped by event
+              Expanded(
+                child: Consumer<ManifestService>(
+                  builder: (context, manifestService, child) {
+                    return StreamBuilder<List<ManifestItem>>(
+                      stream: manifestService
+                          .getManifestItemsByVehicleId(widget.vehicleId),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
 
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.error_outline,
-                                size: 48, color: Colors.red),
-                            const SizedBox(height: 16),
-                            Text('Error: ${snapshot.error}'),
-                          ],
-                        ),
-                      );
-                    }
-
-                    final items = snapshot.data ?? [];
-
-                    if (items.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.inventory_2_outlined,
-                              size: 64,
-                              color: Colors.grey[400],
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.error_outline,
+                                    size: 48, color: Colors.red),
+                                const SizedBox(height: 16),
+                                Text('Error: ${snapshot.error}'),
+                              ],
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No items assigned to this vehicle',
-                              style: theme.textTheme.titleMedium,
+                          );
+                        }
+
+                        final items = snapshot.data ?? [];
+
+                        if (items.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No items assigned to this vehicle',
+                                  style: theme.textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 8),
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Assign Items'),
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                  },
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 8),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.add),
-                              label: const Text('Assign Items'),
-                              onPressed: () {
-                                Navigator.pop(context);
+                          );
+                        }
+
+                        // Filter items based on selected filter
+                        var filteredItems = items;
+                        if (_selectedFilter == 'Pending') {
+                          filteredItems = items.where((item) => item.loadingStatus == LoadingStatus.pending).toList();
+                        } else if (_selectedFilter == 'Loaded') {
+                          filteredItems = items.where((item) => item.loadingStatus == LoadingStatus.loaded).toList();
+                        } else if (_selectedFilter == 'Partial') {
+                          // This would require us to know the total quantity across all vehicles
+                          // For now, just show all items - in real implementation, you'd check partial loading
+                          filteredItems = items;
+                        }
+
+                        // Group items by manifest/event
+                        final groupedItems = <String, List<ManifestItem>>{};
+                        for (final item in filteredItems) {
+                          // Extract the manifestId from the item id format
+                          String manifestId;
+                          
+                          // Try to identify the manifest ID from the item ID
+                          if (item.id.contains('_')) {
+                            manifestId = item.id.split('_').first;
+                          } else {
+                            // If item ID doesn't have the expected format, use menuItemId as fallback
+                            manifestId = item.menuItemId;
+                          }
+
+                          // This is the fix: get the manifestId correctly
+                          if (!groupedItems.containsKey(manifestId)) {
+                            groupedItems[manifestId] = [];
+                          }
+                          groupedItems[manifestId]!.add(item);
+                        }
+
+                        // Convert to list for ListView
+                        final groupedList = groupedItems.entries.toList();
+                        
+                        if (groupedList.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.filter_list,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No items match the selected filter',
+                                  style: theme.textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 8),
+                                TextButton.icon(
+                                  icon: const Icon(Icons.clear_all),
+                                  label: const Text('Clear Filter'),
+                                  onPressed: () {
+                                    setState(() {
+                                      _selectedFilter = 'All Items';
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        // Build list with headers for each event
+                        return ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: groupedList.length,
+                          itemBuilder: (context, index) {
+                            final entry = groupedList[index];
+                            final eventId = entry.key;
+                            final manifestItems = entry.value;
+
+                            return FutureBuilder<Map<String, dynamic>>(
+                              future: _getEventDetails(eventId),
+                              builder: (context, eventSnapshot) {
+                                // Default values if data isn't loaded yet
+                                final eventName = eventSnapshot.data?['name'] ?? 'Loading...';
+                                final eventDate = eventSnapshot.data?['date'] ?? '';
+
+                                // Build event section
+                                return _buildEventSection(
+                                  context,
+                                  eventName,
+                                  eventDate,
+                                  manifestItems,
+                                  theme,
+                                );
                               },
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    // Filter items based on selected filter
-                    var filteredItems = items;
-                    if (_selectedFilter == 'Pending') {
-                      filteredItems = items.where((item) => item.loadingStatus == LoadingStatus.pending).toList();
-                    } else if (_selectedFilter == 'Loaded') {
-                      filteredItems = items.where((item) => item.loadingStatus == LoadingStatus.loaded).toList();
-                    } else if (_selectedFilter == 'Partial') {
-                      // This would require us to know the total quantity across all vehicles
-                      // For now, just show all items - in real implementation, you'd check partial loading
-                      filteredItems = items;
-                    }
-
-                    // Group items by manifest/event
-                    final groupedItems = <String, List<ManifestItem>>{};
-                    for (final item in filteredItems) {
-                      // Extract the manifestId from the item id format
-                      String manifestId;
-                      
-                      // Try to identify the manifest ID from the item ID
-                      if (item.id.contains('_')) {
-                        manifestId = item.id.split('_').first;
-                      } else {
-                        // If item ID doesn't have the expected format, use menuItemId as fallback
-                        manifestId = item.menuItemId;
-                      }
-
-                      // This is the fix: get the manifestId correctly
-                      if (!groupedItems.containsKey(manifestId)) {
-                        groupedItems[manifestId] = [];
-                      }
-                      groupedItems[manifestId]!.add(item);
-                    }
-
-                    // Convert to list for ListView
-                    final groupedList = groupedItems.entries.toList();
-                    
-                    if (groupedList.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.filter_list,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No items match the selected filter',
-                              style: theme.textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 8),
-                            TextButton.icon(
-                              icon: const Icon(Icons.clear_all),
-                              label: const Text('Clear Filter'),
-                              onPressed: () {
-                                setState(() {
-                                  _selectedFilter = 'All Items';
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    // Build list with headers for each event
-                    return ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: groupedList.length,
-                      itemBuilder: (context, index) {
-                        final entry = groupedList[index];
-                        final eventId = entry.key;
-                        final manifestItems = entry.value;
-
-                        return FutureBuilder<Map<String, dynamic>>(
-                          future: _getEventDetails(eventId),
-                          builder: (context, eventSnapshot) {
-                            // Default values if data isn't loaded yet
-                            final eventName = eventSnapshot.data?['name'] ?? 'Loading...';
-                            final eventDate = eventSnapshot.data?['date'] ?? '';
-
-                            // Build event section
-                            return _buildEventSection(
-                              context,
-                              eventName,
-                              eventDate,
-                              manifestItems,
-                              theme,
                             );
                           },
                         );
                       },
                     );
                   },
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
+          
+          // DragItemIndicator - Positioned at the bottom right when items are selected
+          if (_selectedCount > 0)
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: DragItemIndicator(
+                itemCount: _selectedCount,
+                onAssign: _assignSelectedItemsToVehicle,
+              ),
+            ),
         ],
       ),
     );
@@ -488,7 +552,7 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
     final loadedCount = manifestItems
         .where((item) => item.loadingStatus == LoadingStatus.loaded)
         .length;
-    final loadedPercentage = (loadedCount / totalItems * 100).toInt();
+    final loadedPercentage = totalItems > 0 ? (loadedCount / totalItems * 100).toInt() : 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -691,6 +755,8 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
         statusIcon = Icons.check_circle_outline;
         break;
     }
+    
+    final isSelected = _selectedItems[item.id] == true;
 
     return Card(
       elevation: 0,
@@ -698,28 +764,44 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(
-          color: statusColor.withAlpha((0.3 * 255).toInt()),
-          width: 1,
+          color: isSelected 
+            ? Colors.blue.withAlpha((0.8 * 255).toInt()) 
+            : statusColor.withAlpha((0.3 * 255).toInt()),
+          width: isSelected ? 2 : 1,
         ),
       ),
       child: InkWell(
-        onTap: () {
-          // Would implement item details view
-        },
+        onTap: () => _toggleItemSelection(item),
         borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              // Status indicator
-              Container(
-                width: 4,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: statusColor,
-                  borderRadius: BorderRadius.circular(2),
+              // Selection indicator
+              if (isSelected)
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                )
+              else
+                // Status indicator
+                Container(
+                  width: 4,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
               const SizedBox(width: 12),
 
               // Item details
