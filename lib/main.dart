@@ -181,6 +181,7 @@ class MyApp extends StatelessWidget {
               ),
               cardTheme: CardTheme(
                 elevation: 2, // Set elevation for cards
+                color: Colors.white, // Change this to your preferred background color
                 shape: RoundedRectangleBorder(
                   borderRadius:
                       BorderRadius.circular(12), // Set border radius for cards
