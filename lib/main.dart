@@ -148,6 +148,17 @@ class MyApp extends StatelessWidget {
                   seedColor: Colors.blue, // Set primary color to blue
                   brightness: Brightness.light, // Set brightness to light mode
                 ),
+              switchTheme: SwitchThemeData(
+                  thumbColor: MaterialStateProperty.resolveWith<Color>((states) {
+                    if (states.contains(MaterialState.selected)) {
+                      return Colors.white;  // Thumb color when the switch is active
+                    }
+                    return Colors.white;  // Thumb color when the switch is inactive
+                  }),
+                trackColor: MaterialStateProperty.all(Colors.green),  // Track color
+                // You can set different colors for active and inactive states
+                overlayColor: MaterialStateProperty.all(Colors.green.withOpacity(0.4)),  // Circle overlay color
+              ),
               primaryColor: const Color(0xFFFBC72B),
 
               useMaterial3: true, // Use Material 3 design
