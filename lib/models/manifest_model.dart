@@ -1,5 +1,3 @@
-// lib/models/manifest_model.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Represents a manifest, which is essentially a list of items assigned to a specific event.
@@ -11,6 +9,7 @@ class Manifest {
   final List<ManifestItem> items; // All items included in this manifest
   final DateTime createdAt; // Timestamp when the manifest was created
   final DateTime updatedAt; // Timestamp when the manifest was last updated
+  final bool isArchived; // Whether this manifest is archived
 
   Manifest({
     required this.id,
@@ -19,6 +18,7 @@ class Manifest {
     required this.items,
     required this.createdAt,
     required this.updatedAt,
+    this.isArchived = false,
   });
 
   /// Converts this manifest into a Firestore-compatible map.
@@ -29,6 +29,7 @@ class Manifest {
       'items': items.map((item) => item.toMap()).toList(),
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
+      'isArchived': isArchived,
     };
   }
 
@@ -44,6 +45,7 @@ class Manifest {
           [],
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       updatedAt: (map['updatedAt'] as Timestamp).toDate(),
+      isArchived: map['isArchived'] ?? false,
     );
   }
 
@@ -53,6 +55,7 @@ class Manifest {
     String? eventId,
     String? organizationId,
     List<ManifestItem>? items,
+    bool? isArchived,
   }) {
     return Manifest(
       id: id,
@@ -61,6 +64,7 @@ class Manifest {
       items: items ?? this.items,
       createdAt: createdAt,
       updatedAt: DateTime.now(), // Auto-update timestamp on change
+      isArchived: isArchived ?? this.isArchived,
     );
   }
 }
@@ -111,6 +115,24 @@ class ManifestItem {
             (e) => e.toString().split('.').last == map['loadingStatus'],
         orElse: () => LoadingStatus.unassigned,
       ),
+    );
+  }
+
+  /// Creates a copy of the manifest item with optional changes.
+  ManifestItem copyWith({
+    String? menuItemId,
+    String? name,
+    int? quantity,
+    String? vehicleId,
+    LoadingStatus? loadingStatus,
+  }) {
+    return ManifestItem(
+      id: id,
+      menuItemId: menuItemId ?? this.menuItemId,
+      name: name ?? this.name,
+      quantity: quantity ?? this.quantity,
+      vehicleId: vehicleId ?? this.vehicleId,
+      loadingStatus: loadingStatus ?? this.loadingStatus,
     );
   }
 }

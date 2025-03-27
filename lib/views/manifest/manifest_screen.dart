@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/views/manifest/manifest_creation_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cateredtoyou/services/manifest_service.dart';
@@ -48,56 +49,74 @@ class _ManifestScreenState extends State<ManifestScreen> with SingleTickerProvid
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Catering Management'),
-        elevation: 2,
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Manifests'),
-            Tab(text: 'Vehicles'),
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Catering Management'),
+          elevation: 2,
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Manifests'),
+              Tab(text: 'Vehicles'),
+              Tab(text: 'Archive'),
+            ],
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.filter_list),
+              onPressed: () {
+                _showFilterOptions(context);
+              },
+              tooltip: 'Filter manifests',
+            ),
+            IconButton(
+              icon: const Icon(Icons.sort),
+              onPressed: () {
+                _showSortOptions(context);
+              },
+              tooltip: 'Sort manifests',
+            ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: () {
-              _showFilterOptions(context);
-            },
-            tooltip: 'Filter manifests',
-          ),
-          IconButton(
-            icon: const Icon(Icons.sort),
-            onPressed: () {
-              _showSortOptions(context);
-            },
-            tooltip: 'Sort manifests',
-          ),
-        ],
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // Manifests tab
-          _buildManifestsTab(theme),
-          
-          // Vehicles tab
-          const VehicleOverviewTab(),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          // Handle creating a new manifest
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Create manifest functionality would go here'),
-            ),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('New Manifest'),
-        backgroundColor: Colors.green,
+        body: TabBarView(
+          children: [
+            // Active Manifests tab
+            _buildManifestsTab(theme),
+            
+            // Vehicles tab
+            const VehicleOverviewTab(),
+            
+            // Archive tab
+            _buildArchivedTab(theme),
+          ],
+        ),
+        floatingActionButton: Builder(
+          builder: (context) {
+            final tabIndex = DefaultTabController.of(context).index;
+            // Only show FAB on the manifests tab
+            if (tabIndex != 0) return const SizedBox.shrink();
+            
+            return FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ManifestCreationScreen(),
+                  ),
+                ).then((created) {
+                  if (created == true) {
+                    // Refresh the list if a new manifest was created
+                    setState(() {});
+                  }
+                });
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('New Manifest'),
+              backgroundColor: Colors.green,
+            );
+          }
+        ),
       ),
     );
   }
@@ -232,7 +251,12 @@ class _ManifestScreenState extends State<ManifestScreen> with SingleTickerProvid
                             icon: const Icon(Icons.add),
                             label: const Text('Create New Manifest'),
                             onPressed: () {
-                              // Would navigate to manifest creation screen
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ManifestCreationScreen(),
+                                ),
+                              );
                             },
                           ),
                         ],
@@ -329,6 +353,120 @@ class _ManifestScreenState extends State<ManifestScreen> with SingleTickerProvid
                                   : ManifestDetailScreen(
                                       manifestId: manifest.id,
                                     ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildArchivedTab(ThemeData theme) {
+    return Column(
+      children: [
+        // Archive explanation
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue.withAlpha((0.1 * 255).toInt()),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          margin: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.archive_outlined, color: theme.primaryColor),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Archived manifests are completed manifests where all items have been loaded.',
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // Archived manifests list
+        Expanded(
+          child: Consumer<ManifestService>(
+            builder: (context, manifestService, child) {
+              return StreamBuilder<List<Manifest>>(
+                stream: manifestService.getArchivedManifests(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: Colors.red,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Error loading archived manifests',
+                            style: theme.textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final manifests = snapshot.data ?? [];
+                  
+                  if (manifests.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.inventory_2_outlined,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No archived manifests',
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Completed manifests will appear here',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: manifests.length,
+                    itemBuilder: (context, index) {
+                      final manifest = manifests[index];
+                      
+                      return ManifestListItem(
+                        manifest: manifest,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ManifestDetailScreen(
+                                manifestId: manifest.id,
+                              ),
                             ),
                           );
                         },
