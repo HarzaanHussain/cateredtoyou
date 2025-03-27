@@ -9,6 +9,7 @@ import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:cateredtoyou/widgets/custom_app_bar.dart';
 import 'package:cateredtoyou/widgets/custom_drawer.dart';
 import 'package:cateredtoyou/widgets/urgent_tasks_widget.dart';
+import 'package:cateredtoyou/widgets/urgent_events_widget.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -49,6 +50,11 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
+
+
+              // Urgent Events Widget
+              const UrgentEventsWidget(),
+
               const SizedBox(height: 24),
 
               // Urgent Tasks Widget - Added here
