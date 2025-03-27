@@ -8,13 +8,14 @@ import 'package:cateredtoyou/views/manifest/widgets/manifest_item_card.dart';
 /// allowing users to select, modify quantities, and drag items to vehicles.
 class UnassignedItemsTab extends StatelessWidget {
   final Manifest manifest;
-  final List<ManifestItem>? filteredItems; // Optional pre-filtered items
+  final List<ManifestItem>? filteredItems;
   final Map<String, bool> selectedItems;
   final Map<String, int> itemQuantities;
   final Function(String, bool) onItemSelected;
   final Function(bool) onSelectAll;
   final Function(String, int) onQuantityChanged;
   final Function(List<ManifestItem>, List<int>) onDragStart;
+  final Function(BuildContext, ManifestItem, Offset)? onShowContextMenu;
   final bool isSmallScreen;
 
   const UnassignedItemsTab({
@@ -27,6 +28,7 @@ class UnassignedItemsTab extends StatelessWidget {
     required this.onSelectAll,
     required this.onQuantityChanged,
     required this.onDragStart,
+    this.onShowContextMenu,
     required this.isSmallScreen,
   });
 
@@ -162,6 +164,12 @@ class UnassignedItemsTab extends StatelessWidget {
           quantity: quantity,
           onSelected: (selected) => onItemSelected(item.id, selected),
           onQuantityChanged: (newQuantity) => onQuantityChanged(item.id, newQuantity),
+          onLongPress: (context, position) {
+            // This invokes the parent screen's context menu method
+            if (onShowContextMenu != null) {
+              onShowContextMenu!(context, item, position);
+            }
+          },
           isSmallScreen: isSmallScreen,
         );
       },

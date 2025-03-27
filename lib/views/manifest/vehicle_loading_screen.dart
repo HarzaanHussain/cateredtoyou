@@ -1,3 +1,5 @@
+// Update your VehicleLoadingScreen to enhance support for partial item loading
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -6,13 +8,10 @@ import 'package:cateredtoyou/models/vehicle_model.dart';
 import 'package:cateredtoyou/services/manifest_service.dart';
 import 'package:cateredtoyou/services/vehicle_service.dart';
 import 'package:cateredtoyou/services/event_service.dart';
-import 'package:cateredtoyou/views/manifest/widgets/partial_loading_item_tile.dart';
-import 'package:cateredtoyou/views/manifest/widgets/drag_item_indicator.dart';
+import 'package:cateredtoyou/managers/drag_drop_manager.dart';
+import 'package:cateredtoyou/views/manifest/widgets/partial_quantity_selector.dart';
 
 /// A screen that shows all items loaded in a specific vehicle across all events
-///
-/// This screen displays a comprehensive view of all items assigned to a vehicle,
-/// grouping them by event and showing loading status.
 class VehicleLoadingScreen extends StatefulWidget {
   final String vehicleId;
 
@@ -31,21 +30,26 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
   final Map<String, Map<String, dynamic>> _eventDetails = {};
   final Set<String> _failedEventIds = {}; // Track failed event ID lookups
   String _selectedFilter = 'All Items';
-  final Map<String, bool> _selectedItems = {};
-  int _selectedCount = 0;
+  
+  // Add a drag drop manager for item transfers
+  late DragDropManager _dragDropManager;
 
   @override
   void initState() {
     super.initState();
     _loadVehicleDetails();
   }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Initialize drag drop manager
+    _dragDropManager = DragDropManager(context);
+  }
 
   Future<void> _loadVehicleDetails() async {
     try {
-      final vehicleService =
-          Provider.of<VehicleService>(context, listen: false);
-
-      // Get all vehicles and find the one we're looking for
+      final vehicleService = Provider.of<VehicleService>(context, listen: false);
       final vehicles = await vehicleService.getVehicles().first;
 
       if (!mounted) return;
@@ -53,8 +57,7 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
       setState(() {
         _vehicle = vehicles.firstWhere(
           (v) => v.id == widget.vehicleId,
-          orElse: () => throw Exception(
-              'Vehicle not found'), // Throw an exception if not found
+          orElse: () => throw Exception('Vehicle not found'),
         );
         _isLoading = false;
       });
@@ -72,23 +75,20 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
   }
 
   Future<Map<String, dynamic>> _getEventDetails(String manifestId) async {
-    // Try to extract eventId from manifestId if needed
-    String eventId;
+    // Code for event details retrieval remains the same
+    // ...
     
-    // Check if this is a direct manifestId or an item id with format timestamp_menuItemId
+    String eventId;
     if (manifestId.contains('_')) {
-      // Extract the first part as eventId or manifestId
       eventId = manifestId.split('_').first;
     } else {
       eventId = manifestId;
     }
     
-    // Return from cache if available
     if (_eventDetails.containsKey(eventId)) {
       return _eventDetails[eventId]!;
     }
 
-    // If we previously failed to fetch this event, don't try again
     if (_failedEventIds.contains(eventId)) {
       return {
         'name': 'Event #${eventId.substring(0, min(6, eventId.length))}',
@@ -98,20 +98,9 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
 
     try {
       final eventService = Provider.of<EventService>(context, listen: false);
+      var event = await eventService.getEventById(eventId);
       
-      // Log attempt to fetch event
-      debugPrint('Fetching event details for ID: $eventId');
-      
-      // First try to get by manifest id
-      var event = await eventService.getEventById(manifestId);
-      
-      // If that failed, try with the extracted eventId
-      if (event == null && eventId != manifestId) {
-        event = await eventService.getEventById(eventId);
-      }
-
       if (event != null) {
-        // Safely format the date with null check
         String formattedDate;
         try {
           formattedDate = DateFormat('MMM d, yyyy').format(event.startDate);
@@ -125,23 +114,17 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
           'id': event.id,
         };
 
-        // Cache for future use
         _eventDetails[eventId] = details;
         return details;
       }
       
-      // If we get here, event was null but no exception was thrown
-      debugPrint('Event not found: $eventId');
       _failedEventIds.add(eventId);
       return {
         'name': 'Event #${eventId.substring(0, min(6, eventId.length))}',
         'date': 'Date unknown',
       };
     } catch (e) {
-      debugPrint('Error fetching event details: $e');
       _failedEventIds.add(eventId);
-      
-      // Return graceful fallback
       return {
         'name': 'Event #${eventId.substring(0, min(6, eventId.length))}',
         'date': 'Unknown date',
@@ -157,51 +140,329 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
       _selectedFilter = filter;
     });
   }
-
-  void _toggleItemSelection(ManifestItem item) {
-    setState(() {
-      if (_selectedItems.containsKey(item.id) && _selectedItems[item.id] == true) {
-        _selectedItems[item.id] = false;
-        _selectedCount--;
-      } else {
-        _selectedItems[item.id] = true;
-        _selectedCount++;
-      }
-    });
-  }
-
-  void _assignSelectedItemsToVehicle() {
-    // This is a placeholder - implement vehicle assignment logic
+  
+  // New method to show the partial quantity transfer dialog
+  void _showPartialTransferDialog(ManifestItem item, Function(int) onTransfer) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Assign Items'),
-        content: Text('Would assign $_selectedCount selected items to another vehicle'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              
-              // Clear selection after assignment
-              setState(() {
-                _selectedItems.clear();
-                _selectedCount = 0;
-              });
-              
-              // Show success message
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Items assigned successfully')),
-              );
-            },
-            child: const Text('OK'),
+      builder: (context) {
+        int selectedQuantity = 1;
+        
+        return AlertDialog(
+          title: const Text('Transfer Items'),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'How many ${item.name} do you want to transfer to another vehicle?',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+                PartialQuantitySelector(
+                  itemName: item.name,
+                  totalQuantity: item.quantity,
+                  currentQuantity: selectedQuantity,
+                  onQuantityChanged: (value) {
+                    selectedQuantity = value;
+                  },
+                ),
+              ],
+            ),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                onTransfer(selectedQuantity);
+              },
+              child: const Text('Transfer'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // New method to show vehicle selection for transfer
+  void _showVehicleSelectionForTransfer(ManifestItem item, int quantity) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Select Destination Vehicle'),
+          content: SizedBox(
+            width: 400,
+            height: 300,
+            child: Consumer<VehicleService>(
+              builder: (context, vehicleService, child) {
+                return FutureBuilder<List<Vehicle>>(
+                  future: vehicleService.getVehicles().first,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final vehicles = snapshot.data ?? [];
+                    final filteredVehicles = vehicles
+                        .where((v) => v.id != widget.vehicleId)
+                        .toList();
+                    
+                    if (filteredVehicles.isEmpty) {
+                      return const Center(
+                        child: Text('No other vehicles available'),
+                      );
+                    }
+
+                    return ListView.builder(
+                      itemCount: filteredVehicles.length,
+                      itemBuilder: (context, index) {
+                        final vehicle = filteredVehicles[index];
+                        return ListTile(
+                          leading: Icon(_getVehicleIcon(vehicle.type)),
+                          title: Text('${vehicle.make} ${vehicle.model}'),
+                          subtitle: Text(vehicle.licensePlate),
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getStatusColor(vehicle.status).withAlpha((0.2 * 255).toInt()),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              _getStatusLabel(vehicle.status),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: _getStatusColor(vehicle.status),
+                              ),
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _transferItemToVehicle(item, quantity, vehicle.id);
+                          },
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // Method to handle transferring items between vehicles
+  Future<void> _transferItemToVehicle(ManifestItem item, int quantity, String destinationVehicleId) async {
+    try {
+      final manifestService = Provider.of<ManifestService>(context, listen: false);
+      
+      // First ensure we have the latest manifest
+      String manifestId = item.id.split('_').first;
+      final manifest = await manifestService.getManifestById(manifestId).first;
+      
+      if (manifest == null) {
+        throw Exception('Manifest not found');
+      }
+      
+      // Find the original item
+      final originalItem = manifest.items.firstWhere(
+        (manifestItem) => manifestItem.id == item.id,
+        orElse: () => throw Exception('Item not found in manifest'),
+      );
+      
+      // Calculate remaining quantity
+      final remainingQuantity = originalItem.quantity - quantity;
+      
+      if (remainingQuantity < 0) {
+        throw Exception('Invalid quantity');
+      }
+      
+      // Create a copy of all items
+      final updatedItems = List<ManifestItem>.from(manifest.items);
+      
+      // Find and update the original item
+      final originalItemIndex = updatedItems.indexWhere((i) => i.id == item.id);
+      if (originalItemIndex != -1) {
+        if (remainingQuantity > 0) {
+          // Update the quantity of the original item
+          updatedItems[originalItemIndex] = ManifestItem(
+            id: item.id,
+            name: item.name,
+            menuItemId: item.menuItemId,
+            quantity: remainingQuantity,
+            vehicleId: widget.vehicleId,
+            loadingStatus: item.loadingStatus,
+          );
+        } else {
+          // Remove the item if no quantity remains
+          updatedItems.removeAt(originalItemIndex);
+        }
+      }
+      
+      // Add the new item with the transferred quantity to the destination vehicle
+      // Generate a unique ID by appending timestamp to existing item ID
+      final newItemId = '${DateTime.now().millisecondsSinceEpoch}_${item.menuItemId}';
+      updatedItems.add(ManifestItem(
+        id: newItemId,
+        name: item.name,
+        menuItemId: item.menuItemId,
+        quantity: quantity,
+        vehicleId: destinationVehicleId,
+        loadingStatus: LoadingStatus.pending, // Reset to pending for new vehicle
+      ));
+      
+      // Create updated manifest
+      final updatedManifest = Manifest(
+        id: manifest.id,
+        eventId: manifest.eventId,
+        organizationId: manifest.organizationId,
+        items: updatedItems,
+        createdAt: manifest.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      
+      // Update the manifest
+      await manifestService.updateManifest(updatedManifest);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Transferred $quantity ${item.name} to another vehicle'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error transferring item: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Show item options menu
+  void _showItemOptions(ManifestItem item) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Quantity: ${item.quantity}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                
+                // Update loading status
+                ListTile(
+                  leading: Icon(
+                    item.loadingStatus == LoadingStatus.loaded
+                        ? Icons.check_circle
+                        : Icons.pending_actions,
+                    color: item.loadingStatus == LoadingStatus.loaded
+                        ? Colors.green
+                        : Colors.orange,
+                  ),
+                  title: Text(
+                    item.loadingStatus == LoadingStatus.loaded
+                        ? 'Mark as Pending'
+                        : 'Mark as Loaded',
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    
+                    final newStatus = item.loadingStatus == LoadingStatus.loaded
+                        ? LoadingStatus.pending
+                        : LoadingStatus.loaded;
+                    
+                    _dragDropManager.updateItemStatus(item, newStatus);
+                  },
+                ),
+                
+                // Transfer to another vehicle option
+                ListTile(
+                  leading: const Icon(Icons.swap_horiz, color: Colors.blue),
+                  title: const Text('Transfer to Another Vehicle'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showPartialTransferDialog(item, (quantity) {
+                      _showVehicleSelectionForTransfer(item, quantity);
+                    });
+                  },
+                ),
+                
+                // Remove from vehicle option
+                ListTile(
+                  leading: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                  title: const Text('Remove from Vehicle'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _dragDropManager.removeFromVehicle(item);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // The main build method remains largely the same
+    // ...
+    
     final theme = Theme.of(context);
 
     if (_isLoading) {
@@ -251,7 +512,6 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
             tooltip: 'Refresh data',
             onPressed: () {
               setState(() {
-                // Clear caches to force refresh
                 _eventDetails.clear();
                 _failedEventIds.clear();
               });
@@ -259,292 +519,282 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
           ),
         ],
       ),
-      body: Stack(
+      body: Column(
         children: [
-          Column(
-            children: [
-              // Vehicle details card
-              Padding(
+          // Vehicle details card stays the same
+          // ...
+          
+          // Vehicle details card
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color:
-                                theme.primaryColor.withAlpha((0.1 * 255).toInt()),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            _getVehicleIcon(_vehicle!.type),
-                            color: theme.primaryColor,
-                            size: 32,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${_vehicle!.make} ${_vehicle!.model}',
-                                style: theme.textTheme.titleLarge,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'License: ${_vehicle!.licensePlate}',
-                                style: theme.textTheme.bodyMedium,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Type: ${_getVehicleTypeLabel(_vehicle!.type)}',
-                                style: theme.textTheme.bodyMedium,
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _getStatusColor(_vehicle!.status),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Text(
-                            _getStatusLabel(_vehicle!.status),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
+                child: Row(
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: theme.primaryColor.withAlpha((0.1 * 255).toInt()),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        _getVehicleIcon(_vehicle!.type),
+                        color: theme.primaryColor,
+                        size: 32,
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${_vehicle!.make} ${_vehicle!.model}',
+                            style: theme.textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'License: ${_vehicle!.licensePlate}',
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Type: ${_getVehicleTypeLabel(_vehicle!.type)}',
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(_vehicle!.status),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        _getStatusLabel(_vehicle!.status),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+            ),
+          ),
 
-              // Tabs for All Items and Filter options
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: SizedBox(
-                  height: 40,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min, // This prevents overflow
-                      children: [
-                        _buildTab(_selectedFilter == 'All Items', 'All Items', Icons.list, () => _setFilter('All Items')),
-                        const SizedBox(width: 8),
-                        _buildTab(_selectedFilter == 'Pending', 'Pending', Icons.pending_actions, () => _setFilter('Pending')),
-                        const SizedBox(width: 8),
-                        _buildTab(_selectedFilter == 'Loaded', 'Loaded', Icons.check_circle_outline, () => _setFilter('Loaded')),
-                        const SizedBox(width: 8),
-                        _buildTab(_selectedFilter == 'Partial', 'Partial', Icons.splitscreen, () => _setFilter('Partial')),
-                        const SizedBox(width: 16), // Fixed width instead of Spacer
-                        IconButton(
-                          icon: const Icon(Icons.filter_list),
-                          tooltip: 'Filter',
-                          onPressed: () {
-                            // Would implement filter functionality
-                          },
-                        ),
-                      ],
-                    ),
+          // Tabs with filter options
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildTab(_selectedFilter == 'All Items', 'All Items', Icons.list, () => _setFilter('All Items')),
+                  const SizedBox(width: 8),
+                  _buildTab(_selectedFilter == 'Pending', 'Pending', Icons.pending_actions, () => _setFilter('Pending')),
+                  const SizedBox(width: 8),
+                  _buildTab(_selectedFilter == 'Loaded', 'Loaded', Icons.check_circle_outline, () => _setFilter('Loaded')),
+                  const SizedBox(width: 8),
+                  _buildTab(_selectedFilter == 'Partial', 'Partial', Icons.splitscreen, () => _setFilter('Partial')),
+                  const SizedBox(width: 16),
+                  IconButton(
+                    icon: const Icon(Icons.filter_list),
+                    tooltip: 'Filter',
+                    onPressed: () {
+                      // Would implement filter functionality
+                    },
                   ),
-                ),
+                ],
               ),
+            ),
+          ),
 
-              // Items list grouped by event
-              Expanded(
-                child: Consumer<ManifestService>(
-                  builder: (context, manifestService, child) {
-                    return StreamBuilder<List<ManifestItem>>(
-                      stream: manifestService
-                          .getManifestItemsByVehicleId(widget.vehicleId),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
+          // Items list grouped by event
+          Expanded(
+            child: Consumer<ManifestService>(
+              builder: (context, manifestService, child) {
+                return StreamBuilder<List<ManifestItem>>(
+                  stream: manifestService
+                      .getManifestItemsByVehicleId(widget.vehicleId),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
 
-                        if (snapshot.hasError) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.error_outline,
-                                    size: 48, color: Colors.red),
-                                const SizedBox(height: 16),
-                                Text('Error: ${snapshot.error}'),
-                              ],
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline,
+                                size: 48, color: Colors.red),
+                            const SizedBox(height: 16),
+                            Text('Error: ${snapshot.error}'),
+                          ],
+                        ),
+                      );
+                    }
+
+                    final items = snapshot.data ?? [];
+
+                    if (items.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.inventory_2_outlined,
+                              size: 64,
+                              color: Colors.grey[400],
                             ),
-                          );
-                        }
-
-                        final items = snapshot.data ?? [];
-
-                        if (items.isEmpty) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.inventory_2_outlined,
-                                  size: 64,
-                                  color: Colors.grey[400],
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'No items assigned to this vehicle',
-                                  style: theme.textTheme.titleMedium,
-                                ),
-                                const SizedBox(height: 8),
-                                ElevatedButton.icon(
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('Assign Items'),
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                              ],
+                            const SizedBox(height: 16),
+                            Text(
+                              'No items assigned to this vehicle',
+                              style: theme.textTheme.titleMedium,
                             ),
-                          );
-                        }
-
-                        // Filter items based on selected filter
-                        var filteredItems = items;
-                        if (_selectedFilter == 'Pending') {
-                          filteredItems = items.where((item) => item.loadingStatus == LoadingStatus.pending).toList();
-                        } else if (_selectedFilter == 'Loaded') {
-                          filteredItems = items.where((item) => item.loadingStatus == LoadingStatus.loaded).toList();
-                        } else if (_selectedFilter == 'Partial') {
-                          // This would require us to know the total quantity across all vehicles
-                          // For now, just show all items - in real implementation, you'd check partial loading
-                          filteredItems = items;
-                        }
-
-                        // Group items by manifest/event
-                        final groupedItems = <String, List<ManifestItem>>{};
-                        for (final item in filteredItems) {
-                          // Extract the manifestId from the item id format
-                          String manifestId;
-                          
-                          // Try to identify the manifest ID from the item ID
-                          if (item.id.contains('_')) {
-                            manifestId = item.id.split('_').first;
-                          } else {
-                            // If item ID doesn't have the expected format, use menuItemId as fallback
-                            manifestId = item.menuItemId;
-                          }
-
-                          // This is the fix: get the manifestId correctly
-                          if (!groupedItems.containsKey(manifestId)) {
-                            groupedItems[manifestId] = [];
-                          }
-                          groupedItems[manifestId]!.add(item);
-                        }
-
-                        // Convert to list for ListView
-                        final groupedList = groupedItems.entries.toList();
-                        
-                        if (groupedList.isEmpty) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.filter_list,
-                                  size: 64,
-                                  color: Colors.grey[400],
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'No items match the selected filter',
-                                  style: theme.textTheme.titleMedium,
-                                ),
-                                const SizedBox(height: 8),
-                                TextButton.icon(
-                                  icon: const Icon(Icons.clear_all),
-                                  label: const Text('Clear Filter'),
-                                  onPressed: () {
-                                    setState(() {
-                                      _selectedFilter = 'All Items';
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        // Build list with headers for each event
-                        return ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: groupedList.length,
-                          itemBuilder: (context, index) {
-                            final entry = groupedList[index];
-                            final eventId = entry.key;
-                            final manifestItems = entry.value;
-
-                            return FutureBuilder<Map<String, dynamic>>(
-                              future: _getEventDetails(eventId),
-                              builder: (context, eventSnapshot) {
-                                // Default values if data isn't loaded yet
-                                final eventName = eventSnapshot.data?['name'] ?? 'Loading...';
-                                final eventDate = eventSnapshot.data?['date'] ?? '';
-
-                                // Build event section
-                                return _buildEventSection(
-                                  context,
-                                  eventName,
-                                  eventDate,
-                                  manifestItems,
-                                  theme,
-                                );
+                            const SizedBox(height: 8),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.add),
+                              label: const Text('Assign Items'),
+                              onPressed: () {
+                                Navigator.pop(context);
                               },
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // Filter items based on selected filter
+                    var filteredItems = items;
+                    if (_selectedFilter == 'Pending') {
+                      filteredItems = items.where((item) => item.loadingStatus == LoadingStatus.pending).toList();
+                    } else if (_selectedFilter == 'Loaded') {
+                      filteredItems = items.where((item) => item.loadingStatus == LoadingStatus.loaded).toList();
+                    } else if (_selectedFilter == 'Partial') {
+                      // Find items that are partial loads
+                      filteredItems = items.where((item) {
+                        final totalCount = _getTotalItemCountAcrossVehicles(items, item.menuItemId);
+                        return totalCount > item.quantity;
+                      }).toList();
+                    }
+
+                    // Group items by manifest/event and render
+                    // ...
+                    
+                    // Group items by manifest/event
+                    final groupedItems = <String, List<ManifestItem>>{};
+                    for (final item in filteredItems) {
+                      // Extract the manifestId from the item id format
+                      String manifestId;
+                      
+                      if (item.id.contains('_')) {
+                        manifestId = item.id.split('_').first;
+                      } else {
+                        // If item ID doesn't have the expected format, use menuItemId as fallback
+                        manifestId = item.menuItemId;
+                      }
+
+                      if (!groupedItems.containsKey(manifestId)) {
+                        groupedItems[manifestId] = [];
+                      }
+                      groupedItems[manifestId]!.add(item);
+                    }
+
+                    // Convert to list for ListView
+                    final groupedList = groupedItems.entries.toList();
+                    
+                    if (groupedList.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.filter_list,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No items match the selected filter',
+                              style: theme.textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              icon: const Icon(Icons.clear_all),
+                              label: const Text('Clear Filter'),
+                              onPressed: () {
+                                setState(() {
+                                  _selectedFilter = 'All Items';
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // Build list with headers for each event
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: groupedList.length,
+                      itemBuilder: (context, index) {
+                        final entry = groupedList[index];
+                        final eventId = entry.key;
+                        final manifestItems = entry.value;
+
+                        return FutureBuilder<Map<String, dynamic>>(
+                          future: _getEventDetails(eventId),
+                          builder: (context, eventSnapshot) {
+                            // Default values if data isn't loaded yet
+                            final eventName = eventSnapshot.data?['name'] ?? 'Loading...';
+                            final eventDate = eventSnapshot.data?['date'] ?? '';
+
+                            // Build event section
+                            return _buildEventSection(
+                              context,
+                              eventName,
+                              eventDate,
+                              manifestItems,
+                              items, // Pass all items to calculate partials
+                              theme,
                             );
                           },
                         );
                       },
                     );
                   },
-                ),
-              ),
-            ],
-          ),
-          
-          // DragItemIndicator - Positioned at the bottom right when items are selected
-          if (_selectedCount > 0)
-            Positioned(
-              bottom: 16,
-              right: 16,
-              child: DragItemIndicator(
-                itemCount: _selectedCount,
-                onAssign: _assignSelectedItemsToVehicle,
-              ),
+                );
+              },
             ),
+          ),
         ],
       ),
     );
   }
 
+  // Update the event section to show partial item information
   Widget _buildEventSection(
     BuildContext context,
     String eventName,
     String eventDate,
     List<ManifestItem> manifestItems,
+    List<ManifestItem> allItems,
     ThemeData theme,
   ) {
     // Calculate loading statistics
@@ -623,121 +873,36 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
           ),
         ),
 
-        // Group items by type for partial loading display
-        ..._buildGroupedItemTiles(manifestItems, theme),
+        // Display items with partial loading information
+        ...manifestItems.map((item) => _buildEnhancedItemTile(item, allItems)),
 
         const Divider(height: 32),
       ],
     );
   }
 
-  List<Widget> _buildGroupedItemTiles(List<ManifestItem> items, ThemeData theme) {
-    // Group by menu item ID to identify items of the same type
-    final groupedByMenuItem = <String, List<ManifestItem>>{};
+  // Helper method to get total count of an item across all vehicles
+  int _getTotalItemCountAcrossVehicles(List<ManifestItem> allItems, String menuItemId) {
+    // Group items by menuItemId
+    final itemsByType = <String, List<ManifestItem>>{};
     
-    for (final item in items) {
-      if (!groupedByMenuItem.containsKey(item.menuItemId)) {
-        groupedByMenuItem[item.menuItemId] = [];
+    for (final item in allItems) {
+      if (!itemsByType.containsKey(item.menuItemId)) {
+        itemsByType[item.menuItemId] = [];
       }
-      groupedByMenuItem[item.menuItemId]!.add(item);
+      itemsByType[item.menuItemId]!.add(item);
     }
     
-    final itemWidgets = <Widget>[];
+    // Calculate total quantity for this menu item
+    if (itemsByType.containsKey(menuItemId)) {
+      return itemsByType[menuItemId]!.fold(0, (sum, item) => sum + item.quantity);
+    }
     
-    groupedByMenuItem.forEach((menuItemId, menuItems) {
-      // If there's only one item of this type, display normally
-      if (menuItems.length == 1) {
-        itemWidgets.add(_buildItemTile(menuItems.first));
-        return;
-      }
-      
-      // Multiple items of the same type - potential partial loading
-      // Count total quantity across all instances
-      final totalQuantity = menuItems.fold<int>(
-        0, (sum, item) => sum + item.quantity);
-      
-      // Count loaded quantity
-      final loadedCount = menuItems
-        .where((item) => item.loadingStatus == LoadingStatus.loaded)
-        .fold<int>(0, (sum, item) => sum + item.quantity);
-      
-      // Use the first item as reference
-      final referenceItem = menuItems.first;
-      
-      // Create a partial loading item tile
-      itemWidgets.add(
-        PartialLoadingItemTile(
-          item: referenceItem,
-          totalQuantity: totalQuantity,
-          loadedQuantity: loadedCount,
-          pendingQuantity: totalQuantity - loadedCount,
-          onTap: () {
-            // Show details about each instance of this item
-            _showItemInstances(context, menuItems, theme);
-          },
-        ),
-      );
-    });
-    
-    return itemWidgets;
+    return 0;
   }
 
-  void _showItemInstances(BuildContext context, List<ManifestItem> items, ThemeData theme) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.splitscreen,
-                    color: theme.primaryColor,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Item Instances: ${items.first.name}',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const Divider(),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    return _buildItemTile(item);
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildItemTile(ManifestItem item) {
+  // Enhanced item tile with partial loading information
+  Widget _buildEnhancedItemTile(ManifestItem item, List<ManifestItem> allItems) {
     Color statusColor;
     IconData statusIcon;
 
@@ -756,7 +921,18 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
         break;
     }
     
-    final isSelected = _selectedItems[item.id] == true;
+    // Calculate if this is a partial load
+    final totalQuantity = _getTotalItemCountAcrossVehicles(allItems, item.menuItemId);
+    final isPartial = totalQuantity > item.quantity;
+    
+    // Find items of the same type across other vehicles
+    final sameTypeItems = allItems
+        .where((i) => i.menuItemId == item.menuItemId && i.vehicleId != widget.vehicleId)
+        .toList();
+    
+    final otherVehiclesCount = sameTypeItems.isNotEmpty
+        ? sameTypeItems.fold(0, (sum, i) => sum + i.quantity)
+        : 0;
 
     return Card(
       elevation: 0,
@@ -764,102 +940,135 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(
-          color: isSelected 
-            ? Colors.blue.withAlpha((0.8 * 255).toInt()) 
-            : statusColor.withAlpha((0.3 * 255).toInt()),
-          width: isSelected ? 2 : 1,
+          color: statusColor.withAlpha((0.3 * 255).toInt()),
+          width: 1,
         ),
       ),
       child: InkWell(
-        onTap: () => _toggleItemSelection(item),
+        onTap: () => _showItemOptions(item),
         borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Selection indicator
-              if (isSelected)
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: Colors.blue,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.check,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                )
-              else
-                // Status indicator
-                Container(
-                  width: 4,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: statusColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              const SizedBox(width: 12),
-
-              // Item details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Quantity: ${item.quantity}',
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Status label
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withAlpha((0.2 * 255).toInt()),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      statusIcon,
-                      size: 14,
+              Row(
+                children: [
+                  // Status indicator
+                  Container(
+                    width: 4,
+                    height: 40,
+                    decoration: BoxDecoration(
                       color: statusColor,
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      _getLoadingStatusLabel(item.loadingStatus),
-                      style: TextStyle(
-                        color: statusColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Item details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text(
+                              'Quantity: ${item.quantity}',
+                              style: TextStyle(
+                                color: Colors.grey[700],
+                                fontSize: 12,
+                              ),
+                            ),
+                            if (isPartial) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple.withAlpha((0.2 * 255).toInt()),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'Partial: ${item.quantity}/$totalQuantity',
+                                  style: const TextStyle(
+                                    color: Colors.purple,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+
+                  // Status label
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withAlpha((0.2 * 255).toInt()),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          statusIcon,
+                          size: 14,
+                          color: statusColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _getLoadingStatusLabel(item.loadingStatus),
+                          style: TextStyle(
+                            color: statusColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+              
+              // Show other vehicle distribution info if this is a partial load
+              if (isPartial && otherVehiclesCount > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8, left: 16),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Also loaded: $otherVehiclesCount in other vehicles',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),

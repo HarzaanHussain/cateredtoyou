@@ -8,17 +8,17 @@ import 'package:flutter/material.dart';
 class DragItemIndicator extends StatelessWidget {
   final int itemCount;
   final VoidCallback onAssign;
-  
+ 
   const DragItemIndicator({
     super.key,
     required this.itemCount,
     required this.onAssign,
   });
-  
+ 
   @override
   Widget build(BuildContext context) {
     if (itemCount <= 0) return const SizedBox.shrink();
-    
+   
     return Material(
       elevation: 8,
       borderRadius: BorderRadius.circular(16),
