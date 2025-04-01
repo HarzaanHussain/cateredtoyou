@@ -253,7 +253,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/recurring-notifications',
-        builder: (context, state) => const RecurringNotificationSetupScreen(),
+        builder: (context, state) => const UnifiedNotificationScreen(),
         redirect: (context, state) {
           if (!authModel.isAuthenticated) return '/login';
           return null;
