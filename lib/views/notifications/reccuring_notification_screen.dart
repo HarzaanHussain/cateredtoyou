@@ -1,263 +1,21 @@
-import 'package:cateredtoyou/models/reccuring_notification_model.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:cateredtoyou/models/reccuring_notification_model.dart';
 import 'package:cateredtoyou/services/notification_service.dart';
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
+import 'package:intl/intl.dart';
 
-class RecurringNotificationSetupScreen extends StatefulWidget {
-  const RecurringNotificationSetupScreen({super.key});
+class UnifiedNotificationScreen extends StatefulWidget {
+  const UnifiedNotificationScreen({Key? key}) : super(key: key);
 
   @override
-  _RecurringNotificationSetupScreenState createState() =>
-      _RecurringNotificationSetupScreenState();
+  State<UnifiedNotificationScreen> createState() => _UnifiedNotificationScreenState();
 }
 
-class _RecurringNotificationSetupScreenState
-    extends State<RecurringNotificationSetupScreen> {
-  final NotificationService _notificationService = NotificationService();
-  List<RecurringNotification> _recurringNotifications = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadRecurringNotifications();
-  }
-
-  Future<void> _loadRecurringNotifications() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    final notifications = await _notificationService.getRecurringNotifications();
-    setState(() {
-      _recurringNotifications = notifications;
-      _isLoading = false;
-    });
-  }
-
-  Future<void> _deleteRecurringNotification(String id) async {
-    try {
-      await _notificationService.deleteRecurringNotification(id);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Recurring notification deleted')),
-      );
-      _loadRecurringNotifications();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
-  }
-
-  Future<void> _toggleActive(RecurringNotification notification) async {
-    try {
-      final updatedNotification = notification.copyWith(
-        isActive: !notification.isActive,
-      );
-      await _notificationService.updateRecurringNotification(updatedNotification);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              '${notification.title} ${updatedNotification.isActive ? 'activated' : 'deactivated'}'),
-        ),
-      );
-      _loadRecurringNotifications();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
-  }
-
-  void _showCreateDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const CreateRecurringNotificationDialog(),
-    ).then((_) => _loadRecurringNotifications());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recurring Notifications'),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _recurringNotifications.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('No recurring notifications set up yet'),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => _showCreateDialog(context),
-                        child: const Text('Create New'),
-                      ),
-                    ],
-                  ),
-                )
-              : Column(
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text(
-                        'Tap on a notification to edit. Long press to delete.',
-                        style: TextStyle(fontStyle: FontStyle.italic),
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: _recurringNotifications.length,
-                        itemBuilder: (context, index) {
-                          final notification = _recurringNotifications[index];
-                          final dateFormat = DateFormat('MMM d, y - h:mm a');
-                          
-                          return Dismissible(
-                            key: Key('recurring_${notification.id}'),
-                            background: Container(
-                              color: Colors.red,
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 20),
-                              child: const Icon(
-                                Icons.delete,
-                                color: Colors.white,
-                              ),
-                            ),
-                            direction: DismissDirection.endToStart,
-                            confirmDismiss: (direction) async {
-                              return await showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Delete Notification'),
-                                  content: Text(
-                                      'Are you sure you want to delete "${notification.title}"?'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context, false),
-                                      child: const Text('CANCEL'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context, true),
-                                      child: const Text('DELETE'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                            onDismissed: (direction) {
-                              _deleteRecurringNotification(notification.id);
-                            },
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: notification.isActive
-                                    ? Theme.of(context).primaryColor
-                                    : Colors.grey,
-                                child: Icon(
-                                  _getIconForScreen(notification.screen),
-                                  color: Colors.white,
-                                ),
-                              ),
-                              title: Text(
-                                notification.title,
-                                style: TextStyle(
-                                  fontWeight: notification.isActive
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(notification.body),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Repeats: ${notification.intervalDescription}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Next: ${dateFormat.format(notification.nextScheduledDate)}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              isThreeLine: true,
-                              trailing: Switch(
-                                value: notification.isActive,
-                                onChanged: (value) => _toggleActive(notification),
-                              ),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => EditRecurringNotificationScreen(
-                                      notification: notification,
-                                    ),
-                                  ),
-                                ).then((_) => _loadRecurringNotifications());
-                              },
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateDialog(context),
-        child: const Icon(Icons.add),
-      ),
-      bottomNavigationBar: const BottomToolbar(),
-    );
-  }
-
-  IconData _getIconForScreen(String screen) {
-    switch (screen) {
-      case 'inventory':
-        return Icons.inventory_2;
-      case 'events':
-        return Icons.event;
-      case 'staff':
-        return Icons.people;
-      case 'tasks':
-        return Icons.task;
-      case 'vehicles':
-        return Icons.directions_car;
-      default:
-        return Icons.notifications;
-    }
-  }
-}
-
-class CreateRecurringNotificationDialog extends StatefulWidget {
-  const CreateRecurringNotificationDialog({Key? key}) : super(key: key);
-
-  @override
-  _CreateRecurringNotificationDialogState createState() =>
-      _CreateRecurringNotificationDialogState();
-}
-
-class _CreateRecurringNotificationDialogState
-    extends State<CreateRecurringNotificationDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _bodyController = TextEditingController();
-  String _selectedScreen = 'inventory';
-  RecurringInterval _selectedInterval = RecurringInterval.monthly;
-  DateTime _startDate = DateTime.now().add(const Duration(days: 1));
-  DateTime? _endDate;
-  bool _hasEndDate = false;
-
+class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   final NotificationService _notificationService = NotificationService();
 
+  // Lists of screens available for navigation
   final List<String> _availableScreens = [
     'home',
     'events',
@@ -271,6 +29,395 @@ class _CreateRecurringNotificationDialogState
     'tasks',
     'notifications',
   ];
+
+  // Content type and parameter name mapping
+  final Map<String, String> _contentTypeMapping = {
+    'events': 'eventId',
+    'inventory': 'itemId',
+    'tasks': 'taskId',
+    'vehicles': 'vehicleId',
+    'staff': 'staffId',
+    'customers': 'customerId',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _notificationService.initNotification();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Create Notification'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'One-Time', icon: Icon(Icons.notifications)),
+            Tab(text: 'Recurring', icon: Icon(Icons.repeat)),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Tab 1: One-time notification
+          SingleNotificationTab(
+            notificationService: _notificationService,
+            availableScreens: _availableScreens,
+            contentTypeMapping: _contentTypeMapping,
+          ),
+          
+          // Tab 2: Recurring notification
+          RecurringNotificationTab(
+            notificationService: _notificationService,
+            availableScreens: _availableScreens,
+          ),
+        ],
+      ),
+      bottomNavigationBar: const BottomToolbar(),
+    );
+  }
+}
+
+// Tab for one-time notifications
+class SingleNotificationTab extends StatefulWidget {
+  final NotificationService notificationService;
+  final List<String> availableScreens;
+  final Map<String, String> contentTypeMapping;
+
+  const SingleNotificationTab({
+    Key? key,
+    required this.notificationService,
+    required this.availableScreens,
+    required this.contentTypeMapping,
+  }) : super(key: key);
+
+  @override
+  State<SingleNotificationTab> createState() => _SingleNotificationTabState();
+}
+
+class _SingleNotificationTabState extends State<SingleNotificationTab> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _bodyController = TextEditingController();
+  final _screenController = TextEditingController(text: 'home');
+  final _extraDataController = TextEditingController();
+  final _contentIdController = TextEditingController();
+
+  DateTime _scheduledDate = DateTime.now().add(const Duration(minutes: 1));
+  bool _isScheduled = false;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _bodyController.dispose();
+    _screenController.dispose();
+    _extraDataController.dispose();
+    _contentIdController.dispose();
+    super.dispose();
+  }
+
+  // Get parameter name for the current content type
+  String? get _contentIdParamName {
+    return widget.contentTypeMapping[_screenController.text];
+  }
+
+  // Handle screen selection change
+  void _onScreenChanged(String? newValue) {
+    if (newValue != null) {
+      setState(() {
+        _screenController.text = newValue;
+        // Clear content ID if screen changes
+        _contentIdController.clear();
+        // Update extra data field
+        _updateExtraDataField();
+      });
+    }
+  }
+
+  // Update the extra data field based on selected screen and content ID
+  void _updateExtraDataField() {
+    final paramName = _contentIdParamName;
+
+    if (paramName != null && _contentIdController.text.isNotEmpty) {
+      _extraDataController.text = '$paramName:${_contentIdController.text}';
+    } else {
+      _extraDataController.text = '';
+    }
+  }
+
+  Future<void> _selectDateTime(BuildContext context) async {
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _scheduledDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (pickedDate != null) {
+      final TimeOfDay? pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(_scheduledDate),
+      );
+      if (pickedTime != null) {
+        setState(() {
+          _scheduledDate = DateTime(
+            pickedDate.year,
+            pickedDate.month,
+            pickedDate.day,
+            pickedTime.hour,
+            pickedTime.minute,
+          );
+        });
+      }
+    }
+  }
+
+  void _sendNotification() async {
+    if (_formKey.currentState!.validate()) {
+      String screen = _screenController.text.trim();
+      Map<String, dynamic> extraData = {};
+
+      // Parse extra data if provided
+      if (_extraDataController.text.isNotEmpty) {
+        try {
+          // Format expected: key1:value1;key2:value2
+          final pairs = _extraDataController.text.split(';');
+          for (final pair in pairs) {
+            final parts = pair.split(':');
+            if (parts.length == 2) {
+              extraData[parts[0].trim()] = parts[1].trim();
+            }
+          }
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error parsing extra data: $e')),
+          );
+          return;
+        }
+      }
+
+      try {
+        if (_isScheduled) {
+          await widget.notificationService.scheduleNotification(
+            title: _titleController.text,
+            body: _bodyController.text,
+            scheduledTime: _scheduledDate,
+            screen: screen,
+            extraData: extraData,
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Notification scheduled successfully!'),
+              ),
+            );
+            _clearForm();
+          }
+        } else {
+          await widget.notificationService.showNotification(
+            title: _titleController.text,
+            body: _bodyController.text,
+            screen: screen,
+            extraData: extraData,
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Notification sent successfully!'),
+              ),
+            );
+            _clearForm();
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $e'),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  void _clearForm() {
+    _titleController.clear();
+    _bodyController.clear();
+    _contentIdController.clear();
+    _extraDataController.clear();
+    setState(() {
+      _screenController.text = 'home';
+      _isScheduled = false;
+      _scheduledDate = DateTime.now().add(const Duration(minutes: 1));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasContentIdParam = _contentIdParamName != null;
+    final String contentType = _screenController.text.replaceAll('-', ' ');
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Form(
+        key: _formKey,
+        child: ListView(
+          children: [
+            TextFormField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: 'Title',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter a title';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _bodyController,
+              decoration: const InputDecoration(
+                labelText: 'Body',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter a body';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _screenController.text,
+              decoration: const InputDecoration(
+                labelText: 'Navigate to Screen',
+                border: OutlineInputBorder(),
+              ),
+              items: widget.availableScreens.map((String screen) {
+                return DropdownMenuItem<String>(
+                  value: screen,
+                  child: Text(screen),
+                );
+              }).toList(),
+              onChanged: _onScreenChanged,
+            ),
+
+            // Show content ID field when applicable
+            if (hasContentIdParam) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _contentIdController,
+                decoration: InputDecoration(
+                  labelText: '${contentType.capitalize()} ID',
+                  border: const OutlineInputBorder(),
+                  hintText: 'Enter the Firestore document ID',
+                  helperText: 'This will be used for direct navigation',
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _updateExtraDataField();
+                  });
+                },
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Tip: You can find the ${contentType.capitalize()} ID in the Firestore console',
+                style: const TextStyle(
+                  fontStyle: FontStyle.italic, 
+                  fontSize: 12
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _extraDataController,
+              decoration: InputDecoration(
+                labelText: 'Extra Data (key1:value1;key2:value2)',
+                border: const OutlineInputBorder(),
+                hintText: hasContentIdParam
+                  ? 'Auto-filled based on content ID'
+                  : 'Optional: id:123;type:reminder',
+              ),
+            ),
+            const SizedBox(height: 24),
+            SwitchListTile(
+              title: const Text('Schedule Notification'),
+              value: _isScheduled,
+              onChanged: (value) {
+                setState(() {
+                  _isScheduled = value;
+                });
+              },
+            ),
+            if (_isScheduled) ...[
+              ListTile(
+                title: const Text('Scheduled Time'),
+                subtitle: Text(
+                  DateFormat('MMM d, yyyy - h:mm a').format(_scheduledDate),
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.calendar_today),
+                  onPressed: () => _selectDateTime(context),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _sendNotification,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+              ),
+              child: Text(_isScheduled
+                ? 'Schedule Notification'
+                : 'Send Notification'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Tab for recurring notifications
+class RecurringNotificationTab extends StatefulWidget {
+  final NotificationService notificationService;
+  final List<String> availableScreens;
+
+  const RecurringNotificationTab({
+    Key? key,
+    required this.notificationService,
+    required this.availableScreens,
+  }) : super(key: key);
+
+  @override
+  State<RecurringNotificationTab> createState() => _RecurringNotificationTabState();
+}
+
+class _RecurringNotificationTabState extends State<RecurringNotificationTab> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _bodyController = TextEditingController();
+  String _selectedScreen = 'inventory';
+  RecurringInterval _selectedInterval = RecurringInterval.monthly;
+  DateTime _startDate = DateTime.now().add(const Duration(days: 1));
+  DateTime? _endDate;
+  bool _hasEndDate = false;
 
   @override
   void initState() {
@@ -342,7 +489,7 @@ class _CreateRecurringNotificationDialogState
   Future<void> _createRecurringNotification() async {
     if (_formKey.currentState!.validate()) {
       try {
-        await _notificationService.createRecurringNotification(
+        await widget.notificationService.createRecurringNotification(
           title: _titleController.text,
           body: _bodyController.text,
           screen: _selectedScreen,
@@ -352,12 +499,12 @@ class _CreateRecurringNotificationDialogState
         );
 
         if (mounted) {
-          Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Recurring notification created successfully!'),
             ),
           );
+          _clearForm();
         }
       } catch (e) {
         if (mounted) {
@@ -371,484 +518,163 @@ class _CreateRecurringNotificationDialogState
     }
   }
 
+  void _clearForm() {
+    setState(() {
+      _titleController.text = 'Inventory Check Reminder';
+      _bodyController.text = 'Time to verify your physical inventory matches your digital records';
+      _selectedScreen = 'inventory';
+      _selectedInterval = RecurringInterval.monthly;
+      _startDate = DateTime.now().add(const Duration(days: 1));
+      _endDate = null;
+      _hasEndDate = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MMM d, y');
     final timeFormat = DateFormat('h:mm a');
 
-    return AlertDialog(
-      title: const Text('Create Recurring Notification'),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a title';
-                  }
-                  return null;
-                },
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Form(
+        key: _formKey,
+        child: ListView(
+          children: [
+            TextFormField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: 'Title',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _bodyController,
-                decoration: const InputDecoration(
-                  labelText: 'Body',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a body';
-                  }
-                  return null;
-                },
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter a title';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _bodyController,
+              decoration: const InputDecoration(
+                labelText: 'Body',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _selectedScreen,
-                decoration: const InputDecoration(
-                  labelText: 'Target Screen',
-                ),
-                items: _availableScreens.map((String screen) {
-                  return DropdownMenuItem<String>(
-                    value: screen,
-                    child: Text(screen),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  if (newValue != null) {
-                    setState(() {
-                      _selectedScreen = newValue;
-                    });
-                  }
-                },
+              maxLines: 3,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter a body';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedScreen,
+              decoration: const InputDecoration(
+                labelText: 'Target Screen',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<RecurringInterval>(
-                value: _selectedInterval,
-                decoration: const InputDecoration(
-                  labelText: 'Repeat Interval',
-                ),
-                items: RecurringInterval.values.map((interval) {
-                  String display;
-                  switch (interval) {
-                    case RecurringInterval.daily:
-                      display = 'Daily';
-                      break;
-                    case RecurringInterval.weekly:
-                      display = 'Weekly';
-                      break;
-                    case RecurringInterval.monthly:
-                      display = 'Monthly';
-                      break;
-                    case RecurringInterval.quarterly:
-                      display = 'Quarterly';
-                      break;
-                    case RecurringInterval.yearly:
-                      display = 'Yearly';
-                      break;
-                  }
-                  return DropdownMenuItem<RecurringInterval>(
-                    value: interval,
-                    child: Text(display),
-                  );
-                }).toList(),
-                onChanged: (RecurringInterval? newValue) {
-                  if (newValue != null) {
-                    setState(() {
-                      _selectedInterval = newValue;
-                    });
-                  }
-                },
+              items: widget.availableScreens.map((String screen) {
+                return DropdownMenuItem<String>(
+                  value: screen,
+                  child: Text(screen),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    _selectedScreen = newValue;
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<RecurringInterval>(
+              value: _selectedInterval,
+              decoration: const InputDecoration(
+                labelText: 'Repeat Interval',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Start Date & Time',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => _selectStartDate(context),
-                      child: Text(dateFormat.format(_startDate)),
-                    ),
-                  ),
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => _selectStartTime(context),
-                      child: Text(timeFormat.format(_startDate)),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Checkbox(
-                    value: _hasEndDate,
-                    onChanged: (value) {
-                      setState(() {
-                        _hasEndDate = value ?? false;
-                      });
-                    },
-                  ),
-                  const Text('Set End Date'),
-                ],
-              ),
-              if (_hasEndDate)
-                Row(
+              items: RecurringInterval.values.map((interval) {
+                String display;
+                switch (interval) {
+                  case RecurringInterval.daily:
+                    display = 'Daily';
+                    break;
+                  case RecurringInterval.weekly:
+                    display = 'Weekly';
+                    break;
+                  case RecurringInterval.monthly:
+                    display = 'Monthly';
+                    break;
+                  case RecurringInterval.quarterly:
+                    display = 'Quarterly';
+                    break;
+                  case RecurringInterval.yearly:
+                    display = 'Yearly';
+                    break;
+                }
+                return DropdownMenuItem<RecurringInterval>(
+                  value: interval,
+                  child: Text(display),
+                );
+              }).toList(),
+              onChanged: (RecurringInterval? newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    _selectedInterval = newValue;
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => _selectEndDate(context),
-                        child: Text(_endDate != null
-                            ? dateFormat.format(_endDate!)
-                            : 'Select Date'),
-                      ),
+                    const Text(
+                      'Start Date & Time',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.calendar_today),
+                            label: Text(dateFormat.format(_startDate)),
+                            onPressed: () => _selectStartDate(context),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.access_time),
+                            label: Text(timeFormat.format(_startDate)),
+                            onPressed: () => _selectStartTime(context),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('CANCEL'),
-        ),
-        ElevatedButton(
-          onPressed: _createRecurringNotification,
-          child: const Text('CREATE'),
-        ),
-      ],
-    );
-  }
-}
-
-class EditRecurringNotificationScreen extends StatefulWidget {
-  final RecurringNotification notification;
-
-  const EditRecurringNotificationScreen({
-    Key? key,
-    required this.notification,
-  }) : super(key: key);
-
-  @override
-  _EditRecurringNotificationScreenState createState() =>
-      _EditRecurringNotificationScreenState();
-}
-
-class _EditRecurringNotificationScreenState
-    extends State<EditRecurringNotificationScreen> {
-  final _formKey = GlobalKey<FormState>();
-  late TextEditingController _titleController;
-  late TextEditingController _bodyController;
-  late String _selectedScreen;
-  late RecurringInterval _selectedInterval;
-  late DateTime _startDate;
-  DateTime? _endDate;
-  late bool _hasEndDate;
-  late bool _isActive;
-
-  final NotificationService _notificationService = NotificationService();
-
-  final List<String> _availableScreens = [
-    'home',
-    'events',
-    'staff',
-    'inventory',
-    'menu-items',
-    'customers',
-    'vehicles',
-    'deliveries',
-    'calendar',
-    'tasks',
-    'notifications',
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _titleController = TextEditingController(text: widget.notification.title);
-    _bodyController = TextEditingController(text: widget.notification.body);
-    _selectedScreen = widget.notification.screen;
-    _selectedInterval = widget.notification.interval;
-    _startDate = widget.notification.startDate;
-    _endDate = widget.notification.endDate;
-    _hasEndDate = widget.notification.endDate != null;
-    _isActive = widget.notification.isActive;
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _bodyController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _selectStartDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _startDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
-    );
-    if (picked != null && picked != _startDate) {
-      setState(() {
-        _startDate = DateTime(
-          picked.year,
-          picked.month,
-          picked.day,
-          _startDate.hour,
-          _startDate.minute,
-        );
-      });
-    }
-  }
-
-  Future<void> _selectStartTime(BuildContext context) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_startDate),
-    );
-    if (picked != null) {
-      setState(() {
-        _startDate = DateTime(
-          _startDate.year,
-          _startDate.month,
-          _startDate.day,
-          picked.hour,
-          picked.minute,
-        );
-      });
-    }
-  }
-
-  Future<void> _selectEndDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _endDate ?? DateTime.now().add(const Duration(days: 365)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
-    );
-    if (picked != null) {
-      setState(() {
-        _endDate = picked;
-      });
-    }
-  }
-
-  Future<void> _updateRecurringNotification() async {
-    if (_formKey.currentState!.validate()) {
-      try {
-        final updatedNotification = widget.notification.copyWith(
-          title: _titleController.text,
-          body: _bodyController.text,
-          screen: _selectedScreen,
-          interval: _selectedInterval,
-          startDate: _startDate,
-          endDate: _hasEndDate ? _endDate : null,
-          isActive: _isActive,
-        );
-
-        await _notificationService.updateRecurringNotification(
-          updatedNotification,
-        );
-
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Recurring notification updated successfully!'),
+              ),
             ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $e'),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              title: const Text('Set End Date'),
+              value: _hasEndDate,
+              onChanged: (value) {
+                setState(() {
+                  _hasEndDate = value ?? false;
+                });
+              },
             ),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _deleteNotification() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Notification'),
-        content: Text(
-            'Are you sure you want to delete "${widget.notification.title}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('CANCEL'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('DELETE'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        await _notificationService.deleteRecurringNotification(
-          widget.notification.id,
-        );
-
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Recurring notification deleted successfully!'),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $e'),
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final dateFormat = DateFormat('MMM d, y');
-    final timeFormat = DateFormat('h:mm a');
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Edit Recurring Notification'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.delete),
-            onPressed: _deleteNotification,
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              SwitchListTile(
-                title: const Text('Active'),
-                value: _isActive,
-                onChanged: (value) {
-                  setState(() {
-                    _isActive = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a title';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _bodyController,
-                decoration: const InputDecoration(
-                  labelText: 'Body',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a body';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _selectedScreen,
-                decoration: const InputDecoration(
-                  labelText: 'Target Screen',
-                  border: OutlineInputBorder(),
-                ),
-                items: _availableScreens.map((String screen) {
-                  return DropdownMenuItem<String>(
-                    value: screen,
-                    child: Text(screen),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  if (newValue != null) {
-                    setState(() {
-                      _selectedScreen = newValue;
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<RecurringInterval>(
-                value: _selectedInterval,
-                decoration: const InputDecoration(
-                  labelText: 'Repeat Interval',
-                  border: OutlineInputBorder(),
-                ),
-                items: RecurringInterval.values.map((interval) {
-                  String display;
-                  switch (interval) {
-                    case RecurringInterval.daily:
-                      display = 'Daily';
-                      break;
-                    case RecurringInterval.weekly:
-                      display = 'Weekly';
-                      break;
-                    case RecurringInterval.monthly:
-                      display = 'Monthly';
-                      break;
-                    case RecurringInterval.quarterly:
-                      display = 'Quarterly';
-                      break;
-                    case RecurringInterval.yearly:
-                      display = 'Yearly';
-                      break;
-                  }
-                  return DropdownMenuItem<RecurringInterval>(
-                    value: interval,
-                    child: Text(display),
-                  );
-                }).toList(),
-                onChanged: (RecurringInterval? newValue) {
-                  if (newValue != null) {
-                    setState(() {
-                      _selectedInterval = newValue;
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
+            if (_hasEndDate)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -856,79 +682,40 @@ class _EditRecurringNotificationScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Start Date & Time',
+                        'End Date',
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.calendar_today),
-                              label: Text(dateFormat.format(_startDate)),
-                              onPressed: () => _selectStartDate(context),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.access_time),
-                              label: Text(timeFormat.format(_startDate)),
-                              onPressed: () => _selectStartTime(context),
-                            ),
-                          ),
-                        ],
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.calendar_today),
+                        label: Text(_endDate != null
+                          ? dateFormat.format(_endDate!)
+                          : 'Select Date'),
+                        onPressed: () => _selectEndDate(context),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              CheckboxListTile(
-                title: const Text('Set End Date'),
-                value: _hasEndDate,
-                onChanged: (value) {
-                  setState(() {
-                    _hasEndDate = value ?? false;
-                  });
-                },
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _createRecurringNotification,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
               ),
-              if (_hasEndDate)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'End Date',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_today),
-                          label: Text(_endDate != null
-                              ? dateFormat.format(_endDate!)
-                              : 'Select Date'),
-                          onPressed: () => _selectEndDate(context),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _updateRecurringNotification,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(50),
-                ),
-                child: const Text('Save Changes'),
-              ),
-            ],
-          ),
+              child: const Text('Create Recurring Notification'),
+            ),
+          ],
         ),
       ),
-      bottomNavigationBar: const BottomToolbar(),
     );
+  }
+}
+
+// Extension method to capitalize strings
+extension StringExtension on String {
+  String capitalize() {
+    if (isEmpty) return this;
+    return "${this[0].toUpperCase()}${substring(1)}";
   }
 }
