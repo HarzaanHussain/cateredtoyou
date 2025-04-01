@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore packa
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth package for authentication operations
 import 'package:cateredtoyou/models/task_model.dart'; // Import Task and TaskStatus classes for task data
 import 'package:cateredtoyou/services/organization_service.dart'; // Import OrganizationService for organization-related operations
-import 'package:cateredtoyou/models/manifest_task_model.dart'; // Import ManifestTask class for manifest task data
+// Import ManifestTask class for manifest task data
 
 class TaskService extends ChangeNotifier { // TaskService class extends ChangeNotifier to allow listeners to be notified of changes
   final FirebaseFirestore _firestore = FirebaseFirestore.instance; // Firestore instance for database operations

@@ -5,24 +5,32 @@ import 'package:flutter_map/flutter_map.dart'; // Importing Flutter Map library 
 import 'package:latlong2/latlong.dart'; // Importing LatLng library for handling geographical coordinates.
 import 'package:cloud_firestore/cloud_firestore.dart'; // Importing Firestore library for database operations.
 import 'package:url_launcher/url_launcher.dart'; // Importing URL launcher for opening URLs.
-import 'package:http/http.dart' as http; // Importing HTTP library for making network requests.
+import 'package:http/http.dart'
+    as http; // Importing HTTP library for making network requests.
 import 'dart:convert'; // Importing Dart's convert library for JSON encoding and decoding.
 import 'package:cateredtoyou/models/delivery_route_model.dart'; // Importing custom model for delivery route.
 import 'package:cateredtoyou/views/delivery/widgets/delivery_info_card.dart'; // Importing custom widget for displaying delivery info card.
 import 'package:cateredtoyou/views/delivery/widgets/driver_contact_sheet.dart'; // Importing custom widget for displaying driver contact sheet.
+import 'package:cateredtoyou/views/delivery/widgets/loaded_items_section.dart'; // Importing custom widget for displaying loaded items section.
 
-class TrackDeliveryScreen extends StatefulWidget { // Stateful widget for tracking delivery.
+class TrackDeliveryScreen extends StatefulWidget {
+  // Stateful widget for tracking delivery.
   final DeliveryRoute route; // Delivery route passed to the widget.
 
-  const TrackDeliveryScreen({super.key, required this.route}); // Constructor for initializing the widget with the delivery route.
+  const TrackDeliveryScreen(
+      {super.key,
+      required this.route}); // Constructor for initializing the widget with the delivery route.
 
   @override
-  State<TrackDeliveryScreen> createState() => _TrackDeliveryScreenState(); // Creating the state for the widget.
+  State<TrackDeliveryScreen> createState() =>
+      _TrackDeliveryScreenState(); // Creating the state for the widget.
 }
 
 class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
-  final MapController _mapController = MapController(); // Controller for managing the map.
-  late StreamSubscription<DocumentSnapshot> _routeSubscription; // Subscription for listening to route updates from Firestore.
+  final MapController _mapController =
+      MapController(); // Controller for managing the map.
+  late StreamSubscription<DocumentSnapshot>
+      _routeSubscription; // Subscription for listening to route updates from Firestore.
   List<LatLng> _routePoints = []; // List to store the points of the route.
   final List<Marker> _markers = []; // List to store the markers on the map.
   DeliveryRoute? _currentRoute; // Variable to store the current route.
@@ -30,10 +38,12 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   Timer? _routeUpdateTimer; // Timer for periodic updates.
   bool _isFirstLoad = true; // Flag to indicate if it's the first load.
 
-  static const String osmRoutingUrl = 'https://router.project-osrm.org/route/v1/driving/'; // URL for the routing API.
+  static const String osmRoutingUrl =
+      'https://router.project-osrm.org/route/v1/driving/'; // URL for the routing API.
   static const double _defaultZoom = 13.0; // Default zoom level for the map.
   static const double _routePreviewZoom = 11.0; // Zoom level for route preview.
-  static const Duration _animationDuration = Duration(milliseconds: 800); // Duration for map animations.
+  static const Duration _animationDuration =
+      Duration(milliseconds: 800); // Duration for map animations.
 
   @override
   void initState() {
@@ -49,9 +59,11 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         _updateRouteDetails(); // Update route details if the widget is still mounted.
       }
     } catch (e) {
-      debugPrint('Error initializing delivery tracking: $e'); // Print error if initialization fails.
+      debugPrint(
+          'Error initializing delivery tracking: $e'); // Print error if initialization fails.
       if (mounted) {
-        setState(() => _isLoading = false); // Set loading to false if there's an error.
+        setState(() =>
+            _isLoading = false); // Set loading to false if there's an error.
       }
     }
   }
@@ -65,15 +77,19 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   }
 
   void _handleRouteUpdate(DocumentSnapshot snapshot) async {
-    if (!mounted || !snapshot.exists) return; // Return if the widget is not mounted or snapshot doesn't exist.
+    if (!mounted || !snapshot.exists) {
+      return; // Return if the widget is not mounted or snapshot doesn't exist.
+    }
 
     try {
       final newRoute = DeliveryRoute.fromMap(
-          snapshot.data() as Map<String, dynamic>, snapshot.id); // Parse the new route from Firestore data.
+          snapshot.data() as Map<String, dynamic>,
+          snapshot.id); // Parse the new route from Firestore data.
       final locationChanged = newRoute.currentLocation?.latitude !=
               _currentRoute?.currentLocation?.latitude ||
           newRoute.currentLocation?.longitude !=
-              _currentRoute?.currentLocation?.longitude; // Check if the location has changed.
+              _currentRoute?.currentLocation
+                  ?.longitude; // Check if the location has changed.
 
       setState(() {
         _currentRoute = newRoute; // Update the current route.
@@ -92,9 +108,11 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         _performInitialMapPreview(); // Perform initial map preview.
       }
     } catch (e) {
-      debugPrint('Error processing route update: $e'); // Print error if processing route update fails.
+      debugPrint(
+          'Error processing route update: $e'); // Print error if processing route update fails.
       if (mounted) {
-        setState(() => _isLoading = false); // Set loading to false if there's an error.
+        setState(() =>
+            _isLoading = false); // Set loading to false if there's an error.
       }
     }
   }
@@ -112,12 +130,16 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   }
 
   Future<void> _updateRouteDetails() async {
-    if (_currentRoute == null || _currentRoute!.waypoints.length < 2) return; // Return if the current route is null or has less than 2 waypoints.
+    if (_currentRoute == null || _currentRoute!.waypoints.length < 2) {
+      return; // Return if the current route is null or has less than 2 waypoints.
+    }
 
     try {
-      final routeData = await _fetchRoutePoints(); // Fetch route points from the API.
+      final routeData =
+          await _fetchRoutePoints(); // Fetch route points from the API.
       if (mounted && routeData.points.isNotEmpty) {
-        setState(() => _routePoints = routeData.points); // Update route points if data is fetched successfully.
+        setState(() => _routePoints = routeData
+            .points); // Update route points if data is fetched successfully.
 
         await FirebaseFirestore.instance
             .collection('delivery_routes')
@@ -132,15 +154,19 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         _updateMapMarkers(); // Update map markers.
       }
     } catch (e) {
-      debugPrint('Error updating route details: $e'); // Print error if updating route details fails.
+      debugPrint(
+          'Error updating route details: $e'); // Print error if updating route details fails.
     }
   }
 
   Future<void> _updateProgressDetails() async {
-    if (_currentRoute?.currentLocation == null) return; // Return if the current location is null.
+    if (_currentRoute?.currentLocation == null) {
+      return; // Return if the current location is null.
+    }
 
     try {
-      final currentLoc = _currentRoute!.currentLocation!; // Get the current location.
+      final currentLoc =
+          _currentRoute!.currentLocation!; // Get the current location.
       final destination = _currentRoute!.waypoints.last; // Get the destination.
 
       final url =
@@ -153,7 +179,8 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body); // Decode the response.
         if (data['code'] == 'Ok') {
-          final remainingDistance = data['routes'][0]['distance'] as double; // Get the remaining distance.
+          final remainingDistance = data['routes'][0]['distance']
+              as double; // Get the remaining distance.
 
           await FirebaseFirestore.instance
               .collection('delivery_routes')
@@ -165,7 +192,8 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         }
       }
     } catch (e) {
-      debugPrint('Error updating progress details: $e'); // Print error if updating progress details fails.
+      debugPrint(
+          'Error updating progress details: $e'); // Print error if updating progress details fails.
     }
   }
 
@@ -182,9 +210,10 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
     if (response.statusCode == 200) {
       final data = json.decode(response.body); // Decode the response.
       if (data['code'] == 'Ok') {
-        final coordinates =
-            data['routes'][0]['geometry']['coordinates'] as List; // Get the coordinates.
-        final distance = data['routes'][0]['distance'] as double; // Get the distance.
+        final coordinates = data['routes'][0]['geometry']['coordinates']
+            as List; // Get the coordinates.
+        final distance =
+            data['routes'][0]['distance'] as double; // Get the distance.
         return (
           points: coordinates
               .map((coord) => LatLng(coord[1].toDouble(), coord[0].toDouble()))
@@ -193,16 +222,19 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         ); // Return the points and distance.
       }
     }
-    throw Exception('Failed to fetch route data'); // Throw an exception if fetching route data fails.
+    throw Exception(
+        'Failed to fetch route data'); // Throw an exception if fetching route data fails.
   }
 
   void _performInitialMapPreview() {
     if (_routePoints.isEmpty) return; // Return if route points are empty.
 
-    final bounds = _calculateRouteBounds(); // Calculate the bounds of the route.
+    final bounds =
+        _calculateRouteBounds(); // Calculate the bounds of the route.
     final center = bounds.center; // Get the center of the bounds.
 
-    _mapController.move(center, _routePreviewZoom); // Zoom out to show the entire route.
+    _mapController.move(
+        center, _routePreviewZoom); // Zoom out to show the entire route.
 
     Future.delayed(_animationDuration + const Duration(seconds: 1), () {
       if (mounted) {
@@ -216,7 +248,8 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
                 _currentRoute!.waypoints.first.longitude,
               ); // Get the target location.
 
-        _mapController.move(targetLocation, _defaultZoom); // Animate to the current location or start point.
+        _mapController.move(targetLocation,
+            _defaultZoom); // Animate to the current location or start point.
       }
     });
   }
@@ -255,7 +288,9 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   }
 
   void _updateMapMarkers() {
-    if (!mounted || _currentRoute == null) return; // Return if the widget is not mounted or current route is null.
+    if (!mounted || _currentRoute == null) {
+      return; // Return if the widget is not mounted or current route is null.
+    }
 
     setState(() {
       _markers.clear(); // Clear existing markers.
@@ -334,17 +369,17 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_currentRoute?.metadata?['eventName'] ?? 'Track Delivery'), // Display the event name or default title.
+        title: Text(_currentRoute?.metadata?['eventName'] ?? 'Track Delivery'),
         actions: [
           IconButton(
             icon: const Icon(Icons.my_location),
             onPressed: _performInitialMapPreview,
             tooltip: 'View entire route',
-          ), // Button to view the entire route.
+          ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator()) // Show loading indicator if data is still loading.
+          ? const Center(child: CircularProgressIndicator())
           : Stack(
               children: [
                 DeliveryMap(
@@ -363,7 +398,26 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
                     _currentRoute!.waypoints.first.longitude,
                   ),
                   isLoading: _isLoading,
-                ), // Display the delivery map with markers and route.
+                ),
+
+                // Position the loaded items section at the top with proper padding
+                if (_currentRoute != null &&
+                    _currentRoute!.metadata != null &&
+                    _currentRoute!.metadata!['loadedItems'] != null)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    top: 16,
+                    child: LoadedItemsSection(
+                      items: List<Map<String, dynamic>>.from(
+                          _currentRoute!.metadata!['loadedItems']),
+                      allItemsLoaded:
+                          _currentRoute!.metadata!['vehicleHasAllItems'] ??
+                              false,
+                    ),
+                  ),
+
+                // DeliveryInfoCard at the bottom
                 if (_currentRoute != null)
                   Positioned(
                     left: 0,
@@ -375,7 +429,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
                       onContactDriverTap: () =>
                           _showDriverContactSheet(context),
                     ),
-                  ), // Display the delivery info card at the bottom.
+                  ),
               ],
             ),
     );

@@ -51,6 +51,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFFBC72B), // Change this to your desired color
       bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         leading: IconButton(
@@ -73,8 +74,11 @@ class _StaffListScreenState extends State<StaffListScreen> {
             padding:
                 const EdgeInsets.all(16.0), // Padding around the search field.
             child: TextField(
-              controller: _searchController, // Controller for the search field.
+              controller: _searchController,
+               // Controller for the search field.
               decoration: InputDecoration(
+                filled: true, // Enables the background color
+                fillColor: Colors.white, // Sets background color to white
                 hintText:
                     'Search staff...', // Placeholder text for the search field.
                 prefixIcon: const Icon(

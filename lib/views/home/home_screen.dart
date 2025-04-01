@@ -8,7 +8,8 @@ import 'package:cateredtoyou/widgets/permission_widget.dart';
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:cateredtoyou/widgets/custom_app_bar.dart';
 import 'package:cateredtoyou/widgets/custom_drawer.dart';
-import 'package:cateredtoyou/widgets/urgent_tasks_widget.dart'; // Import the new widget
+import 'package:cateredtoyou/widgets/urgent_tasks_widget.dart';
+import 'package:cateredtoyou/widgets/urgent_events_widget.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -49,36 +50,17 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
+
+
+              // Urgent Events Widget
+              const UrgentEventsWidget(),
+
               const SizedBox(height: 24),
 
               // Urgent Tasks Widget - Added here
               const UrgentTasksWidget(),
 
               const SizedBox(height: 24),
-
-              // Buttons without the 'Management' section
-              FutureBuilder<bool>(
-                future: rolePermissions.hasPermission('view_customers'),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData || !snapshot.data!) {
-                    return const SizedBox.shrink();
-                  }
-                  return Card(
-                    child: PermissionWidget(
-                      permissionId: 'view_customers',
-                      child: ListTile(
-                        leading: const Icon(Icons.handshake),
-                        title: const Text('Customer Management'),
-                        subtitle: const Text('View and edit customer information'),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                        onTap: () => context.push('/customers'),
-                      ),
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 16),
 
               // Vehicle and Delivery Section
               FutureBuilder<bool>(

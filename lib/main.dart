@@ -10,7 +10,6 @@ import 'package:cateredtoyou/services/task_automation_service.dart'; // Import T
 import 'package:cateredtoyou/services/task_service.dart'; // Import TaskService for task-related operations
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth package for Firebase authentication
 import 'package:firebase_core/firebase_core.dart'; // Import Firebase core package for Firebase initialization
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart'; // Import Flutter material package for UI components
 import 'package:provider/provider.dart'; // Import provider package for state management
 import 'package:cateredtoyou/models/auth_model.dart'; // Import AuthModel for authentication state
@@ -167,6 +166,17 @@ class MyApp extends StatelessWidget {
                   seedColor: Colors.blue, // Set primary color to blue
                   brightness: Brightness.light, // Set brightness to light mode
                 ),
+              switchTheme: SwitchThemeData(
+                  thumbColor: MaterialStateProperty.resolveWith<Color>((states) {
+                    if (states.contains(MaterialState.selected)) {
+                      return Colors.white;  // Thumb color when the switch is active
+                    }
+                    return Colors.white;  // Thumb color when the switch is inactive
+                  }),
+                trackColor: MaterialStateProperty.all(Colors.green),  // Track color
+                // You can set different colors for active and inactive states
+                overlayColor: MaterialStateProperty.all(Colors.green.withOpacity(0.4)),  // Circle overlay color
+              ),
               primaryColor: const Color(0xFFFBC72B),
 
               useMaterial3: true, // Use Material 3 design
@@ -194,6 +204,7 @@ class MyApp extends StatelessWidget {
               ),
               cardTheme: CardTheme(
                 elevation: 2, // Set elevation for cards
+                color: Colors.white, // Change this to your preferred background color
                 shape: RoundedRectangleBorder(
                   borderRadius:
                       BorderRadius.circular(12), // Set border radius for cards

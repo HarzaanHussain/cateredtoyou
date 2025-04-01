@@ -24,6 +24,7 @@ import 'package:cateredtoyou/views/menu_item/menu_item_list_screen.dart'; // Imp
 import 'package:cateredtoyou/views/notifications/add_noti_testing.dart';
 import 'package:cateredtoyou/views/notifications/notification_screen.dart';
 import 'package:cateredtoyou/views/notifications/reccuring_notification_screen.dart';
+import 'package:cateredtoyou/views/settings/app_settings.dart';
 import 'package:cateredtoyou/views/staff/add_staff_screen.dart'; // Importing AddStaffScreen widget
 import 'package:cateredtoyou/views/staff/edit_staff_screen.dart'; // Importing EditStaffScreen widget
 import 'package:cateredtoyou/views/staff/staff_list_screen.dart'; // Importing StaffListScreen widget
@@ -378,6 +379,18 @@ class AppRouter {
           return null;
         },
       ),
+      GoRoute(
+  path: '/settings',
+  name: 'settings',
+  builder: (context, state) => const AppSettingsScreen(),
+  redirect: (context, state) {
+    if (!authModel.isAuthenticated) {
+      // If user is not authenticated
+      return '/login'; // Redirect to login
+    }
+    return null; // No redirection if authenticated
+  },
+),
     ],
 
     errorBuilder: (context, state) => Material(
