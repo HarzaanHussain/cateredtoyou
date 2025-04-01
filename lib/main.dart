@@ -155,7 +155,7 @@ class MyApp extends StatelessWidget {
                     brightness: Brightness.light,
                     primary: Color(0xFF2C3E50),       // Dark navy for sophistication
                     onPrimary: Colors.white,
-                    secondary:   Color.fromARGB(255, 222, 141, 66), //bronze accent // Color(0xFFD4AF37),     // Elegant gold accent
+                    secondary:    Color(0xFFD4AF37),     // Elegant gold accent
                     onSecondary: Colors.black,
                     error: Colors.red,
                     onError: Colors.white,
@@ -171,7 +171,7 @@ class MyApp extends StatelessWidget {
                   ),
                   elevatedButtonTheme: ElevatedButtonThemeData(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Color.fromARGB(255, 222, 141, 66),// const Color(0xFFD4AF37), // Gold button background
+                      backgroundColor: const Color(0xFFD4AF37), // Gold button background
                       foregroundColor: Colors.black,            // Button text color
                       minimumSize: const Size.fromHeight(48),
                       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
