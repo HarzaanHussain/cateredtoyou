@@ -20,6 +20,7 @@ import 'package:cateredtoyou/views/menu_item/menu_item_edit_screen.dart'; // Imp
 import 'package:cateredtoyou/views/menu_item/menu_item_list_screen.dart'; // Importing MenuItemListScreen widget
 import 'package:cateredtoyou/views/notifications/add_noti_testing.dart';
 import 'package:cateredtoyou/views/notifications/notification_screen.dart';
+import 'package:cateredtoyou/views/notifications/reccuring_notification_screen.dart';
 import 'package:cateredtoyou/views/staff/add_staff_screen.dart'; // Importing AddStaffScreen widget
 import 'package:cateredtoyou/views/staff/edit_staff_screen.dart'; // Importing EditStaffScreen widget
 import 'package:cateredtoyou/views/staff/staff_list_screen.dart'; // Importing StaffListScreen widget
@@ -152,6 +153,21 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/inventory/:itemId',
+        builder: (context, state) {
+          final itemId = state.pathParameters['itemId']!;
+          return ContentByIdLoader(
+            contentType: 'inventory',
+            contentId: itemId,
+            loadingTitle: 'Loading Inventory Item',
+          );
+        },
+        redirect: (context, state){
+          if (!authModel.isAuthenticated) return '/login';
+          return null;
+        }
+      ),
+      GoRoute(
         path: '/events', // Path for event list route
         builder: (context, state) =>
             const EventListScreen(), // Building EventListScreen widget
@@ -234,6 +250,14 @@ class AppRouter {
         path: '/add_notification',
         builder: (context, state) => 
           const CreateNotificationPage(),
+      ),
+      GoRoute(
+        path: '/recurring-notifications',
+        builder: (context, state) => const RecurringNotificationSetupScreen(),
+        redirect: (context, state) {
+          if (!authModel.isAuthenticated) return '/login';
+          return null;
+        },
       ),
       GoRoute(
         // Route for tasks list
