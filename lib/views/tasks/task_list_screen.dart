@@ -21,7 +21,7 @@ class TaskListScreen extends StatelessWidget {
     return DefaultTabController(
       length: 4,
       child: Scaffold(
-        backgroundColor: const Color(0xFFFBC72B), // Change this to your desired color
+        //backgroundColor: const Color(0xFFFBC72B), // Change this to your desired color
 
         bottomNavigationBar: const BottomToolbar(),
         appBar: AppBar(
