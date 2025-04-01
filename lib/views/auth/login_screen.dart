@@ -119,20 +119,20 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
-                  controller: _passwordController,
+                 controller: _passwordController,
                   label: 'Password',
                   prefixIcon: Icons.lock,
                   obscureText: !_isPasswordVisible,
                   suffixIcon: IconButton(
-                    icon: Icon(_isPasswordVisible
-                        ? Icons.visibility_off
-                        : Icons.visibility),
+                    icon: Icon(_isPasswordVisible ? Icons.visibility_off : Icons.visibility),
                     onPressed: () => setState(() {
                       _isPasswordVisible = !_isPasswordVisible;
                     }),
                   ),
                   validator: Validators.validatePassword,
+                  onFieldSubmitted: (_) => _handleLogin(), // Trigger login on enter key
                 ),
+
                 const SizedBox(height: 24),
                 CustomButton(
                   label: 'Login',

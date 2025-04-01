@@ -12,6 +12,7 @@ class CustomTextField extends StatelessWidget {
   final bool readOnly;
   final VoidCallback? onTap;
     final void Function(String)? onChanged;
+  final void Function(String)? onFieldSubmitted; //add this for allowind enter on login screen
 
   const CustomTextField({
     super.key,
@@ -26,6 +27,7 @@ class CustomTextField extends StatelessWidget {
     this.readOnly = false,
     this.onTap,
      this.onChanged,
+    this.onFieldSubmitted, // include in the constructor
     
   });
 
@@ -40,6 +42,7 @@ class CustomTextField extends StatelessWidget {
       readOnly: readOnly,
       onTap: onTap,
        onChanged: onChanged,
+      onFieldSubmitted: onFieldSubmitted, // pass the callback along
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: prefixIcon != null ? Icon(prefixIcon) : null,
