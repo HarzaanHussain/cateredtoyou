@@ -138,6 +138,42 @@ class InventoryService extends ChangeNotifier { // InventoryService class extend
     }
   }
 
+  Future<InventoryItem?> getInventoryItemById(String itemId) async {
+  try {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return null;
+
+    // Get user's organization ID
+    final userDoc = await _firestore
+        .collection('users')
+        .doc(currentUser.uid)
+        .get();
+
+    if (!userDoc.exists) return null;
+    
+    final orgId = userDoc.data()?['organizationId'];
+    if (orgId == null) return null;
+
+    // Get the inventory item
+    final doc = await _firestore
+        .collection('inventory')
+        .doc(itemId)
+        .get();
+
+    if (!doc.exists) return null;
+    
+    final item = InventoryItem.fromMap(doc.data()!, doc.id);
+    
+    // Verify the item belongs to the user's organization
+    if (item.organizationId != orgId) return null;
+    
+    return item;
+  } catch (e) {
+    debugPrint('Error getting inventory item by ID: $e');
+    return null;
+  }
+}
+
   // Update inventory item with organization ID verification
   Future<void> updateInventoryItem(InventoryItem item) async {
     final currentUser = _auth.currentUser; // Get current authenticated user

@@ -1,7 +1,9 @@
 import 'dart:convert';
 
 import 'package:cateredtoyou/models/notification_model.dart';
+import 'package:cateredtoyou/models/reccuring_notification_model.dart';
 import 'package:cateredtoyou/utils/notification_storage.dart';
+import 'package:cateredtoyou/utils/recurring_notification_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
@@ -220,6 +222,132 @@ class NotificationService {
       priority: Priority.high,
     ));
   }
+
+  Future<void> processRecurringNotifications() async {
+    if (!_isInitialized) await initNotification();
+  
+    try {
+      final now = DateTime.now();
+      final notifications = await RecurringNotificationStorage.getRecurringNotifications();
+    
+      for (final notification in notifications) {
+        // Skip inactive notifications
+        if (!notification.isActive) continue;
+      
+        // Skip if end date has passed
+        if (notification.endDate != null && notification.endDate!.isBefore(now)) {
+          // Deactivate this notification since end date has passed
+          await RecurringNotificationStorage.updateRecurringNotification(
+            notification.copyWith(isActive: false)
+          );
+          continue;
+        }
+      
+        // Check if it's time to send this notification
+        if (notification.nextScheduledDate.isBefore(now)) {
+          // Schedule the notification
+          await scheduleNotification(
+            title: notification.title,
+            body: notification.body,
+            scheduledTime: now.add(const Duration(minutes: 1)), // Schedule for 1 minute from now
+            screen: notification.screen,
+            extraData: notification.extraData,
+          );
+        
+          // Calculate and update the next occurrence
+          final nextDate = notification.calculateNextDate(now);
+          await RecurringNotificationStorage.updateNextScheduledDate(
+            notification.id, 
+            nextDate
+          );
+        
+          print('Scheduled recurring notification: ${notification.title} - Next date: $nextDate');
+        }
+      }
+    } catch (e) {
+      print('Error processing recurring notifications: $e');
+    }
+  }
+
+  // Create a recurring notification
+Future<RecurringNotification> createRecurringNotification({
+  required String title,
+  required String body,
+  required String screen,
+  required RecurringInterval interval,
+  Map<String, dynamic>? extraData,
+  DateTime? startDate,
+  DateTime? endDate,
+}) async {
+  if (!_isInitialized) await initNotification();
+  
+  final now = DateTime.now();
+  final start = startDate ?? now;
+  
+  // Create the recurring notification object
+  final notification = RecurringNotification(
+    id: '',  // Will be generated in storage
+    title: title,
+    body: body,
+    screen: screen,
+    extraData: extraData,
+    interval: interval,
+    startDate: start,
+    endDate: endDate,
+    isActive: true,
+    createdAt: now,
+    nextScheduledDate: start,
+  );
+  
+  // Save it to storage
+  final savedNotification = await RecurringNotificationStorage.addRecurringNotification(
+    notification
+  );
+  
+  // If the start date is in the past or very soon, process it right away
+  if (start.isBefore(now.add(const Duration(minutes: 15)))) {
+    await processRecurringNotifications();
+  }
+  
+  return savedNotification;
+}
+
+// Update an existing recurring notification
+Future<void> updateRecurringNotification(RecurringNotification notification) async {
+  if (!_isInitialized) await initNotification();
+  
+  await RecurringNotificationStorage.updateRecurringNotification(notification);
+}
+
+// Delete a recurring notification
+Future<void> deleteRecurringNotification(String id) async {
+  if (!_isInitialized) await initNotification();
+  
+  await RecurringNotificationStorage.deleteRecurringNotification(id);
+}
+
+// Get all recurring notifications
+Future<List<RecurringNotification>> getRecurringNotifications() async {
+  if (!_isInitialized) await initNotification();
+  
+  return RecurringNotificationStorage.getRecurringNotifications();
+}
+
+// Create a standard inventory check recurring notification
+Future<RecurringNotification> createInventoryCheckNotification({
+  required RecurringInterval interval,
+  DateTime? startDate,
+  DateTime? endDate,
+}) async {
+  return createRecurringNotification(
+    title: 'Inventory Check Reminder',
+    body: 'Time to verify your physical inventory matches your digital records',
+    screen: 'inventory',
+    interval: interval,
+    startDate: startDate,
+    endDate: endDate,
+  );
+}
 
   //SHOW NOTIFICATIONS
   Future<void> showNotification({

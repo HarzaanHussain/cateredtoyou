@@ -230,7 +230,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Add Notification',
-            onPressed: () => context.push('/add_notification'),
+            onPressed: () => context.push('/recurring-notifications'),
           )
         ],
       ),
