@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cateredtoyou/services/auth_service.dart';
 import 'package:cateredtoyou/services/delivery_route_service.dart'; // Import DeliveryRouteService for delivery route-related operations
 import 'package:cateredtoyou/services/event_service.dart'; // Import EventService for event-related operations
@@ -43,6 +45,16 @@ class FirebaseSecondary {
   }
 }
 
+void setupRecurringNotificationsCheck() {
+  // Process right now to handle any that are due
+  NotificationService().processRecurringNotifications();
+  
+  // Set up periodic checking of recurring notifications
+  Timer.periodic(const Duration(hours: 1), (timer) {
+    NotificationService().processRecurringNotifications();
+  });
+}
+
 void main() async {
   WidgetsFlutterBinding
       .ensureInitialized(); // Ensure Flutter binding is initialized before running the app
@@ -50,6 +62,7 @@ void main() async {
   await FirebaseSecondary
       .initializeSecondary(); // Initialize secondary Firebase app
   await NotificationService().initNotification();
+  setupRecurringNotificationsCheck();
 
   runApp(const MyApp()); // Run the MyApp widget
 }

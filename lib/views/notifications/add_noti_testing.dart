@@ -15,10 +15,22 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
   final _bodyController = TextEditingController();
   final _screenController = TextEditingController(text: 'home');
   final _extraDataController = TextEditingController();
+  final _contentIdController = TextEditingController();
 
   DateTime _scheduledDate = DateTime.now().add(const Duration(minutes: 1));
   bool _isScheduled = false;
   final NotificationService _notificationService = NotificationService();
+
+  // Content type and parameter name mapping
+  final Map<String, String> _contentTypeMapping = {
+    'events': 'eventId',
+    'inventory': 'itemId',
+    'tasks': 'taskId',
+    'vehicles': 'vehicleId',
+    'staff': 'staffId',
+    'customers': 'customerId',
+  };
+
   final List<String> _availableScreens = [
     'home',
     'events',
@@ -45,7 +57,39 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
     _bodyController.dispose();
     _screenController.dispose();
     _extraDataController.dispose();
+    _contentIdController.dispose();
     super.dispose();
+  }
+
+  // Get parameter name for the current content type
+  String? get _contentIdParamName {
+    return _contentTypeMapping[_screenController.text];
+  }
+
+  // Handle screen selection change
+  void _onScreenChanged(String? newValue) {
+    if (newValue != null) {
+      setState(() {
+        _screenController.text = newValue;
+
+        // Clear content ID if screen changes
+        _contentIdController.clear();
+
+        // Update extra data field
+        _updateExtraDataField();
+      });
+    }
+  }
+
+  // Update the extra data field based on selected screen and content ID
+  void _updateExtraDataField() {
+    final paramName = _contentIdParamName;
+
+    if (paramName != null && _contentIdController.text.isNotEmpty) {
+      _extraDataController.text = '$paramName:${_contentIdController.text}';
+    } else {
+      _extraDataController.text = '';
+    }
   }
 
   Future<void> _selectDateTime(BuildContext context) async {
@@ -143,6 +187,9 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final bool hasContentIdParam = _contentIdParamName != null;
+    final String contentType = _screenController.text.replaceAll('-', ' ');
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Notification'),
@@ -194,21 +241,43 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
                     child: Text(screen),
                   );
                 }).toList(),
-                onChanged: (String? newValue) {
-                  if (newValue != null) {
-                    setState(() {
-                      _screenController.text = newValue;
-                    });
-                  }
-                },
+                onChanged: _onScreenChanged,
               ),
+
+              // Show content ID field when applicable
+              if (hasContentIdParam) ...[
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _contentIdController,
+                  decoration: InputDecoration(
+                    labelText: '${contentType.capitalize()} ID',
+                    border: const OutlineInputBorder(),
+                    hintText: 'Enter the Firestore document ID',
+                    helperText: 'This will be used for direct navigation',
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _updateExtraDataField();
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Tip: You can find the ${contentType.capitalize()} ID in the Firestore console',
+                  style: const TextStyle(
+                      fontStyle: FontStyle.italic, fontSize: 12),
+                ),
+              ],
+
               const SizedBox(height: 16),
               TextFormField(
                 controller: _extraDataController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Extra Data (key1:value1;key2:value2)',
-                  border: OutlineInputBorder(),
-                  hintText: 'Optional: id:123;type:reminder',
+                  border: const OutlineInputBorder(),
+                  hintText: hasContentIdParam
+                      ? 'Auto-filled based on content ID'
+                      : 'Optional: id:123;type:reminder',
                 ),
               ),
               const SizedBox(height: 24),
@@ -248,5 +317,12 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
         ),
       ),
     );
+  }
+}
+
+// Extension method to capitalize strings
+extension StringExtension on String {
+  String capitalize() {
+    return "${this[0].toUpperCase()}${substring(1)}";
   }
 }

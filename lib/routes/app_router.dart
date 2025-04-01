@@ -4,6 +4,8 @@ import 'package:cateredtoyou/models/inventory_item_model.dart'; // Importing Inv
 import 'package:cateredtoyou/models/menu_item_model.dart'; // Importing MenuItem model
 import 'package:cateredtoyou/models/user_model.dart'; // Importing User model
 import 'package:cateredtoyou/models/vehicle_model.dart'; // Importing Vehicle model
+import 'package:cateredtoyou/routes/ContentByIdLoader.dart';
+import 'package:cateredtoyou/services/event_service.dart';
 import 'package:cateredtoyou/services/notification_service.dart';
 import 'package:cateredtoyou/views/customers/add_customer_screen.dart';
 import 'package:cateredtoyou/views/customers/customer_list_screen.dart';
@@ -21,6 +23,7 @@ import 'package:cateredtoyou/views/menu_item/menu_item_edit_screen.dart'; // Imp
 import 'package:cateredtoyou/views/menu_item/menu_item_list_screen.dart'; // Importing MenuItemListScreen widget
 import 'package:cateredtoyou/views/notifications/add_noti_testing.dart';
 import 'package:cateredtoyou/views/notifications/notification_screen.dart';
+import 'package:cateredtoyou/views/notifications/reccuring_notification_screen.dart';
 import 'package:cateredtoyou/views/settings/app_settings.dart';
 import 'package:cateredtoyou/views/staff/add_staff_screen.dart'; // Importing AddStaffScreen widget
 import 'package:cateredtoyou/views/staff/edit_staff_screen.dart'; // Importing EditStaffScreen widget
@@ -31,6 +34,7 @@ import 'package:cateredtoyou/views/tasks/task_list_screen.dart'; // Importing Ta
 import 'package:cateredtoyou/views/vehicles/vehicle_details_screen.dart'; // Importing VehicleDetailsScreen widget
 import 'package:cateredtoyou/views/vehicles/vehicle_form_screen.dart'; // Importing VehicleFormScreen widget
 import 'package:cateredtoyou/views/vehicles/vehicle_list_screen.dart'; // Importing VehicleListScreen widget
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components
 import 'package:go_router/go_router.dart'; // Importing GoRouter package for routing
 import 'package:cateredtoyou/models/auth_model.dart'; // Importing AuthModel for authentication state
@@ -38,6 +42,7 @@ import 'package:cateredtoyou/views/auth/login_screen.dart'; // Importing LoginSc
 import 'package:cateredtoyou/views/auth/register_screen.dart'; // Importing RegisterScreen widget
 import 'package:cateredtoyou/views/home/home_screen.dart';
 import 'package:cateredtoyou/views/calendar/calendarscreen.dart';
+import 'package:provider/provider.dart';
 
 import '../models/customer_model.dart';
 import '../views/manifest/manifest_screen.dart'; // Importing HomeScreen widget
@@ -157,6 +162,21 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/inventory/:itemId',
+        builder: (context, state) {
+          final itemId = state.pathParameters['itemId']!;
+          return ContentByIdLoader(
+            contentType: 'inventory',
+            contentId: itemId,
+            loadingTitle: 'Loading Inventory Item',
+          );
+        },
+        redirect: (context, state){
+          if (!authModel.isAuthenticated) return '/login';
+          return null;
+        }
+      ),
+      GoRoute(
         path: '/events', // Path for event list route
         builder: (context, state) =>
             const EventListScreen(), // Building EventListScreen widget
@@ -166,6 +186,21 @@ class AppRouter {
             return '/login'; // Redirect to login
           }
           return null; // No redirection if authenticated
+        },
+      ),
+      GoRoute(
+        path: '/events/:eventId',
+        builder: (context, state) {
+          final eventId = state.pathParameters['eventId']!;
+          return ContentByIdLoader(
+            contentType: 'event',
+            contentId: eventId,
+            loadingTitle: 'Loading Event',
+          );
+        },
+        redirect: (context, state) {
+          if (!authModel.isAuthenticated) return '/login';
+          return null;
         },
       ),
       GoRoute(
@@ -238,6 +273,14 @@ class AppRouter {
       GoRoute(
         path: '/add_notification',
         builder: (context, state) => const CreateNotificationPage(),
+      ),
+      GoRoute(
+        path: '/recurring-notifications',
+        builder: (context, state) => const UnifiedNotificationScreen(),
+        redirect: (context, state) {
+          if (!authModel.isAuthenticated) return '/login';
+          return null;
+        },
       ),
       GoRoute(
         // Route for tasks list
@@ -357,3 +400,67 @@ class AppRouter {
     ),
   );
 }
+
+// class EventByIdLoader extends StatelessWidget {
+//   final String eventId;
+//   const EventByIdLoader({Key? key, required this.eventId}) : super(key: key);
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return FutureBuilder<Event?>(
+//       future: Provider.of<EventService>(context, listen: false)
+//           .getEventById(eventId),
+//       builder: (context, snapshot) {
+//         // While loading, show a loading screen
+//         if (snapshot.connectionState == ConnectionState.waiting) {
+//           return Scaffold(
+//             appBar: AppBar(
+//               title: const Text('Loading Event'),
+//               leading: IconButton(
+//                 icon: const Icon(Icons.arrow_back),
+//                 onPressed: () => GoRouter.of(context).go('/home'),
+//               ),
+//             ),
+//             body: const Center(child: CircularProgressIndicator()),
+//             bottomNavigationBar: const BottomToolbar(),
+//           );
+//         }
+
+//         // If there's an error or no data, show an error screen
+//         if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+//           return Scaffold(
+//             appBar: AppBar(
+//               title: const Text('Event Not Found'),
+//               leading: IconButton(
+//                 icon: const Icon(Icons.arrow_back),
+//                 onPressed: () => GoRouter.of(context).go('/home'),
+//               ),
+//             ),
+//             body: Center(
+//               child: Column(
+//                 mainAxisAlignment: MainAxisAlignment.center,
+//                 children: [
+//                   Text(
+//                     snapshot.hasError
+//                         ? 'Error: ${snapshot.error}'
+//                         : 'Event not found',
+//                     style: const TextStyle(color: Colors.red),
+//                   ),
+//                   const SizedBox(height: 16),
+//                   ElevatedButton(
+//                     onPressed: () => GoRouter.of(context).go('/home'),
+//                     child: const Text('Go to Home'),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//             bottomNavigationBar: const BottomToolbar(),
+//           );
+//         }
+
+//         // If we have the data, return the normal EventDetailsScreen
+//         return EventDetailsScreen(event: snapshot.data!);
+//       },
+//     );
+//   }
+// }
