@@ -151,77 +151,94 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ],
-    child: Builder(
+      child: Builder(
         builder: (context) {
           final authModel =
               context.watch<AuthModel>(); // Watch AuthModel for changes
           final appRouter =
               AppRouter(authModel); // Create AppRouter instance with AuthModel
-
-          return MaterialApp.router(
-            title: 'CateredToYou', // Set the title of the app
-            debugShowCheckedModeBanner: false, // Disable debug banner
-            theme: ThemeData(
-                colorScheme: ColorScheme.fromSeed(
-                  seedColor: Colors.blue, // Set primary color to blue
-                  brightness: Brightness.light, // Set brightness to light mode
-                ),
-              switchTheme: SwitchThemeData(
-                  thumbColor: MaterialStateProperty.resolveWith<Color>((states) {
-                    if (states.contains(MaterialState.selected)) {
-                      return Colors.white;  // Thumb color when the switch is active
-                    }
-                    return Colors.white;  // Thumb color when the switch is inactive
-                  }),
-                trackColor: MaterialStateProperty.all(Colors.green),  // Track color
-                // You can set different colors for active and inactive states
-                overlayColor: MaterialStateProperty.all(Colors.green.withOpacity(0.4)),  // Circle overlay color
-              ),
-              primaryColor: const Color(0xFFFBC72B),
-
-              useMaterial3: true, // Use Material 3 design
-              inputDecorationTheme: InputDecorationTheme(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(
-                      8), // Set border radius for input fields
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 16,
-                ), // Set padding for input fields
-              ),
-              elevatedButtonTheme: ElevatedButtonThemeData(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFFFFC533), //Button BG color to orange
-                  foregroundColor: Colors.black, // Button text color to black
-                  minimumSize: const Size.fromHeight(
-                      48), // Set minimum height for buttons
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                        8), // Set border radius for buttons
+        
+              return  MaterialApp.router(
+                title: 'CateredToYou',
+                debugShowCheckedModeBanner: false,
+                theme: ThemeData(
+                  useMaterial3: true,
+                  // Define a custom ColorScheme
+                  colorScheme: const ColorScheme(
+                    brightness: Brightness.light,
+                    primary: Color(0xFF2C3E50),       // Dark navy for sophistication
+                    onPrimary: Colors.white,
+                    secondary:    Color(0xFFD4AF37),     // Elegant gold accent
+                    onSecondary: Colors.black,
+                    error: Colors.red,
+                    onError: Colors.white,
+                    surface: Color(0xFFFCF8F2),      // Warm cream background
+                    onSurface: Colors.black87,
+                
+                  ),
+                  scaffoldBackgroundColor: const Color(0xFFFCF8F2),
+                  appBarTheme: const AppBarTheme(
+                    backgroundColor: Color(0xFF2C3E50),
+                    foregroundColor: Colors.white,
+                    elevation: 4,
+                  ),
+                  elevatedButtonTheme: ElevatedButtonThemeData(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD4AF37), // Gold button background
+                      foregroundColor: Colors.black,            // Button text color
+                      minimumSize: const Size.fromHeight(48),
+                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  inputDecorationTheme: InputDecorationTheme(
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderSide: const BorderSide(color: Color(0xFFBDC3C7)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: Color(0xFFD4AF37)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  ),
+                  cardTheme: CardTheme(
+                    color: Colors.white,
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    margin: const EdgeInsets.all(8),
+                  ),
+                  textTheme: TextTheme(
+                    headlineSmall: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2C3E50),
+                    ),
+                    titleMedium: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF2C3E50),
+                    ),
+                    bodyLarge: const TextStyle(fontSize: 16, color: Colors.black87),
+                    bodyMedium: const TextStyle(fontSize: 14, color: Colors.black54),
+                  ),
+                  switchTheme: SwitchThemeData(
+                    thumbColor: WidgetStateProperty.resolveWith<Color>(
+                      (states) => Colors.white,
+                    ),
+                    trackColor: WidgetStateProperty.all(const Color(0xFFD4AF37)),
+                    overlayColor: WidgetStateProperty.all(const Color(0xFFD4AF37)),
                   ),
                 ),
-              ),
-              cardTheme: CardTheme(
-                elevation: 2, // Set elevation for cards
-                color: Colors.white, // Change this to your preferred background color
-                shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(12), // Set border radius for cards
-                ),
-                margin: const EdgeInsets.symmetric(
-                  vertical: 8,
-                ), // Set margin for cards
-              ),
-              listTileTheme: const ListTileThemeData(
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ), // Set padding for list tiles
-              ),
-            ),
-            routerConfig: appRouter.router, // Set router configuration
-          );
+                routerConfig: appRouter.router,
+              );
+        
         },
       ),
     );

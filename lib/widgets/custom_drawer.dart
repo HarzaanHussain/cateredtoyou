@@ -19,7 +19,7 @@ class CustomDrawer extends StatelessWidget {
             Container(
               height: 100,
               width: double.infinity,
-              color: const Color(0xFFFFC533),
+              color: Color(0xFF2C3E50),
               padding: const EdgeInsets.all(16),
               alignment: Alignment.centerLeft,
               child: Text(
