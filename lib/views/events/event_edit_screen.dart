@@ -418,11 +418,18 @@ class _EventEditScreenState extends State<EventEditScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2.0),
                     )
-                  : Text(_currentPage < 2
-                      ? 'Next'
-                      : (widget.event == null
-                          ? 'Create Event'
-                          : 'Update Event')),
+                  : Text(
+                      _currentPage < 2
+                          ? 'Next'
+                          : (widget.event == null
+                              ? 'Create Event'
+                              : 'Update Event'),
+                      style: _currentPage == 2
+                          ? const TextStyle(
+                              fontSize: 13) // Smaller font size for longer text
+                          : null, // Default size for "Next"
+                      textAlign: TextAlign.center,
+                    ),
             ),
           ),
         ],
