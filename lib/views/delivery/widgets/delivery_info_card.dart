@@ -194,7 +194,7 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
     );
   }
 
-  Widget _buildProgressDetails(BuildContext context) {
+   Widget _buildProgressDetails(BuildContext context) {
     // Function to build progress details
     final theme = Theme.of(context); // Get theme
     return Container(
@@ -230,6 +230,65 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
               ),
             ],
           ),
+          
+          // Add progress bar
+          if (widget.route.status == 'in_progress') ...[
+            const SizedBox(height: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Delivery Progress',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    Text(
+                      '${(_getDeliveryProgress() * 100).toStringAsFixed(0)}%',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                LinearProgressIndicator(
+                  value: _getDeliveryProgress(),
+                  minHeight: 8,
+                  borderRadius: BorderRadius.circular(4),
+                  backgroundColor: Colors.grey.shade300,
+                ),
+              ],
+            ),
+          ],
+          
+          // Add driver speed if available
+          if (widget.route.status == 'in_progress' && 
+              widget.route.currentLocation != null &&
+              widget.route.metadata?['currentSpeed'] != null) ...[
+            const SizedBox(height: 12),
+            Divider(color: theme.colorScheme.outlineVariant),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  Icons.speed,
+                  color: theme.colorScheme.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Current Speed: ${_formatDriverSpeed()}',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          
+          // Traffic data if available
           if (widget.route.metadata?['routeDetails']?['traffic'] != null) ...[
             // Check if traffic data is available
             const SizedBox(height: 12), // Spacing
@@ -257,6 +316,29 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
         ],
       ),
     );
+  }
+  // Helper to get delivery progress
+  double _getDeliveryProgress() {
+    // First check if there's a stored progress value
+    if (widget.route.metadata?['routeDetails']?['progress'] != null) {
+      final progress = widget.route.metadata!['routeDetails']['progress'];
+      if (progress is num) {
+        return progress.toDouble().clamp(0.0, 1.0);
+      }
+    }
+    
+    // Otherwise calculate based on DeliveryProgress helper
+    return widget.route.calculateProgress();
+  }
+  
+  // Format driver speed
+  String _formatDriverSpeed() {
+    final speed = widget.route.metadata?['currentSpeed'];
+    if (speed == null) return 'N/A';
+    
+    // Convert m/s to mph
+    final speedMph = (speed * 2.23694).toStringAsFixed(1);
+    return '$speedMph mph';
   }
 
   Widget _buildProgressDetail(

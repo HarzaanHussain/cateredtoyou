@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/views/delivery/widgets/delivery_progress.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Importing Firestore package to use Firestore related classes like Timestamp and GeoPoint
 
 class DeliveryRoute {
@@ -88,7 +89,7 @@ class DeliveryRoute {
     );
   }
 
-  DeliveryRoute copyWith({
+ DeliveryRoute copyWith({
     String? eventId, // Optional parameter for eventId
     String? vehicleId, // Optional parameter for vehicleId
     String? driverId, // Optional parameter for driverId
@@ -99,6 +100,7 @@ class DeliveryRoute {
     String? status, // Optional parameter for status
     GeoPoint? currentLocation, // Optional parameter for currentLocation
     double? currentHeading, // Optional parameter for currentHeading
+    double? currentSpeed, // Optional parameter for current speed
     Map<String, dynamic>? dropoffInstructions, // Optional parameter for dropoffInstructions
     String? assignedZone, // Optional parameter for assignedZone
     Map<String, dynamic>? routeOptimizationData, // Optional parameter for routeOptimizationData
@@ -125,4 +127,95 @@ class DeliveryRoute {
       updatedAt: DateTime.now(), // Setting updatedAt to the current time
     );
   }
+   double calculateProgress() {
+    return DeliveryProgress.calculateProgress(
+      waypoints: waypoints,
+      currentLocation: currentLocation,
+      startTime: startTime,
+      estimatedEndTime: estimatedEndTime,
+      status: status,
+      metadata: metadata,
+    );
+  }
+  
+  // Get the estimated time remaining in minutes
+  int get estimatedTimeRemainingMinutes {
+    if (status != 'in_progress') return 0;
+    
+    // Check if we have a pre-calculated value
+    if (metadata != null && 
+        metadata!['routeDetails'] != null && 
+        metadata!['routeDetails']['estimatedTimeRemaining'] != null) {
+      final seconds = metadata!['routeDetails']['estimatedTimeRemaining'];
+      if (seconds is num) {
+        return (seconds / 60).round();
+      }
+    }
+    
+    // Fallback to simple calculation
+    final now = DateTime.now();
+    if (now.isAfter(estimatedEndTime)) return 0;
+    
+    return estimatedEndTime.difference(now).inMinutes;
+  }
+  
+  // Get the remaining distance in meters
+  double get remainingDistanceMeters {
+    if (status != 'in_progress') return 0;
+    
+    // Check if we have a pre-calculated value
+    if (metadata != null && 
+        metadata!['routeDetails'] != null && 
+        metadata!['routeDetails']['remainingDistance'] != null) {
+      final distance = metadata!['routeDetails']['remainingDistance'];
+      if (distance is num) {
+        return distance.toDouble();
+      }
+    }
+    
+    // No pre-calculated value available
+    return 0;
+  }
+  
+  // Get the remaining distance in miles
+  double get remainingDistanceMiles {
+    return remainingDistanceMeters / 1609.344;
+  }
+  
+  // Get the current speed in mph
+  double get currentSpeedMph {
+    final speed = metadata?['currentSpeed'];
+    if (speed == null) return 0;
+    
+    // Convert m/s to mph
+    return (speed * 2.23694);
+  }
+  
+  // Format the remaining distance for display
+  String get formattedRemainingDistance {
+    final miles = remainingDistanceMiles;
+    return miles > 0 ? '${miles.toStringAsFixed(1)} miles' : 'Arrived';
+  }
+  
+  // Format the estimated time remaining for display
+  String get formattedTimeRemaining {
+    final minutes = estimatedTimeRemainingMinutes;
+    if (minutes <= 0) return 'Arrived';
+    
+    if (minutes < 60) {
+      return '$minutes min';
+    } else {
+      final hours = minutes ~/ 60;
+      final remainingMinutes = minutes % 60;
+      return '$hours h ${remainingMinutes > 0 ? '$remainingMinutes min' : ''}';
+    }
+  }
+  
+  // Format current speed for display
+  String get formattedSpeed {
+    final speed = currentSpeedMph;
+    if (speed <= 0) return 'N/A';
+    return '${speed.toStringAsFixed(1)} mph';
+  }
+
 }
