@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore package for database operations
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth package for authentication
 import 'package:flutter/foundation.dart'; // Import foundation package for ChangeNotifier
+import 'dart:math' as math; // Import math package for trigonometric functions with alias
 import 'package:cateredtoyou/services/organization_service.dart'; // Import custom OrganizationService
 import 'package:cateredtoyou/models/delivery_route_model.dart'; // Import custom DeliveryRoute model
 
@@ -10,6 +11,41 @@ class DeliveryRouteService extends ChangeNotifier { // Define a service class ex
   final OrganizationService _organizationService; // OrganizationService instance for organization-related operations
 
   DeliveryRouteService(this._organizationService); // Constructor to initialize OrganizationService
+
+  // Helper method to calculate distance between two points using Haversine formula
+  double _calculateDistance(
+    double startLat,
+    double startLng,
+    double endLat,
+    double endLng,
+  ) {
+    const double earthRadius = 6371.0; // Earth's radius in kilometers
+
+    // Convert latitude and longitude to radians
+    final startLatRad = _degreesToRadians(startLat);
+    final startLngRad = _degreesToRadians(startLng);
+    final endLatRad = _degreesToRadians(endLat);
+    final endLngRad = _degreesToRadians(endLng);
+
+    // Calculate differences
+    final dLat = endLatRad - startLatRad;
+    final dLng = endLngRad - startLngRad;
+
+    // Haversine formula
+    final a = _square(sin(dLat / 2)) +
+        cos(startLatRad) * cos(endLatRad) * _square(sin(dLng / 2));
+    final c = 2 * asin(sqrt(a));
+
+    return earthRadius * c; // Return the distance in kilometers
+  }
+
+  // Helper math functions
+  double _square(double value) => value * value;
+  double _degreesToRadians(double degrees) => degrees * (3.14159 / 180.0);
+  double sin(double rad) => math.sin(rad);
+  double cos(double rad) => math.cos(rad);
+  double asin(double value) => math.asin(value.clamp(-1.0, 1.0));
+  double sqrt(double value) => value > 0 ? math.sqrt(value) : 0.0;
 
   // Get all delivery routes for the organization
   Stream<List<DeliveryRoute>> getDeliveryRoutes() async* { // Method to get delivery routes as a stream
@@ -122,7 +158,7 @@ class DeliveryRouteService extends ChangeNotifier { // Define a service class ex
   }
 
   // Update route status
-  Future<void> updateRouteStatus(String routeId, String newStatus) async { // Method to update the status of a delivery route
+ Future<void> updateRouteStatus(String routeId, String newStatus) async { // Method to update the status of a delivery route
     try {
       final currentUser = _auth.currentUser; // Get current authenticated user
       if (currentUser == null) throw 'Not authenticated'; // Throw error if not authenticated
@@ -142,7 +178,10 @@ class DeliveryRouteService extends ChangeNotifier { // Define a service class ex
         'updatedAt': FieldValue.serverTimestamp(), // Update time
       };
 
-      if (newStatus == 'completed') { // If the new status is 'completed'
+      if (newStatus == 'in_progress') {
+        // If starting the delivery, record the actual start time
+        updateData['actualStartTime'] = FieldValue.serverTimestamp();
+      } else if (newStatus == 'completed') { // If the new status is 'completed'
         updateData['actualEndTime'] = FieldValue.serverTimestamp(); // Set actual end time
         updateData['metadata.completedAt'] = FieldValue.serverTimestamp(); // Set completion time in metadata
       }
@@ -164,6 +203,101 @@ class DeliveryRouteService extends ChangeNotifier { // Define a service class ex
       rethrow; // Rethrow error
     }
   }
+  // Update route progress details based on current location
+   Future<void> updateDriverLocation(String routeId, GeoPoint location, {double? heading, double? speed}) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw 'Not authenticated';
+
+      final routeDoc = await _firestore.collection('delivery_routes').doc(routeId).get();
+      if (!routeDoc.exists) throw 'Route not found';
+
+      final route = DeliveryRoute.fromMap(routeDoc.data()!, routeId);
+
+      // Check if user is the assigned driver
+      if (route.driverId != currentUser.uid) {
+        throw 'Only the assigned driver can update this route';
+      }
+
+      // Only update location if delivery is in progress
+      if (route.status != 'in_progress') {
+        throw 'Delivery must be in progress to update location';
+      }
+
+      final updateData = {
+        'currentLocation': location,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'metadata.lastLocationUpdate': FieldValue.serverTimestamp(),
+      };
+
+      // Add optional parameters if provided
+      if (heading != null) {
+        updateData['currentHeading'] = heading;
+      }
+      
+      if (speed != null) {
+        updateData['currentSpeed'] = speed;
+      }
+
+      await _firestore.collection('delivery_routes').doc(routeId).update(updateData);
+      
+      // Calculate and update route progress details
+      await _updateProgressDetails(routeId, location);
+    } catch (e) {
+      debugPrint('Error updating driver location: $e');
+      rethrow;
+    }
+  }
+ // Calculate and update progress metrics for a delivery
+  Future<void> _updateProgressDetails(String routeId, GeoPoint currentLocation) async {
+    try {
+      final routeDoc = await _firestore.collection('delivery_routes').doc(routeId).get();
+      if (!routeDoc.exists) return;
+      
+      final route = DeliveryRoute.fromMap(routeDoc.data()!, routeId);
+      
+      // Calculate remaining distance to destination
+      if (route.waypoints.length < 2) return;
+      
+      final destination = route.waypoints.last;
+      
+      try {
+        // Simple direct distance calculation (in a real app, you would use a routing API)
+        final remainingDistance = _calculateDistance(
+          currentLocation.latitude,
+          currentLocation.longitude,
+          destination.latitude,
+          destination.longitude
+        ) * 1000; // Convert to meters
+        
+        // Estimate remaining time based on current speed or average speed
+        final currentSpeed = route.metadata?['currentSpeed'] ?? 10.0; // Default to 10 m/s (~22 mph)
+        final estimatedTimeInSeconds = (remainingDistance / currentSpeed).round();
+        
+        // Progress as percentage of completion (rough estimate)
+        final totalDistance = route.metadata?['routeDetails']?['totalDistance'] as num? ?? 0;
+        final progress = totalDistance > 0 
+          ? 1.0 - (remainingDistance / totalDistance) 
+          : 0.0;
+        
+        // Clamp progress to valid range
+        final validProgress = progress.clamp(0.0, 1.0);
+        
+        await _firestore.collection('delivery_routes').doc(routeId).update({
+          'metadata.routeDetails.remainingDistance': remainingDistance,
+          'metadata.routeDetails.estimatedTimeRemaining': estimatedTimeInSeconds,
+          'metadata.routeDetails.progress': validProgress,
+          'metadata.routeDetails.lastProgressUpdate': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        debugPrint('Error calculating route progress: $e');
+      }
+    } catch (e) {
+      debugPrint('Error updating progress details: $e');
+    }
+  }
+  
+
   // Update estimated arrival time
   Future<void> updateEstimatedTime(String routeId, DateTime newEstimatedTime) async {
     try {
@@ -222,4 +356,8 @@ class DeliveryRouteService extends ChangeNotifier { // Define a service class ex
       rethrow; // Rethrow error
     }
   }
+    
 }
+
+
+

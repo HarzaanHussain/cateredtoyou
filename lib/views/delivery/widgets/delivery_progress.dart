@@ -11,6 +11,7 @@ class DeliveryProgress {
     required DateTime startTime, // Start time of the delivery
     required DateTime estimatedEndTime, // Estimated end time of the delivery
     required String status, // Status of the delivery
+    Map<String, dynamic>? metadata, // Optional metadata that may contain cached progress
   }) {
     // Return 1.0 if delivery is completed
     if (status.toLowerCase() == 'completed') {
@@ -26,6 +27,16 @@ class DeliveryProgress {
     if (status.toLowerCase() == 'pending') {
       return 0.0; // Delivery is pending
     }
+    
+    // First check if we have a pre-calculated progress value in metadata
+    if (metadata != null && 
+        metadata['routeDetails'] != null && 
+        metadata['routeDetails']['progress'] != null) {
+      final progress = metadata['routeDetails']['progress'];
+      if (progress is num) {
+        return progress.toDouble().clamp(0.0, 1.0);
+      }
+    }
 
     // If no current location is available, calculate based on time only
     if (currentLocation == null) {
@@ -39,7 +50,6 @@ class DeliveryProgress {
     // Weight the progress calculation (60% distance, 40% time)
     return (distanceProgress * 0.6) + (timeProgress * 0.4); // Combine distance and time progress
   }
-
   /// Calculates progress based on distance traveled
   static double _calculateDistanceProgress(List<GeoPoint> waypoints, GeoPoint currentLocation) {
     if (waypoints.isEmpty || waypoints.length < 2) return 0.0; // Return 0.0 if there are not enough waypoints

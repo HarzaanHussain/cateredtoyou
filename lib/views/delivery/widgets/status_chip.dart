@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'; // Importing the Flutter material package for UI components.
+import 'package:flutter/material.dart'; // Importing Flutter's material design library
 
 class StatusChip extends StatelessWidget { // Defining a stateless widget called StatusChip.
   final String status; // Declaring a final variable to hold the status string.
