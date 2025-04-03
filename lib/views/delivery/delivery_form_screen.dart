@@ -43,6 +43,8 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
       _deliveryAddressController; // Controller for the delivery address input.
   late final TextEditingController
       _notesController; // Controller for the notes input.
+  final _pickupAddressKey = GlobalKey();
+  final _deliveryAddressKey = GlobalKey();
 
   // Form Fields
   String? _selectedEventId; // Selected event ID.
@@ -343,86 +345,199 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
   Future<void> _showAddressSuggestions(List results, bool isPickup) async {
     if (!mounted) return;
 
+    // Find the RenderObject of the text field to position the suggestions properly
+    final RenderBox? textFieldBox = isPickup
+        ? _pickupAddressKey.currentContext?.findRenderObject() as RenderBox?
+        : _deliveryAddressKey.currentContext?.findRenderObject() as RenderBox?;
+
+    if (textFieldBox == null) {
+      // Fallback to modal bottom sheet if we can't find the text field position
+      await _showAddressSuggestionsBottomSheet(results, isPickup);
+      return;
+    }
+
+    // Get the position and size of the text field
+    final textFieldPosition = textFieldBox.localToGlobal(Offset.zero);
+    final textFieldSize = textFieldBox.size;
+
+    // Calculate the position for the popup
+    // Position it below the text field with a small offset
+    final offset = Offset(0, textFieldSize.height + 5);
+    final position = textFieldPosition + offset;
+
+    // Show a dropdown menu at the calculated position
+    final selected = await showMenu<Map<String, dynamic>>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx + textFieldSize.width,
+        position.dy +
+            20.0, // This value doesn't matter much as the menu adapts its height
+      ),
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      // Set a reasonable limit to the menu height
+      constraints: BoxConstraints(
+        maxWidth: textFieldSize.width,
+        maxHeight: MediaQuery.of(context).size.height *
+            0.4, // Limit to 40% of screen height
+      ),
+      items: results.map<PopupMenuItem<Map<String, dynamic>>>((result) {
+        return PopupMenuItem<Map<String, dynamic>>(
+          value: result,
+          padding: EdgeInsets.zero, // Remove default padding
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _formatAddressForDisplay(result['display_name']),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  result['display_name'],
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+
+    // Process the selected address
+    if (selected != null) {
+      _processSelectedAddress(selected, isPickup);
+    }
+  }
+
+// Helper method to format an address for display
+  String _formatAddressForDisplay(String fullAddress) {
+    // Extract just the main part of the address (typically the first comma-separated part)
+    final parts = fullAddress.split(',');
+    if (parts.isEmpty) return fullAddress;
+    return parts[0].trim();
+  }
+
+// Helper method to process the selected address
+  void _processSelectedAddress(Map<String, dynamic> selected, bool isPickup) {
+    final latLng = LatLng(
+      double.parse(selected['lat']),
+      double.parse(selected['lon']),
+    );
+
+    setState(() {
+      if (isPickup) {
+        _pickupLocation = latLng;
+        _pickupAddressController.text = selected['display_name'];
+      } else {
+        _deliveryLocation = latLng;
+        _deliveryAddressController.text = selected['display_name'];
+      }
+    });
+
+    _updateMapMarkersAndPolylines();
+
+    if (_pickupLocation != null && _deliveryLocation != null) {
+      _getRouteDetails();
+    }
+
+    _updateMapBounds();
+  }
+
+// Fallback method if we can't determine text field position
+  Future<void> _showAddressSuggestionsBottomSheet(
+      List results, bool isPickup) async {
     final selected = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.4,
-        minChildSize: 0.2,
-        maxChildSize: 0.75,
-        builder: (context, scrollController) => Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20)), // Rounded top corners.
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurfaceVariant
-                      .withAlpha((0.4 * 255).toInt()), // Handle color.
-                  borderRadius: BorderRadius.circular(2), // Rounded handle.
-                ),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height *
+              0.6, // Limit to 60% of screen height
+        ),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurfaceVariant
+                    .withAlpha((0.4 * 255).toInt()),
+                borderRadius: BorderRadius.circular(2),
               ),
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  itemCount: results.length,
-                  itemBuilder: (context, index) {
-                    final result = results[index];
-                    return ListTile(
-                      leading: const Icon(Icons.location_on), // Location icon.
-                      title: Text(
-                        result['display_name'],
-                        maxLines: 2,
-                        overflow:
-                            TextOverflow.ellipsis, // Ellipsis for long text.
-                      ),
-                      onTap: () => Navigator.pop(
-                          context, result), // Return selected result.
-                    );
-                  },
-                ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                'Select Address',
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-            ],
-          ),
+            ),
+            const Divider(),
+            Flexible(
+              child: ListView.builder(
+                itemCount: results.length,
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemBuilder: (context, index) {
+                  final result = results[index];
+                  return ListTile(
+                    leading: const Icon(Icons.location_on),
+                    title: Text(
+                      _formatAddressForDisplay(result['display_name']),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      result['display_name'],
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: () => Navigator.pop(context, result),
+                  );
+                },
+              ),
+            ),
+            // Add a safe area at the bottom for notched devices
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
         ),
       ),
     );
 
+    // Process the selected address
     if (selected != null) {
-      final latLng = LatLng(
-        double.parse(selected['lat']),
-        double.parse(selected['lon']),
-      );
-
-      setState(() {
-        if (isPickup) {
-          _pickupLocation = latLng; // Set pickup location.
-          _pickupAddressController.text =
-              selected['display_name']; // Set pickup address.
-        } else {
-          _deliveryLocation = latLng; // Set delivery location.
-          _deliveryAddressController.text =
-              selected['display_name']; // Set delivery address.
-        }
-      });
-
-      _updateMapMarkersAndPolylines(); // Update map markers and polylines.
-
-      if (_pickupLocation != null && _deliveryLocation != null) {
-        await _getRouteDetails(); // Get route details if both locations are set.
-      }
-
-      _updateMapBounds(); // Update map bounds.
+      _processSelectedAddress(selected, isPickup);
     }
   }
 
@@ -697,48 +812,48 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
   }
 
   Widget _buildAddressInput({
-    required TextEditingController
-        controller, // Required controller for the input.
-    required String label, // Required label for the input.
-    required String hint, // Required hint for the input.
-    required bool
-        isPickup, // Required flag to indicate if this is the pickup address input.
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required bool isPickup,
   }) {
+    final key = isPickup ? _pickupAddressKey : _deliveryAddressKey;
+
     return TextFormField(
-      controller: controller, // Set the controller for the input.
+      key: key, // Add the key here
+      controller: controller,
       decoration: InputDecoration(
-        labelText: label, // Set the label text.
-        hintText: hint, // Set the hint text.
-        prefixIcon: const Icon(Icons.location_on), // Set the prefix icon.
-        border: const OutlineInputBorder(), // Set the border style.
+        labelText: label,
+        hintText: hint,
+        prefixIcon: const Icon(Icons.location_on),
+        border: const OutlineInputBorder(),
         suffixIcon: controller.text.isNotEmpty
             ? IconButton(
-                icon: const Icon(Icons.clear), // Set the clear icon.
+                icon: const Icon(Icons.clear),
                 onPressed: () {
-                  controller.clear(); // Clear the input text.
+                  controller.clear();
                   setState(() {
                     if (isPickup) {
-                      _pickupLocation = null; // Clear the pickup location.
+                      _pickupLocation = null;
                     } else {
-                      _deliveryLocation = null; // Clear the delivery location.
+                      _deliveryLocation = null;
                     }
-                    _updateMapMarkersAndPolylines(); // Update the map markers and polylines.
+                    _updateMapMarkersAndPolylines();
                   });
                 },
               )
-            : null, // Show the clear icon only if the input text is not empty.
+            : null,
       ),
       onChanged: (value) {
         if (value.length > 3) {
-          _searchAddress(value,
-              isPickup); // Search for the address if the input text length is greater than 3.
+          _searchAddress(value, isPickup);
         }
       },
       validator: (value) {
         if (value == null || value.isEmpty) {
           return isPickup
               ? 'Please enter pickup location'
-              : 'Please enter delivery location'; // Validate the input.
+              : 'Please enter delivery location';
         }
         return null;
       },
@@ -985,51 +1100,72 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
   }
 
   Widget _buildEventSection() {
-    final orgService = context.read<OrganizationService>(); // Access the OrganizationService to fetch the current user's organization.
+    final orgService = context.read<
+        OrganizationService>(); // Access the OrganizationService to fetch the current user's organization.
 
     return FutureBuilder<String?>(
-      future: orgService.getCurrentUserOrganization().then((org) => org?.id), // Fetch the current user's organization ID asynchronously.
+      future: orgService.getCurrentUserOrganization().then((org) =>
+          org?.id), // Fetch the current user's organization ID asynchronously.
       builder: (context, orgSnapshot) {
         if (!orgSnapshot.hasData) {
-          return const Center(child: CircularProgressIndicator()); // Show a loading indicator while the organization data is being fetched.
+          return const Center(
+              child:
+                  CircularProgressIndicator()); // Show a loading indicator while the organization data is being fetched.
         }
 
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start of the column.
+          crossAxisAlignment: CrossAxisAlignment
+              .start, // Align children to the start of the column.
           children: [
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('events') // Access the 'events' collection in Firestore.
-                  .where('organizationId', isEqualTo: orgSnapshot.data) // Filter events by the current user's organization ID.
-                  .where('status', whereIn: ['confirmed', 'in_progress']).snapshots(), // Filter events with statuses 'confirmed' or 'in_progress'.
+                  .collection(
+                      'events') // Access the 'events' collection in Firestore.
+                  .where('organizationId',
+                      isEqualTo: orgSnapshot
+                          .data) // Filter events by the current user's organization ID.
+                  .where('status', whereIn: [
+                'confirmed',
+                'in_progress'
+              ]).snapshots(), // Filter events with statuses 'confirmed' or 'in_progress'.
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return Text('Error: ${snapshot.error}'); // Display an error message if there's an issue with the Firestore query.
+                  return Text(
+                      'Error: ${snapshot.error}'); // Display an error message if there's an issue with the Firestore query.
                 }
 
                 if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator()); // Show a loading indicator while event data is being fetched.
+                  return const Center(
+                      child:
+                          CircularProgressIndicator()); // Show a loading indicator while event data is being fetched.
                 }
 
-                final events = snapshot.data!.docs; // Retrieve the list of event documents.
+                final events = snapshot
+                    .data!.docs; // Retrieve the list of event documents.
 
                 return DropdownButtonFormField<String>(
-                  value: _selectedEventId, // Set the currently selected event ID.
+                  value:
+                      _selectedEventId, // Set the currently selected event ID.
                   decoration: const InputDecoration(
                     labelText: 'Select Event', // Label for the dropdown.
-                    hintText: 'Choose an event for delivery', // Hint text for the dropdown.
-                    prefixIcon: Icon(Icons.event), // Icon to indicate the dropdown is for events.
+                    hintText:
+                        'Choose an event for delivery', // Hint text for the dropdown.
+                    prefixIcon: Icon(Icons
+                        .event), // Icon to indicate the dropdown is for events.
                   ),
                   items: events.map((doc) {
-                    final data = doc.data() as Map<String, dynamic>; // Extract the event data from the document.
+                    final data = doc.data() as Map<String,
+                        dynamic>; // Extract the event data from the document.
                     return DropdownMenuItem(
                       value: doc.id, // Set the event ID as the value.
-                      child: Text(data['name'] ?? 'Unnamed Event'), // Display the event name or a fallback if it's unnamed.
+                      child: Text(data['name'] ??
+                          'Unnamed Event'), // Display the event name or a fallback if it's unnamed.
                     );
                   }).toList(), // Convert the list of events into dropdown menu items.
                   onChanged: (value) {
                     if (value != null) {
-                      _handleEventSelection(value); // Handle the event selection and fetch its details.
+                      _handleEventSelection(
+                          value); // Handle the event selection and fetch its details.
                     }
                   },
                   validator: (value) {
@@ -1045,33 +1181,45 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
             // Display manifest status - moved outside the dropdown
             if (_isLoadingManifest)
               Padding(
-                padding: const EdgeInsets.only(top: 8.0), // Add spacing above the loading indicator.
+                padding: const EdgeInsets.only(
+                    top: 8.0), // Add spacing above the loading indicator.
                 child: Row(
                   children: const [
                     SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2), // Show a small loading indicator for manifest loading.
+                      child: CircularProgressIndicator(
+                          strokeWidth:
+                              2), // Show a small loading indicator for manifest loading.
                     ),
-                    SizedBox(width: 8), // Add spacing between the indicator and the text.
-                    Text('Loading manifest...'), // Inform the user that the manifest is being loaded.
+                    SizedBox(
+                        width:
+                            8), // Add spacing between the indicator and the text.
+                    Text(
+                        'Loading manifest...'), // Inform the user that the manifest is being loaded.
                   ],
                 ),
               )
             else if (_manifestError != null)
               Padding(
-                padding: const EdgeInsets.only(top: 8.0), // Add spacing above the error message.
+                padding: const EdgeInsets.only(
+                    top: 8.0), // Add spacing above the error message.
                 child: Text(
                   _manifestError!, // Display the manifest error message.
-                  style: TextStyle(color: Colors.red.shade700), // Style the error message in red.
+                  style: TextStyle(
+                      color: Colors
+                          .red.shade700), // Style the error message in red.
                 ),
               )
             else if (_manifest != null)
               Padding(
-                padding: const EdgeInsets.only(top: 8.0), // Add spacing above the manifest status.
+                padding: const EdgeInsets.only(
+                    top: 8.0), // Add spacing above the manifest status.
                 child: Text(
                   'Manifest loaded: ${_manifest!.items.length} items', // Display the number of items in the loaded manifest.
-                  style: const TextStyle(color: Colors.green), // Style the message in green to indicate success.
+                  style: const TextStyle(
+                      color: Colors
+                          .green), // Style the message in green to indicate success.
                 ),
               ),
           ],
@@ -1606,6 +1754,8 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
         waypoints: waypoints, // Add waypoints.
         metadata: metadata, // Add metadata.
       );
+      await deliveryService.initializeRouteMetrics(metadata['routeId']);
+      
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

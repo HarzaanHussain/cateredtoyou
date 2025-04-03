@@ -1,5 +1,6 @@
 import 'package:cateredtoyou/views/delivery/widgets/delivery_progress.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Importing Firestore package to use Firestore related classes like Timestamp and GeoPoint
+import 'dart:math' as math;
 
 class DeliveryRoute {
   final String id; // Unique identifier for the delivery route
@@ -147,7 +148,8 @@ class DeliveryRoute {
   
   // Get the estimated time remaining in minutes
   int get estimatedTimeRemainingMinutes {
-    if (status != 'in_progress') return 0;
+    // If delivery is completed or cancelled, return 0
+    if (status == 'completed' || status == 'cancelled') return 0;
     
     // Check if we have a pre-calculated value
     if (metadata != null && 
@@ -161,14 +163,23 @@ class DeliveryRoute {
     
     // Fallback to simple calculation
     final now = DateTime.now();
-    if (now.isAfter(estimatedEndTime)) return 0;
+    
+    // For pending deliveries, calculate time until start
+    if (status == 'pending') {
+      if (now.isAfter(startTime)) return 0; // If past start time but still pending
+      return startTime.difference(now).inMinutes;
+    }
+    
+    // For in_progress deliveries, calculate time until estimated end
+    if (now.isAfter(estimatedEndTime)) return 0; // Don't show negative times
     
     return estimatedEndTime.difference(now).inMinutes;
   }
   
   // Get the remaining distance in meters
   double get remainingDistanceMeters {
-    if (status != 'in_progress') return 0;
+    // If delivery is completed or cancelled, return 0
+    if (status == 'completed' || status == 'cancelled') return 0;
     
     // Check if we have a pre-calculated value
     if (metadata != null && 
@@ -180,8 +191,61 @@ class DeliveryRoute {
       }
     }
     
-    // No pre-calculated value available
+    // If no pre-calculated value available, estimate from waypoints
+    if (currentLocation != null && waypoints.isNotEmpty) {
+      final destination = waypoints.last;
+      
+      // Calculate simple straight-line distance (Haversine formula)
+      const double earthRadius = 6371000; // Earth radius in meters
+      final lat1 = _degreesToRadians(currentLocation!.latitude);
+      final lon1 = _degreesToRadians(currentLocation!.longitude);
+      final lat2 = _degreesToRadians(destination.latitude);
+      final lon2 = _degreesToRadians(destination.longitude);
+      
+      final dLat = lat2 - lat1;
+      final dLon = lon2 - lon1;
+      
+      final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+                math.cos(lat1) * math.cos(lat2) *
+                math.sin(dLon / 2) * math.sin(dLon / 2);
+      final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+      
+      return earthRadius * c; // Distance in meters
+    }
+    
+    // For pending status, calculate total route distance
+    if (status == 'pending' && waypoints.length >= 2) {
+      double totalDistance = 0;
+      for (int i = 0; i < waypoints.length - 1; i++) {
+        final point1 = waypoints[i];
+        final point2 = waypoints[i + 1];
+        
+        const double earthRadius = 6371000; // Earth radius in meters
+        final lat1 = _degreesToRadians(point1.latitude);
+        final lon1 = _degreesToRadians(point1.longitude);
+        final lat2 = _degreesToRadians(point2.latitude);
+        final lon2 = _degreesToRadians(point2.longitude);
+        
+        final dLat = lat2 - lat1;
+        final dLon = lon2 - lon1;
+        
+        final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+                  math.cos(lat1) * math.cos(lat2) *
+                  math.sin(dLon / 2) * math.sin(dLon / 2);
+        final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+        
+        totalDistance += earthRadius * c;
+      }
+      
+      return totalDistance;
+    }
+    
     return 0;
+  }
+  
+  // Helper method to convert degrees to radians
+  double _degreesToRadians(double degrees) {
+    return degrees * (math.pi / 180);
   }
   
   // Get the remaining distance in miles
@@ -200,14 +264,25 @@ class DeliveryRoute {
   
   // Format the remaining distance for display
   String get formattedRemainingDistance {
+    if (status == 'completed') return 'Delivered';
+    if (status == 'cancelled') return 'Cancelled';
+    
     final miles = remainingDistanceMiles;
-    return miles > 0 ? '${miles.toStringAsFixed(1)} miles' : 'Arrived';
+    if (miles <= 0) return 'Calculating...';
+    
+    return '${miles.toStringAsFixed(1)} miles';
   }
   
   // Format the estimated time remaining for display
   String get formattedTimeRemaining {
+    if (status == 'completed') return 'Delivered';
+    if (status == 'cancelled') return 'Cancelled';
+    
     final minutes = estimatedTimeRemainingMinutes;
-    if (minutes <= 0) return 'Arrived';
+    if (minutes <= 0) {
+      if (status == 'in_progress') return 'Arriving soon';
+      return 'N/A';
+    }
     
     if (minutes < 60) {
       return '$minutes min';
@@ -225,4 +300,57 @@ class DeliveryRoute {
     return '${speed.toStringAsFixed(1)} mph';
   }
 
+  // Get the total distance of the route in meters (for display purposes)
+  double get totalDistanceMeters {
+    // Check if we have a pre-calculated value
+    if (metadata != null && 
+        metadata!['routeDetails'] != null && 
+        metadata!['routeDetails']['totalDistance'] != null) {
+      final distance = metadata!['routeDetails']['totalDistance'];
+      if (distance is num) {
+        return distance.toDouble();
+      }
+    }
+    
+    // Calculate from waypoints if not in metadata
+    if (waypoints.length >= 2) {
+      double totalDistance = 0;
+      for (int i = 0; i < waypoints.length - 1; i++) {
+        final point1 = waypoints[i];
+        final point2 = waypoints[i + 1];
+        
+        const double earthRadius = 6371000; // Earth radius in meters
+        final lat1 = _degreesToRadians(point1.latitude);
+        final lon1 = _degreesToRadians(point1.longitude);
+        final lat2 = _degreesToRadians(point2.latitude);
+        final lon2 = _degreesToRadians(point2.longitude);
+        
+        final dLat = lat2 - lat1;
+        final dLon = lon2 - lon1;
+        
+        final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+                  math.cos(lat1) * math.cos(lat2) *
+                  math.sin(dLon / 2) * math.sin(dLon / 2);
+        final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+        
+        totalDistance += earthRadius * c;
+      }
+      
+      return totalDistance;
+    }
+    
+    return 0;
+  }
+  
+  // Get the total distance in miles
+  double get totalDistanceMiles {
+    return totalDistanceMeters / 1609.344;
+  }
+  
+  // Format the total distance for display
+  String get formattedTotalDistance {
+    final miles = totalDistanceMiles;
+    if (miles <= 0) return 'Calculating...';
+    return '${miles.toStringAsFixed(1)} miles';
+  }
 }

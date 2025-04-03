@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
@@ -45,6 +46,11 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   String _lastUpdateTime = '';
   DateTime? _lastLocationUpdateTime;
 
+  // Animation variables
+  LatLng? _animatedDriverPosition;
+  Timer? _animationTimer;
+  Timer? _visualRefreshTimer;
+
   // Constants
   static const String osmRoutingUrl =
       'https://router.project-osrm.org/route/v1/driving/';
@@ -54,6 +60,10 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   void initState() {
     super.initState();
     _currentRoute = widget.route;
+    
+    // Immediately calculate and populate route metrics for initial view
+    _calculateRouteMetrics(widget.route);
+    
     _setupRouteSubscription();
     _fetchRouteDetails();
     _setupRefreshTimer();
@@ -63,6 +73,8 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   void dispose() {
     _routeSubscription.cancel();
     _routeUpdateTimer?.cancel();
+    _animationTimer?.cancel();
+    _visualRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -75,11 +87,139 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   }
 
   void _setupRefreshTimer() {
+    // Main update timer for data refresh - every 30 seconds
     _routeUpdateTimer = Timer.periodic(
-      const Duration(minutes: 1),
+      const Duration(seconds: 30),
       (_) => _updateDeliveryMetrics(),
     );
+    
+    // Visual refresh timer for smoother animations - every 500ms
+    _visualRefreshTimer = Timer.periodic(
+      const Duration(milliseconds: 500),
+      (_) {
+        if (mounted && _currentRoute?.status == 'in_progress') {
+          setState(() {
+            // This triggers a rebuild, keeping animations smoother
+            // No need to do any heavy work here
+          });
+        }
+      },
+    );
   }
+
+  Future<void> _calculateRouteMetrics(DeliveryRoute route) async {
+    // Only calculate metrics if they don't already exist
+    if (route.metadata == null || 
+        route.metadata!['routeDetails'] == null || 
+        route.metadata!['routeDetails']['totalDistance'] == null) {
+      
+      try {
+        // Calculate total route distance and estimated journey time
+        final totalDistance = await _calculateTotalRouteDistance(route.waypoints);
+        
+        // Simple estimation of journey time (assuming 30 mph average)
+        final averageSpeedMps = 13.4; // 30 mph in meters per second
+        final estimatedDuration = (totalDistance / averageSpeedMps).round();
+        
+        // If route hasn't started yet, update its metadata with calculations
+        if (route.status == 'pending') {
+          await FirebaseFirestore.instance
+              .collection('delivery_routes')
+              .doc(route.id)
+              .update({
+            'metadata.routeDetails.totalDistance': totalDistance,
+            'metadata.routeDetails.estimatedDuration': estimatedDuration,
+            'metadata.routeDetails.lastCalculated': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (e) {
+        debugPrint('Error calculating initial route metrics: $e');
+      }
+    }
+  }
+
+  Future<double> _calculateTotalRouteDistance(List<GeoPoint> waypoints) async {
+    if (waypoints.length < 2) return 0;
+    
+    try {
+      double totalDistance = 0;
+      
+      // Try to get accurate distance via routing API
+      for (int i = 0; i < waypoints.length - 1; i++) {
+        final startPoint = waypoints[i];
+        final endPoint = waypoints[i + 1];
+        
+        final url = '$osmRoutingUrl${startPoint.longitude},${startPoint.latitude};'
+                    '${endPoint.longitude},${endPoint.latitude}?overview=false';
+        
+        final response = await http.get(Uri.parse(url));
+        
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['code'] == 'Ok') {
+            totalDistance += data['routes'][0]['distance'] as num;
+          } else {
+            // Fallback to straight-line distance if routing fails
+            totalDistance += _calculateStraightLineDistance(
+              startPoint.latitude, startPoint.longitude,
+              endPoint.latitude, endPoint.longitude
+            ) * 1000; // Convert km to meters
+          }
+        } else {
+          // Fallback to straight-line distance if API request fails
+          totalDistance += _calculateStraightLineDistance(
+            startPoint.latitude, startPoint.longitude,
+            endPoint.latitude, endPoint.longitude
+          ) * 1000; // Convert km to meters
+        }
+      }
+      
+      return totalDistance;
+    } catch (e) {
+      debugPrint('Error calculating total route distance: $e');
+      
+      // Fallback to simple distance calculation
+      double totalDistance = 0;
+      for (int i = 0; i < waypoints.length - 1; i++) {
+        final startPoint = waypoints[i];
+        final endPoint = waypoints[i + 1];
+        
+        totalDistance += _calculateStraightLineDistance(
+          startPoint.latitude, startPoint.longitude,
+          endPoint.latitude, endPoint.longitude
+        ) * 1000; // Convert km to meters
+      }
+      
+      return totalDistance;
+    }
+  }
+
+  double _calculateStraightLineDistance(
+    double lat1, double lon1, 
+    double lat2, double lon2
+  ) {
+    const double earthRadiusKm = 6371;
+    
+    final dLat = _degreesToRadians(lat2 - lat1);
+    final dLon = _degreesToRadians(lon2 - lon1);
+    
+    final a = 
+      sin(dLat / 2) * sin(dLat / 2) +
+      cos(_degreesToRadians(lat1)) * cos(_degreesToRadians(lat2)) * 
+      sin(dLon / 2) * sin(dLon / 2);
+      
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadiusKm * c;
+  }
+  
+  double _degreesToRadians(double degrees) {
+    return degrees * (3.14159 / 180);
+  }
+  
+  double sin(double rad) => math.sin(rad);
+  double cos(double rad) => math.cos(rad);
+  double atan2(double y, double x) => math.atan2(y, x);
+  double sqrt(double value) => value <= 0 ? 0 : math.sqrt(value);
 
   void _handleRouteUpdate(DocumentSnapshot snapshot) async {
     if (!mounted || !snapshot.exists) return;
@@ -119,6 +259,12 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         _locationUpdatedRecently = true;
         _lastUpdateTime =
             DateFormat('h:mm:ss a').format(_lastLocationUpdateTime!);
+
+        // Set up smooth animation of the driver marker
+        _setupSmoothMarkerAnimation(
+          _currentRoute?.currentLocation, 
+          newRoute.currentLocation!
+        );
 
         // Reset "recently updated" after 10 seconds
         Future.delayed(const Duration(seconds: 10), () {
@@ -161,7 +307,10 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         _isFirstLoad = false;
         _performInitialMapPreview();
       } else if (locationChanged && _currentRoute?.status == 'in_progress') {
-        _centerOnDriver();
+        // Only auto-center if we're not already animating (for smoother experience)
+        if (_animationTimer == null) {
+          _centerOnDriver();
+        }
       }
     } catch (e) {
       debugPrint('Error processing route update: $e');
@@ -173,7 +322,79 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
       }
     }
   }
-   // Calculate and update ETA based on current driver location
+
+  void _setupSmoothMarkerAnimation(GeoPoint? oldLocation, GeoPoint newLocation) {
+    // Cancel any existing animation
+    _animationTimer?.cancel();
+
+    // If this is the first location update, just set the position directly
+    if (oldLocation == null) {
+      _animatedDriverPosition = LatLng(newLocation.latitude, newLocation.longitude);
+      return;
+    }
+
+    // Set up animation parameters
+    final startLat = oldLocation.latitude;
+    final startLng = oldLocation.longitude;
+    final endLat = newLocation.latitude;
+    final endLng = newLocation.longitude;
+    
+    // Calculate distance to determine animation duration
+    final distance = _calculateStraightLineDistance(
+      startLat, startLng, endLat, endLng
+    );
+    
+    // Set animation duration based on distance (longer for larger jumps)
+    // but keep it under 2 seconds for responsiveness
+    final animationDuration = (distance > 0.5) 
+        ? Duration(milliseconds: 1500) 
+        : Duration(milliseconds: (distance * 2000).clamp(300, 1000).toInt());
+    
+    // Number of animation steps (more for smoother animation)
+    const steps = 20;
+    final stepDuration = Duration(milliseconds: animationDuration.inMilliseconds ~/ steps);
+    
+    // Initialize with start position
+    _animatedDriverPosition = LatLng(startLat, startLng);
+    int currentStep = 0;
+    
+    // Create animation timer
+    _animationTimer = Timer.periodic(stepDuration, (timer) {
+      currentStep++;
+      
+      if (currentStep >= steps) {
+        // Animation complete - set final position
+        if (mounted) {
+          setState(() {
+            _animatedDriverPosition = LatLng(endLat, endLng);
+          });
+        }
+        timer.cancel();
+        _animationTimer = null;
+        return;
+      }
+      
+      // Calculate intermediate position using easeInOut curve for smoother motion
+      final progress = _easeInOut(currentStep / steps);
+      final lat = startLat + (endLat - startLat) * progress;
+      final lng = startLng + (endLng - startLng) * progress;
+      
+      if (mounted) {
+        setState(() {
+          _animatedDriverPosition = LatLng(lat, lng);
+          _updateMapMarkers(); // Update markers with new animated position
+        });
+      }
+    });
+  }
+
+  // Easing function for smoother animation
+  double _easeInOut(double t) {
+    return t < 0.5 
+        ? 4 * t * t * t 
+        : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1;
+  }
+
   Future<void> _calculateUpdatedETA(DeliveryRoute route) async {
     if (route.currentLocation == null || route.waypoints.isEmpty) return;
     
@@ -196,39 +417,57 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
           
           // Get remaining duration in seconds (accounting for traffic with a 1.2 multiplier)
           final baseDuration = data['routes'][0]['duration'] as num;
+          // Ensure baseDuration is not zero to avoid division by zero
+          final safeDuration = baseDuration > 0 ? baseDuration : 60;
           final trafficMultiplier = 1.2;
-          final remainingDuration = (baseDuration * trafficMultiplier).round();
+          final remainingDuration = (safeDuration * trafficMultiplier).round();
           
           // Calculate new ETA
           final now = DateTime.now();
           final newETA = now.add(Duration(seconds: remainingDuration));
           
+          // Ensure ETA is never earlier than "now + 1 minute" to prevent negative times
+          final minETA = now.add(const Duration(minutes: 1));
+          final finalETA = newETA.isBefore(minETA) ? minETA : newETA;
+          
           // Calculate speed in meters per second (use current speed if available or estimate from route)
-          final currentSpeed = route.metadata?['currentSpeed'] as num? ?? (remainingDistance / baseDuration);
+          // Avoid division by zero by checking baseDuration
+          final currentSpeed = route.metadata?['currentSpeed'] as num? ?? 
+                              (remainingDistance / safeDuration);
           
           // Calculate progress percentage
-          final totalDistance = route.metadata?['routeDetails']?['totalDistance'] as num? ?? remainingDistance;
-          double progress = totalDistance > 0 
-              ? 1.0 - (remainingDistance / totalDistance)
-              : 0.0;
-          progress = progress.clamp(0.0, 1.0);
+          double progress = 0.0;
+          
+          // Try to get total distance from metadata or calculate it
+          final totalDistance = route.metadata?['routeDetails']?['totalDistance'] as num?;
+          
+          if (totalDistance != null && totalDistance > 0) {
+            // Safe progress calculation
+            final rawProgress = 1.0 - (remainingDistance / totalDistance);
+            // Check for valid numerical values to avoid NaN/Infinity
+            progress = rawProgress.isFinite && !rawProgress.isNaN ? 
+                rawProgress.clamp(0.0, 1.0) : 0.5;
+          } else {
+            // Fallback to basic calculation - assume we're halfway
+            progress = 0.5;
+          }
           
           // Update Firestore with new calculations
           await FirebaseFirestore.instance
               .collection('delivery_routes')
               .doc(route.id)
               .update({
-            'estimatedEndTime': Timestamp.fromDate(newETA),
+            'estimatedEndTime': Timestamp.fromDate(finalETA),
             'metadata.routeDetails.remainingDistance': remainingDistance,
             'metadata.routeDetails.remainingDuration': remainingDuration,
-            'metadata.routeDetails.estimatedArrival': Timestamp.fromDate(newETA),
+            'metadata.routeDetails.estimatedArrival': Timestamp.fromDate(finalETA),
             'metadata.routeDetails.progress': progress,
             'metadata.routeDetails.currentSpeed': currentSpeed,
             'metadata.routeDetails.lastUpdated': FieldValue.serverTimestamp(),
           });
           
           // Log the update
-          debugPrint('📊 Updated ETA: ${DateFormat('h:mm a').format(newETA)}, '
+          debugPrint('📊 Updated ETA: ${DateFormat('h:mm a').format(finalETA)}, '
                    'Distance: ${(remainingDistance / 1609.344).toStringAsFixed(2)} miles, '
                    'Progress: ${(progress * 100).toStringAsFixed(1)}%');
         }
@@ -242,8 +481,28 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   void _updateDeliveryMetrics() {
     if (_currentRoute == null || !mounted) return;
 
+    // For pending deliveries, we still want to calculate some basic metrics
+    if (_currentRoute!.status == 'pending') {
+      _updatePendingDeliveryMetrics();
+    }
+    
     // Update progress metrics if needed
     setState(() {});
+  }
+  
+  void _updatePendingDeliveryMetrics() async {
+    try {
+      // Check if we need to calculate basic metrics
+      if (_currentRoute!.metadata == null ||
+          _currentRoute!.metadata!['routeDetails'] == null ||
+          _currentRoute!.metadata!['routeDetails']['totalDistance'] == null) {
+        
+        // Calculate and update total route distance for pending deliveries
+        await _calculateRouteMetrics(_currentRoute!);
+      }
+    } catch (e) {
+      debugPrint('Error updating pending delivery metrics: $e');
+    }
   }
 
   Future<void> _fetchRouteDetails() async {
@@ -351,15 +610,18 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
       title: 'Delivery',
     ));
 
-    // Add driver location marker if available
-    if (_currentRoute!.currentLocation != null) {
-      final currentLocation = _currentRoute!.currentLocation!;
+    // Use animated position for the driver marker if available
+    if (_animatedDriverPosition != null || _currentRoute!.currentLocation != null) {
+      // Determine which position to use (animated or actual)
+      final markerPos = _animatedDriverPosition ?? 
+                       LatLng(
+                         _currentRoute!.currentLocation!.latitude,
+                         _currentRoute!.currentLocation!.longitude
+                       );
+      
       markers.add(
         Marker(
-          point: LatLng(
-            currentLocation.latitude,
-            currentLocation.longitude,
-          ),
+          point: markerPos,
           width: 60,
           height: 60,
           child: Stack(
@@ -427,13 +689,19 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   }
 
   void _centerOnDriver() {
-    if (_currentRoute?.currentLocation == null) return;
-
-    final location = _currentRoute!.currentLocation!;
-    _mapController.move(
-      LatLng(location.latitude, location.longitude),
-      _defaultZoom,
-    );
+    // Use animated position if available, otherwise use actual position
+    if (_animatedDriverPosition != null) {
+      _mapController.move(
+        _animatedDriverPosition!,
+        _defaultZoom,
+      );
+    } else if (_currentRoute?.currentLocation != null) {
+      final location = _currentRoute!.currentLocation!;
+      _mapController.move(
+        LatLng(location.latitude, location.longitude),
+        _defaultZoom,
+      );
+    }
   }
 
   void _showDriverContactSheet() {
