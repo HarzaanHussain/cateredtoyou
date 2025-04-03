@@ -5,7 +5,7 @@ import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:intl/intl.dart';
 
 class UnifiedNotificationScreen extends StatefulWidget {
-  const UnifiedNotificationScreen({Key? key}) : super(key: key);
+  const UnifiedNotificationScreen({super.key});
 
   @override
   State<UnifiedNotificationScreen> createState() => _UnifiedNotificationScreenState();
@@ -95,11 +95,11 @@ class SingleNotificationTab extends StatefulWidget {
   final Map<String, String> contentTypeMapping;
 
   const SingleNotificationTab({
-    Key? key,
+    super.key,
     required this.notificationService,
     required this.availableScreens,
     required this.contentTypeMapping,
-  }) : super(key: key);
+  });
 
   @override
   State<SingleNotificationTab> createState() => _SingleNotificationTabState();
@@ -400,10 +400,10 @@ class RecurringNotificationTab extends StatefulWidget {
   final List<String> availableScreens;
 
   const RecurringNotificationTab({
-    Key? key,
+    super.key,
     required this.notificationService,
     required this.availableScreens,
-  }) : super(key: key);
+  });
 
   @override
   State<RecurringNotificationTab> createState() => _RecurringNotificationTabState();

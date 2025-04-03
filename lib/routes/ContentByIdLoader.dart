@@ -14,11 +14,11 @@ class ContentByIdLoader extends StatelessWidget {
   final String loadingTitle;
 
   const ContentByIdLoader({
-    Key? key,
+    super.key,
     required this.contentType,
     required this.contentId,
     this.loadingTitle = 'Loading...',
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

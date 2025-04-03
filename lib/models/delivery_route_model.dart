@@ -65,16 +65,23 @@ class DeliveryRoute {
   }
 
   factory DeliveryRoute.fromMap(Map<String, dynamic> map, String docId) {
+    // Safely handle Timestamp conversions with null checks
+    DateTime? getDateTimeFromTimestamp(dynamic timestamp) {
+      if (timestamp == null) return DateTime.now();
+      if (timestamp is Timestamp) return timestamp.toDate();
+      return DateTime.now();
+    }
+    
     return DeliveryRoute(
       id: docId, // Setting id from the document ID
       eventId: map['eventId'] ?? '', // Extracting eventId from the map, defaulting to an empty string if null
       vehicleId: map['vehicleId'] ?? '', // Extracting vehicleId from the map, defaulting to an empty string if null
       driverId: map['driverId'] ?? '', // Extracting driverId from the map, defaulting to an empty string if null
       organizationId: map['organizationId'] ?? '', // Extracting organizationId from the map, defaulting to an empty string if null
-      startTime: (map['startTime'] as Timestamp).toDate(), // Converting Firestore Timestamp to DateTime for startTime
-      estimatedEndTime: (map['estimatedEndTime'] as Timestamp).toDate(), // Converting Firestore Timestamp to DateTime for estimatedEndTime
+      startTime: getDateTimeFromTimestamp(map['startTime']) ?? DateTime.now(), // Safely convert Timestamp or use current time as default
+      estimatedEndTime: getDateTimeFromTimestamp(map['estimatedEndTime']) ?? DateTime.now(), // Safely convert Timestamp or use current time as default
       actualEndTime: map['actualEndTime'] != null 
-          ? (map['actualEndTime'] as Timestamp).toDate() // Converting Firestore Timestamp to DateTime for actualEndTime if not null
+          ? getDateTimeFromTimestamp(map['actualEndTime']) // Safely convert Timestamp
           : null,
       waypoints: List<GeoPoint>.from(map['waypoints'] ?? []), // Extracting waypoints from the map, defaulting to an empty list if null
       status: map['status'] ?? 'pending', // Extracting status from the map, defaulting to 'pending' if null
@@ -84,8 +91,8 @@ class DeliveryRoute {
       assignedZone: map['assignedZone'] as String?, // Extracting assignedZone from the map, nullable
       routeOptimizationData: map['routeOptimizationData'] as Map<String, dynamic>?, // Extracting routeOptimizationData from the map, nullable
       metadata: map['metadata'] as Map<String, dynamic>?, // Extracting metadata from the map, nullable
-      createdAt: (map['createdAt'] as Timestamp).toDate(), // Converting Firestore Timestamp to DateTime for createdAt
-      updatedAt: (map['updatedAt'] as Timestamp).toDate(), // Converting Firestore Timestamp to DateTime for updatedAt
+      createdAt: getDateTimeFromTimestamp(map['createdAt']) ?? DateTime.now(), // Safely convert Timestamp or use current time as default
+      updatedAt: getDateTimeFromTimestamp(map['updatedAt']) ?? DateTime.now(), // Safely convert Timestamp or use current time as default
     );
   }
 
