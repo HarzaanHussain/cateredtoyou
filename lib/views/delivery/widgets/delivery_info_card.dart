@@ -1,5 +1,5 @@
 import 'dart:async'; // Importing the async library for Timer functionality
-import 'package:cateredtoyou/views/delivery/widgets/delivery_progress.dart'; // Importing a custom widget for delivery progress
+// Importing a custom widget for delivery progress
 import 'package:flutter/material.dart'; // Importing Flutter's material design library
 import 'package:intl/intl.dart'; // Importing the intl package for date formatting
 import 'package:cateredtoyou/models/delivery_route_model.dart'; // Importing the delivery route model

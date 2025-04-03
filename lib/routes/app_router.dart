@@ -5,7 +5,6 @@ import 'package:cateredtoyou/models/menu_item_model.dart'; // Importing MenuItem
 import 'package:cateredtoyou/models/user_model.dart'; // Importing User model
 import 'package:cateredtoyou/models/vehicle_model.dart'; // Importing Vehicle model
 import 'package:cateredtoyou/routes/ContentByIdLoader.dart';
-import 'package:cateredtoyou/services/event_service.dart';
 import 'package:cateredtoyou/services/notification_service.dart';
 import 'package:cateredtoyou/views/customers/add_customer_screen.dart';
 import 'package:cateredtoyou/views/customers/customer_list_screen.dart';
@@ -34,7 +33,6 @@ import 'package:cateredtoyou/views/tasks/task_list_screen.dart'; // Importing Ta
 import 'package:cateredtoyou/views/vehicles/vehicle_details_screen.dart'; // Importing VehicleDetailsScreen widget
 import 'package:cateredtoyou/views/vehicles/vehicle_form_screen.dart'; // Importing VehicleFormScreen widget
 import 'package:cateredtoyou/views/vehicles/vehicle_list_screen.dart'; // Importing VehicleListScreen widget
-import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components
 import 'package:go_router/go_router.dart'; // Importing GoRouter package for routing
 import 'package:cateredtoyou/models/auth_model.dart'; // Importing AuthModel for authentication state
@@ -42,7 +40,6 @@ import 'package:cateredtoyou/views/auth/login_screen.dart'; // Importing LoginSc
 import 'package:cateredtoyou/views/auth/register_screen.dart'; // Importing RegisterScreen widget
 import 'package:cateredtoyou/views/home/home_screen.dart';
 import 'package:cateredtoyou/views/calendar/calendarscreen.dart';
-import 'package:provider/provider.dart';
 
 import '../models/customer_model.dart';
 import '../views/manifest/manifest_screen.dart'; // Importing HomeScreen widget
