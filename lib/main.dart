@@ -5,41 +5,39 @@ import 'package:cateredtoyou/services/delivery_route_service.dart'; // Import De
 import 'package:cateredtoyou/services/event_service.dart'; // Import EventService for event-related operations
 import 'package:cateredtoyou/services/location_service.dart';
 import 'package:cateredtoyou/services/manifest_service.dart';
-import 'package:cateredtoyou/services/menu_item_service.dart'; // Import MenuItemService for menu item-related operations
+import 'package:cateredtoyou/services/menu_item_service.dart';
 import 'package:cateredtoyou/services/notification_service.dart';
-import 'package:cateredtoyou/services/task_automation_service.dart'; // Import TaskAutomationService for task automation operations
-import 'package:cateredtoyou/services/task_service.dart'; // Import TaskService for task-related operations
-import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth package for Firebase authentication
-import 'package:firebase_core/firebase_core.dart'; // Import Firebase core package for Firebase initialization
-import 'package:flutter/material.dart'; // Import Flutter material package for UI components
-import 'package:provider/provider.dart'; // Import provider package for state management
-import 'package:cateredtoyou/models/auth_model.dart'; // Import AuthModel for authentication state
-import 'package:cateredtoyou/routes/app_router.dart'; // Import AppRouter for navigation
-import 'package:cateredtoyou/services/firebase_service.dart'; // Import FirebaseService for Firebase initialization
-import 'package:cateredtoyou/services/organization_service.dart'; // Import OrganizationService for organization-related operations
-import 'package:cateredtoyou/services/staff_service.dart'; // Import StaffService for staff-related operations
-import 'package:cateredtoyou/services/role_permissions.dart'; // Import RolePermissions for role-based permissions
-import 'package:cateredtoyou/services/inventory_service.dart'; // Import InventoryService for inventory-related operations
-import 'package:cateredtoyou/services/customer_service.dart'; // Import CustomerService for customer-related operations
-import 'package:cateredtoyou/services/vehicle_service.dart'; // Import VehicleService for vehicle-related operations
+import 'package:cateredtoyou/services/task_automation_service.dart';
+import 'package:cateredtoyou/services/task_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:cateredtoyou/models/auth_model.dart';
+import 'package:cateredtoyou/routes/app_router.dart';
+import 'package:cateredtoyou/services/firebase_service.dart';
+import 'package:cateredtoyou/services/organization_service.dart';
+import 'package:cateredtoyou/services/staff_service.dart';
+import 'package:cateredtoyou/services/role_permissions.dart';
+import 'package:cateredtoyou/services/inventory_service.dart';
+import 'package:cateredtoyou/services/customer_service.dart';
+import 'package:cateredtoyou/services/vehicle_service.dart';
+// Import the ThemeManager service
+import 'package:cateredtoyou/services/theme_manager.dart';
 
-// Class to handle secondary Firebase app initialization
+/// Class to handle secondary Firebase app initialization
 class FirebaseSecondary {
-  static late FirebaseApp secondaryApp; // Secondary Firebase app instance
-  static late FirebaseAuth secondaryAuth; // Secondary FirebaseAuth instance
+  static late FirebaseApp secondaryApp;
+  static late FirebaseAuth secondaryAuth;
 
-  // Method to initialize the secondary Firebase app
   static Future<void> initializeSecondary() async {
     try {
-      // Try to initialize the secondary Firebase app with the same options as the primary app
       secondaryApp = await Firebase.initializeApp(
         name: 'Secondary',
         options: Firebase.app().options,
       );
-      // Get the FirebaseAuth instance for the secondary app
       secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
     } catch (e) {
-      // If the secondary app is already initialized, get its instance
       secondaryApp = Firebase.app('Secondary');
       secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
     }
@@ -47,7 +45,6 @@ class FirebaseSecondary {
 }
 
 void setupRecurringNotificationsCheck() {
-  // Process right now to handle any that are due
   NotificationService().processRecurringNotifications();
 
   // Set up periodic checking of recurring notifications
@@ -57,15 +54,13 @@ void setupRecurringNotificationsCheck() {
 }
 
 void main() async {
-  WidgetsFlutterBinding
-      .ensureInitialized(); // Ensure Flutter binding is initialized before running the app
-  await FirebaseService.initialize(); // Initialize Firebase services
-  await FirebaseSecondary
-      .initializeSecondary(); // Initialize secondary Firebase app
+  WidgetsFlutterBinding.ensureInitialized();
+  await FirebaseService.initialize();
+  await FirebaseSecondary.initializeSecondary();
   await NotificationService().initNotification();
   setupRecurringNotificationsCheck();
 
-  runApp(const MyApp()); // Run the MyApp widget
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -77,34 +72,22 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         // Organization service should be first as other services depend on it
-        ChangeNotifierProvider(
-          create: (_) => OrganizationService(),
-        ),
-        Provider<AuthService>(
-          create: (_) => AuthService(),
-        ),
+        ChangeNotifierProvider(create: (_) => OrganizationService()),
+        Provider<AuthService>(create: (_) => AuthService()),
         // Staff service depends on OrganizationService
         ChangeNotifierProvider(
-          create: (context) => StaffService(
-            context.read<OrganizationService>(),
-          ),
+          create: (context) => StaffService(context.read<OrganizationService>()),
         ),
         ChangeNotifierProvider(
-          create: (context) => ManifestService(
-            context.read<OrganizationService>(),
-          ),
+          create: (context) => ManifestService(context.read<OrganizationService>()),
         ),
         // Inventory service depends on OrganizationService
         ChangeNotifierProvider(
-          create: (context) => InventoryService(
-            context.read<OrganizationService>(),
-          ),
+          create: (context) => InventoryService(context.read<OrganizationService>()),
         ),
         // Vehicle service depends on OrganizationService
         ChangeNotifierProvider(
-          create: (context) => VehicleService(
-            context.read<OrganizationService>(),
-          ),
+          create: (context) => VehicleService(context.read<OrganizationService>()),
         ),
         // Delivery route service depends on OrganizationService
         ChangeNotifierProvider(
@@ -118,18 +101,12 @@ class MyApp extends StatelessWidget {
           ),
         ),
         // Role permissions service
-        ChangeNotifierProvider(
-          create: (_) => RolePermissions(),
-        ),
+        ChangeNotifierProvider(create: (_) => RolePermissions()),
         // Auth model should be last as it might depend on other services
-        ChangeNotifierProvider(
-          create: (_) => AuthModel(),
-        ),
+        ChangeNotifierProvider(create: (_) => AuthModel()),
         // Task service depends on OrganizationService
         ChangeNotifierProvider(
-          create: (context) => TaskService(
-            context.read<OrganizationService>(),
-          ),
+          create: (context) => TaskService(context.read<OrganizationService>()),
         ),
         // Task automation service depends on TaskService
         Provider(
@@ -147,16 +124,14 @@ class MyApp extends StatelessWidget {
         ),
         // Menu item service depends on OrganizationService
         ChangeNotifierProvider(
-          create: (context) => MenuItemService(
-            context.read<OrganizationService>(),
-          ),
+          create: (context) => MenuItemService(context.read<OrganizationService>()),
         ),
         // Customer service depends on OrganizationService
         ChangeNotifierProvider(
-          create: (context) => CustomerService(
-            context.read<OrganizationService>(),
-          ),
+          create: (context) => CustomerService(context.read<OrganizationService>()),
         ),
+        // Add ThemeManager to enable dark mode toggling
+        ChangeNotifierProvider(create: (_) => ThemeManager()),
       ],
       child: Builder(
         builder: (context) {

@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cateredtoyou/services/auth_service.dart';
+import 'package:cateredtoyou/services/theme_manager.dart';
 
 /// App Settings Screen
-///
 /// This screen allows users to configure app-wide preferences
 /// and settings like appearance, notifications, and account details.
 class AppSettingsScreen extends StatefulWidget {
@@ -15,8 +15,8 @@ class AppSettingsScreen extends StatefulWidget {
 }
 
 class _AppSettingsScreenState extends State<AppSettingsScreen> {
-  // Settings state variables
-  bool _darkMode = false;
+  // If you no longer need a separate dark mode state, you can remove this:
+  // bool _darkMode = false;
   bool _notificationsEnabled = true;
   bool _soundEnabled = true;
   String _selectedLanguage = 'English';
@@ -56,15 +56,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             'Dark Mode',
             'Switch between light and dark theme',
             Icons.dark_mode,
-            _darkMode,
+            // Use the ThemeManager's value for dark mode:
+            Provider.of<ThemeManager>(context).isDarkMode,
             (value) {
-              setState(() {
-                _darkMode = value;
-              });
-              // Would actually change theme here
+              // Toggle the theme using the ThemeManager
+              Provider.of<ThemeManager>(context, listen: false)
+                  .toggleTheme(value);
             },
           ),
-          
           const Divider(),
           
           // Notifications section
@@ -92,7 +91,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             },
             enabled: _notificationsEnabled,
           ),
-          
           const Divider(),
           
           // Display & Regional section
@@ -122,7 +120,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
               });
             },
           ),
-          
           const Divider(),
           
           // Data & Sync section
@@ -149,7 +146,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
               });
             },
           ),
-          
           const Divider(),
           
           // Data management
@@ -185,7 +181,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
               );
             },
           ),
-          
           const Divider(),
           
           // Account section
@@ -248,7 +243,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
               );
             },
           ),
-          
           const Divider(),
           
           // About section
@@ -272,7 +266,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
               // Would open privacy policy
             },
           ),
-          
           const SizedBox(height: 32),
           
           Center(
