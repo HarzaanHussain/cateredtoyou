@@ -8,11 +8,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cateredtoyou/models/delivery_route_model.dart';
 import 'package:cateredtoyou/views/delivery/widgets/delivery_map.dart';
 import 'package:cateredtoyou/views/delivery/widgets/delivery_info_card.dart';
 import 'package:cateredtoyou/views/delivery/widgets/driver_contact_sheet.dart';
 import 'package:cateredtoyou/views/delivery/widgets/loaded_items_section.dart';
+import 'package:cateredtoyou/views/delivery/widgets/reassign_driver_dialog.dart';
+import 'package:cateredtoyou/utils/permission_helpers.dart';
+import 'package:cateredtoyou/services/delivery_route_service.dart';
+import 'package:cateredtoyou/services/location_service.dart';
 
 class TrackDeliveryScreen extends StatefulWidget {
   final DeliveryRoute route;
@@ -38,7 +44,9 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   bool _isLoading = true;
   Timer? _routeUpdateTimer;
   bool _isFirstLoad = true;
-  bool _showInfoCard = true; // Track whether to show or hide the info card
+  bool _showInfoCard = true;
+  bool _isManagementUser = false;
+  bool _isActiveDriver = false;
 
   // Location tracking status variables
   bool _isUpdatingLocation = false;
@@ -60,13 +68,14 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   void initState() {
     super.initState();
     _currentRoute = widget.route;
-    
+
     // Immediately calculate and populate route metrics for initial view
     _calculateRouteMetrics(widget.route);
-    
+
     _setupRouteSubscription();
     _fetchRouteDetails();
     _setupRefreshTimer();
+    _checkUserPermissions();
   }
 
   @override
@@ -76,6 +85,25 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
     _animationTimer?.cancel();
     _visualRefreshTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _checkUserPermissions() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      setState(() {
+        _isManagementUser = false;
+        _isActiveDriver = false;
+      });
+      return;
+    }
+
+    final isManager = await isManagementUser(context);
+    final isDriver = await isActiveDeliveryDriver(widget.route.id, userId);
+
+    setState(() {
+      _isManagementUser = isManager;
+      _isActiveDriver = isDriver;
+    });
   }
 
   void _setupRouteSubscription() {
@@ -92,7 +120,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
       const Duration(seconds: 30),
       (_) => _updateDeliveryMetrics(),
     );
-    
+
     // Visual refresh timer for smoother animations - every 500ms
     _visualRefreshTimer = Timer.periodic(
       const Duration(milliseconds: 500),
@@ -100,7 +128,6 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         if (mounted && _currentRoute?.status == 'in_progress') {
           setState(() {
             // This triggers a rebuild, keeping animations smoother
-            // No need to do any heavy work here
           });
         }
       },
@@ -109,18 +136,18 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
 
   Future<void> _calculateRouteMetrics(DeliveryRoute route) async {
     // Only calculate metrics if they don't already exist
-    if (route.metadata == null || 
-        route.metadata!['routeDetails'] == null || 
+    if (route.metadata == null ||
+        route.metadata!['routeDetails'] == null ||
         route.metadata!['routeDetails']['totalDistance'] == null) {
-      
       try {
         // Calculate total route distance and estimated journey time
-        final totalDistance = await _calculateTotalRouteDistance(route.waypoints);
-        
+        final totalDistance =
+            await _calculateTotalRouteDistance(route.waypoints);
+
         // Simple estimation of journey time (assuming 30 mph average)
         final averageSpeedMps = 13.4; // 30 mph in meters per second
         final estimatedDuration = (totalDistance / averageSpeedMps).round();
-        
+
         // If route hasn't started yet, update its metadata with calculations
         if (route.status == 'pending') {
           await FirebaseFirestore.instance
@@ -129,7 +156,8 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
               .update({
             'metadata.routeDetails.totalDistance': totalDistance,
             'metadata.routeDetails.estimatedDuration': estimatedDuration,
-            'metadata.routeDetails.lastCalculated': FieldValue.serverTimestamp(),
+            'metadata.routeDetails.lastCalculated':
+                FieldValue.serverTimestamp(),
           });
         }
       } catch (e) {
@@ -140,20 +168,21 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
 
   Future<double> _calculateTotalRouteDistance(List<GeoPoint> waypoints) async {
     if (waypoints.length < 2) return 0;
-    
+
     try {
       double totalDistance = 0;
-      
+
       // Try to get accurate distance via routing API
       for (int i = 0; i < waypoints.length - 1; i++) {
         final startPoint = waypoints[i];
         final endPoint = waypoints[i + 1];
-        
-        final url = '$osmRoutingUrl${startPoint.longitude},${startPoint.latitude};'
-                    '${endPoint.longitude},${endPoint.latitude}?overview=false';
-        
+
+        final url =
+            '$osmRoutingUrl${startPoint.longitude},${startPoint.latitude};'
+            '${endPoint.longitude},${endPoint.latitude}?overview=false';
+
         final response = await http.get(Uri.parse(url));
-        
+
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           if (data['code'] == 'Ok') {
@@ -161,61 +190,60 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
           } else {
             // Fallback to straight-line distance if routing fails
             totalDistance += _calculateStraightLineDistance(
-              startPoint.latitude, startPoint.longitude,
-              endPoint.latitude, endPoint.longitude
-            ) * 1000; // Convert km to meters
+                    startPoint.latitude,
+                    startPoint.longitude,
+                    endPoint.latitude,
+                    endPoint.longitude) *
+                1000; // Convert km to meters
           }
         } else {
           // Fallback to straight-line distance if API request fails
-          totalDistance += _calculateStraightLineDistance(
-            startPoint.latitude, startPoint.longitude,
-            endPoint.latitude, endPoint.longitude
-          ) * 1000; // Convert km to meters
+          totalDistance += _calculateStraightLineDistance(startPoint.latitude,
+                  startPoint.longitude, endPoint.latitude, endPoint.longitude) *
+              1000; // Convert km to meters
         }
       }
-      
+
       return totalDistance;
     } catch (e) {
       debugPrint('Error calculating total route distance: $e');
-      
+
       // Fallback to simple distance calculation
       double totalDistance = 0;
       for (int i = 0; i < waypoints.length - 1; i++) {
         final startPoint = waypoints[i];
         final endPoint = waypoints[i + 1];
-        
-        totalDistance += _calculateStraightLineDistance(
-          startPoint.latitude, startPoint.longitude,
-          endPoint.latitude, endPoint.longitude
-        ) * 1000; // Convert km to meters
+
+        totalDistance += _calculateStraightLineDistance(startPoint.latitude,
+                startPoint.longitude, endPoint.latitude, endPoint.longitude) *
+            1000; // Convert km to meters
       }
-      
+
       return totalDistance;
     }
   }
 
   double _calculateStraightLineDistance(
-    double lat1, double lon1, 
-    double lat2, double lon2
-  ) {
-    const double earthRadiusKm = 6371;
-    
+      double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadiusKm = 6371.0; // Earth's radius in kilometers
+
     final dLat = _degreesToRadians(lat2 - lat1);
     final dLon = _degreesToRadians(lon2 - lon1);
-    
-    final a = 
-      sin(dLat / 2) * sin(dLat / 2) +
-      cos(_degreesToRadians(lat1)) * cos(_degreesToRadians(lat2)) * 
-      sin(dLon / 2) * sin(dLon / 2);
-      
+
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_degreesToRadians(lat1)) *
+            cos(_degreesToRadians(lat2)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
+
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return earthRadiusKm * c;
   }
-  
+
   double _degreesToRadians(double degrees) {
     return degrees * (3.14159 / 180);
   }
-  
+
   double sin(double rad) => math.sin(rad);
   double cos(double rad) => math.cos(rad);
   double atan2(double y, double x) => math.atan2(y, x);
@@ -262,9 +290,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
 
         // Set up smooth animation of the driver marker
         _setupSmoothMarkerAnimation(
-          _currentRoute?.currentLocation, 
-          newRoute.currentLocation!
-        );
+            _currentRoute?.currentLocation, newRoute.currentLocation!);
 
         // Reset "recently updated" after 10 seconds
         Future.delayed(const Duration(seconds: 10), () {
@@ -274,10 +300,6 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
             });
           }
         });
-
-        // Log the update for testing/debugging
-        debugPrint(
-            '🚚 DRIVER LOCATION UPDATED: ${newRoute.currentLocation?.latitude}, ${newRoute.currentLocation?.longitude}');
 
         // Update route details and ETA based on new location
         try {
@@ -312,6 +334,9 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
           _centerOnDriver();
         }
       }
+
+      // Also check if user permissions have changed (e.g., if they were reassigned)
+      await _checkUserPermissions();
     } catch (e) {
       debugPrint('Error processing route update: $e');
       if (mounted) {
@@ -323,13 +348,15 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
     }
   }
 
-  void _setupSmoothMarkerAnimation(GeoPoint? oldLocation, GeoPoint newLocation) {
+  void _setupSmoothMarkerAnimation(
+      GeoPoint? oldLocation, GeoPoint newLocation) {
     // Cancel any existing animation
     _animationTimer?.cancel();
 
     // If this is the first location update, just set the position directly
     if (oldLocation == null) {
-      _animatedDriverPosition = LatLng(newLocation.latitude, newLocation.longitude);
+      _animatedDriverPosition =
+          LatLng(newLocation.latitude, newLocation.longitude);
       return;
     }
 
@@ -338,30 +365,30 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
     final startLng = oldLocation.longitude;
     final endLat = newLocation.latitude;
     final endLng = newLocation.longitude;
-    
+
     // Calculate distance to determine animation duration
-    final distance = _calculateStraightLineDistance(
-      startLat, startLng, endLat, endLng
-    );
-    
+    final distance =
+        _calculateStraightLineDistance(startLat, startLng, endLat, endLng);
+
     // Set animation duration based on distance (longer for larger jumps)
     // but keep it under 2 seconds for responsiveness
-    final animationDuration = (distance > 0.5) 
-        ? Duration(milliseconds: 1500) 
+    final animationDuration = (distance > 0.5)
+        ? Duration(milliseconds: 1500)
         : Duration(milliseconds: (distance * 2000).clamp(300, 1000).toInt());
-    
+
     // Number of animation steps (more for smoother animation)
     const steps = 20;
-    final stepDuration = Duration(milliseconds: animationDuration.inMilliseconds ~/ steps);
-    
+    final stepDuration =
+        Duration(milliseconds: animationDuration.inMilliseconds ~/ steps);
+
     // Initialize with start position
     _animatedDriverPosition = LatLng(startLat, startLng);
     int currentStep = 0;
-    
+
     // Create animation timer
     _animationTimer = Timer.periodic(stepDuration, (timer) {
       currentStep++;
-      
+
       if (currentStep >= steps) {
         // Animation complete - set final position
         if (mounted) {
@@ -373,12 +400,12 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         _animationTimer = null;
         return;
       }
-      
+
       // Calculate intermediate position using easeInOut curve for smoother motion
       final progress = _easeInOut(currentStep / steps);
       final lat = startLat + (endLat - startLat) * progress;
       final lng = startLng + (endLng - startLng) * progress;
-      
+
       if (mounted) {
         setState(() {
           _animatedDriverPosition = LatLng(lat, lng);
@@ -390,20 +417,19 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
 
   // Easing function for smoother animation
   double _easeInOut(double t) {
-    return t < 0.5 
-        ? 4 * t * t * t 
-        : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1;
+    return t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1;
   }
 
   Future<void> _calculateUpdatedETA(DeliveryRoute route) async {
     if (route.currentLocation == null || route.waypoints.isEmpty) return;
-    
+
     try {
       final currentLoc = route.currentLocation!;
       final destination = route.waypoints.last;
 
       // Get route details from OSRM API
-      final url = '$osmRoutingUrl${currentLoc.longitude},${currentLoc.latitude};'
+      final url =
+          '$osmRoutingUrl${currentLoc.longitude},${currentLoc.latitude};'
           '${destination.longitude},${destination.latitude}'
           '?overview=false';
 
@@ -414,44 +440,46 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         if (data['code'] == 'Ok') {
           // Get remaining distance in meters
           final remainingDistance = data['routes'][0]['distance'] as num;
-          
+
           // Get remaining duration in seconds (accounting for traffic with a 1.2 multiplier)
           final baseDuration = data['routes'][0]['duration'] as num;
           // Ensure baseDuration is not zero to avoid division by zero
           final safeDuration = baseDuration > 0 ? baseDuration : 60;
           final trafficMultiplier = 1.2;
           final remainingDuration = (safeDuration * trafficMultiplier).round();
-          
+
           // Calculate new ETA
           final now = DateTime.now();
           final newETA = now.add(Duration(seconds: remainingDuration));
-          
+
           // Ensure ETA is never earlier than "now + 1 minute" to prevent negative times
           final minETA = now.add(const Duration(minutes: 1));
           final finalETA = newETA.isBefore(minETA) ? minETA : newETA;
-          
+
           // Calculate speed in meters per second (use current speed if available or estimate from route)
           // Avoid division by zero by checking baseDuration
-          final currentSpeed = route.metadata?['currentSpeed'] as num? ?? 
-                              (remainingDistance / safeDuration);
-          
+          final currentSpeed = route.metadata?['currentSpeed'] as num? ??
+              (remainingDistance / safeDuration);
+
           // Calculate progress percentage
           double progress = 0.0;
-          
+
           // Try to get total distance from metadata or calculate it
-          final totalDistance = route.metadata?['routeDetails']?['totalDistance'] as num?;
-          
+          final totalDistance =
+              route.metadata?['routeDetails']?['totalDistance'] as num?;
+
           if (totalDistance != null && totalDistance > 0) {
             // Safe progress calculation
             final rawProgress = 1.0 - (remainingDistance / totalDistance);
             // Check for valid numerical values to avoid NaN/Infinity
-            progress = rawProgress.isFinite && !rawProgress.isNaN ? 
-                rawProgress.clamp(0.0, 1.0) : 0.5;
+            progress = rawProgress.isFinite && !rawProgress.isNaN
+                ? rawProgress.clamp(0.0, 1.0)
+                : 0.5;
           } else {
             // Fallback to basic calculation - assume we're halfway
             progress = 0.5;
           }
-          
+
           // Update Firestore with new calculations
           await FirebaseFirestore.instance
               .collection('delivery_routes')
@@ -460,21 +488,16 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
             'estimatedEndTime': Timestamp.fromDate(finalETA),
             'metadata.routeDetails.remainingDistance': remainingDistance,
             'metadata.routeDetails.remainingDuration': remainingDuration,
-            'metadata.routeDetails.estimatedArrival': Timestamp.fromDate(finalETA),
+            'metadata.routeDetails.estimatedArrival':
+                Timestamp.fromDate(finalETA),
             'metadata.routeDetails.progress': progress,
             'metadata.routeDetails.currentSpeed': currentSpeed,
             'metadata.routeDetails.lastUpdated': FieldValue.serverTimestamp(),
           });
-          
-          // Log the update
-          debugPrint('📊 Updated ETA: ${DateFormat('h:mm a').format(finalETA)}, '
-                   'Distance: ${(remainingDistance / 1609.344).toStringAsFixed(2)} miles, '
-                   'Progress: ${(progress * 100).toStringAsFixed(1)}%');
         }
       }
     } catch (e) {
       debugPrint('Error updating ETA details: $e');
-      // Don't rethrow, just log - we don't want to break the UI for ETA updates
     }
   }
 
@@ -485,18 +508,17 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
     if (_currentRoute!.status == 'pending') {
       _updatePendingDeliveryMetrics();
     }
-    
+
     // Update progress metrics if needed
     setState(() {});
   }
-  
+
   void _updatePendingDeliveryMetrics() async {
     try {
       // Check if we need to calculate basic metrics
       if (_currentRoute!.metadata == null ||
           _currentRoute!.metadata!['routeDetails'] == null ||
           _currentRoute!.metadata!['routeDetails']['totalDistance'] == null) {
-        
         // Calculate and update total route distance for pending deliveries
         await _calculateRouteMetrics(_currentRoute!);
       }
@@ -611,14 +633,13 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
     ));
 
     // Use animated position for the driver marker if available
-    if (_animatedDriverPosition != null || _currentRoute!.currentLocation != null) {
+    if (_animatedDriverPosition != null ||
+        _currentRoute!.currentLocation != null) {
       // Determine which position to use (animated or actual)
-      final markerPos = _animatedDriverPosition ?? 
-                       LatLng(
-                         _currentRoute!.currentLocation!.latitude,
-                         _currentRoute!.currentLocation!.longitude
-                       );
-      
+      final markerPos = _animatedDriverPosition ??
+          LatLng(_currentRoute!.currentLocation!.latitude,
+              _currentRoute!.currentLocation!.longitude);
+
       markers.add(
         Marker(
           point: markerPos,
@@ -711,7 +732,10 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
       context: context,
       isScrollControlled: true,
       builder: (context) => DriverContactSheet(
-        driverId: _currentRoute!.driverId,
+        driverId: (_currentRoute!.currentDriver != null &&
+                _currentRoute!.currentDriver!.isNotEmpty)
+            ? _currentRoute!.currentDriver!
+            : _currentRoute!.driverId,
         onContactMethod: _handleContactMethod,
       ),
     );
@@ -746,6 +770,237 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not open navigation app')),
         );
+      }
+    }
+  }
+
+  // Management Actions
+  Future<void> _takeOverDelivery() async {
+    try {
+      final deliveryService =
+          Provider.of<DeliveryRouteService>(context, listen: false);
+      final locationService =
+          Provider.of<LocationService>(context, listen: false);
+
+      // Take over the delivery
+      await deliveryService.takeOverDelivery(_currentRoute!.id);
+
+      // If delivery is in progress, start tracking
+      if (_currentRoute!.status == 'in_progress') {
+        await locationService.startTrackingDelivery(_currentRoute!.id);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You have taken over this delivery')),
+        );
+
+        // Refresh user permissions
+        await _checkUserPermissions();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showReassignDialog() async {
+    await showDialog(
+      context: context,
+      builder: (context) => ReassignDriverDialog(route: _currentRoute!),
+    );
+  }
+
+  Future<void> _showDeleteDialog() async {
+    final reasonController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Delivery'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Are you sure you want to delete this delivery?'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Reason (optional)',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final deliveryService =
+            Provider.of<DeliveryRouteService>(context, listen: false);
+        await deliveryService.cancelRoute(_currentRoute!.id,
+            reason: reasonController.text);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Delivery deleted')),
+          );
+
+          // Pop back to previous screen
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${e.toString()}')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showEditDialog() async {
+    final startTimeController =
+        TimeOfDay.fromDateTime(_currentRoute!.startTime);
+    final endTimeController =
+        TimeOfDay.fromDateTime(_currentRoute!.estimatedEndTime);
+
+    var selectedStartTime = startTimeController;
+    var selectedEndTime = endTimeController;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Edit Delivery Times'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('Start Time'),
+                subtitle: Text(DateFormat('h:mm a').format(
+                  DateTime(
+                    DateTime.now().year,
+                    DateTime.now().month,
+                    DateTime.now().day,
+                    selectedStartTime.hour,
+                    selectedStartTime.minute,
+                  ),
+                )),
+                trailing: const Icon(Icons.access_time),
+                onTap: () async {
+                  final pickedTime = await showTimePicker(
+                    context: context,
+                    initialTime: selectedStartTime,
+                  );
+                  if (pickedTime != null) {
+                    setState(() {
+                      selectedStartTime = pickedTime;
+                    });
+                  }
+                },
+              ),
+              ListTile(
+                title: const Text('Estimated End Time'),
+                subtitle: Text(DateFormat('h:mm a').format(
+                  DateTime(
+                    DateTime.now().year,
+                    DateTime.now().month,
+                    DateTime.now().day,
+                    selectedEndTime.hour,
+                    selectedEndTime.minute,
+                  ),
+                )),
+                trailing: const Icon(Icons.access_time),
+                onTap: () async {
+                  final pickedTime = await showTimePicker(
+                    context: context,
+                    initialTime: selectedEndTime,
+                  );
+                  if (pickedTime != null) {
+                    setState(() {
+                      selectedEndTime = pickedTime;
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Update'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final now = DateTime.now();
+
+        // Create new DateTime objects with the selected times
+        final newStartDateTime = DateTime(
+          _currentRoute!.startTime.year,
+          _currentRoute!.startTime.month,
+          _currentRoute!.startTime.day,
+          selectedStartTime.hour,
+          selectedStartTime.minute,
+        );
+
+        final newEndDateTime = DateTime(
+          _currentRoute!.estimatedEndTime.year,
+          _currentRoute!.estimatedEndTime.month,
+          _currentRoute!.estimatedEndTime.day,
+          selectedEndTime.hour,
+          selectedEndTime.minute,
+        );
+
+        // Update in Firestore
+        await FirebaseFirestore.instance
+            .collection('delivery_routes')
+            .doc(_currentRoute!.id)
+            .update({
+          'startTime': Timestamp.fromDate(newStartDateTime),
+          'estimatedEndTime': Timestamp.fromDate(newEndDateTime),
+          'updatedAt': Timestamp.fromDate(now),
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Delivery times updated')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${e.toString()}')),
+          );
+        }
       }
     }
   }
@@ -813,6 +1068,110 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
                       allItemsLoaded:
                           _currentRoute!.metadata!['vehicleHasAllItems'] ??
                               false,
+                    ),
+                  ),
+
+                // Management actions section
+                if (_isManagementUser || _isActiveDriver)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: _showInfoCard
+                        ? 250
+                        : 16, // Position above or at bottom depending on info card
+                    child: Card(
+                      elevation: 4,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.admin_panel_settings,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Management Actions',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Action buttons
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  if (!_isActiveDriver &&
+                                      _currentRoute!.status != 'completed' &&
+                                      _currentRoute!.status != 'cancelled')
+                                    _buildActionButton(
+                                      icon: Icons.person_add,
+                                      label: 'Take Over',
+                                      color: Colors.blue,
+                                      onPressed: _takeOverDelivery,
+                                    ),
+                                  if (_isManagementUser &&
+                                      _currentRoute!.status != 'completed' &&
+                                      _currentRoute!.status != 'cancelled')
+                                    _buildActionButton(
+                                      icon: Icons.edit,
+                                      label: 'Edit',
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                      onPressed: _showEditDialog,
+                                    ),
+                                  if (_isManagementUser &&
+                                      _currentRoute!.status != 'completed' &&
+                                      _currentRoute!.status != 'cancelled')
+                                    _buildActionButton(
+                                      icon: Icons.delete,
+                                      label: 'Delete',
+                                      color:
+                                          Theme.of(context).colorScheme.error,
+                                      onPressed: _showDeleteDialog,
+                                    ),
+                                  if (_isManagementUser &&
+                                      _currentRoute!.status != 'completed' &&
+                                      _currentRoute!.status != 'cancelled')
+                                    _buildActionButton(
+                                      icon: Icons.swap_horiz,
+                                      label: 'Reassign',
+                                      color: Colors.orange,
+                                      onPressed: _showReassignDialog,
+                                    ),
+                                  if (_isActiveDriver &&
+                                      _currentRoute!.status == 'in_progress')
+                                    _buildActionButton(
+                                      icon: Icons.check_circle,
+                                      label: 'Complete',
+                                      color: Colors.green,
+                                      onPressed: () => _completeDelivery(),
+                                    ),
+                                  if (_isActiveDriver &&
+                                      _currentRoute!.status == 'pending')
+                                    _buildActionButton(
+                                      icon: Icons.play_arrow,
+                                      label: 'Start',
+                                      color: Colors.green,
+                                      onPressed: () => _startDelivery(),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
 
@@ -886,5 +1245,107 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
             )
           : null,
     );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 16.0),
+      child: SizedBox(
+        width: 120, // Add a fixed width constraint
+        child: ElevatedButton.icon(
+          icon: Icon(icon, color: color),
+          label: Text(label, style: TextStyle(color: color)),
+          style: ElevatedButton.styleFrom(
+            foregroundColor: color,
+            backgroundColor: color.withAlpha((0.1 * 255).toInt()),
+            side: BorderSide(color: color.withAlpha((0.5 * 255).toInt())),
+          ),
+          onPressed: onPressed,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _startDelivery() async {
+    try {
+      final deliveryService =
+          Provider.of<DeliveryRouteService>(context, listen: false);
+      final locationService =
+          Provider.of<LocationService>(context, listen: false);
+
+      // Update status in Firestore
+      await deliveryService.updateRouteStatus(_currentRoute!.id, 'in_progress');
+
+      // Start location tracking
+      await locationService.startTrackingDelivery(_currentRoute!.id);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Delivery started successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error starting delivery: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _completeDelivery() async {
+    try {
+      final deliveryService =
+          Provider.of<DeliveryRouteService>(context, listen: false);
+      final locationService =
+          Provider.of<LocationService>(context, listen: false);
+
+      // Show confirmation dialog
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Complete Delivery'),
+          content: const Text(
+              'Are you sure you want to mark this delivery as completed?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Complete'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true || !mounted) return;
+
+      // Update status in Firestore
+      await deliveryService.updateRouteStatus(_currentRoute!.id, 'completed');
+
+      // Stop location tracking
+      if (locationService.activeDeliveryId == _currentRoute!.id) {
+        await locationService.stopTrackingDelivery(completed: true);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Delivery completed successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error completing delivery: $e')),
+        );
+      }
+    }
   }
 }

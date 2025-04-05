@@ -17,6 +17,12 @@ class LocationService extends ChangeNotifier {
   bool _isTracking = false;
   Timer? _updateTimer;
   Timer? _trackingWatchdog;
+  Timer? _locationRetryTimer;
+  
+  // For faster updates
+  final int _fastUpdateIntervalMs = 1000; // Update UI every 1 second
+  final int _firebaseUpdateIntervalMs = 3000; // Update Firebase every 3 seconds
+  DateTime? _lastFirebaseUpdate;
   
   // Error states and recovery
   int _errorCount = 0;
@@ -85,6 +91,7 @@ class LocationService extends ChangeNotifier {
       _activeDeliveryId = deliveryId;
       _isTracking = true;
       _errorCount = 0;
+      _lastFirebaseUpdate = null; // Reset last update time
       
       // Update delivery status to in_progress if it's not already
       if (routeDoc.data()?['status'] != 'in_progress') {
@@ -93,29 +100,41 @@ class LocationService extends ChangeNotifier {
       
       // Get current position first with high accuracy
       debugPrint('Getting initial position for delivery tracking...');
-      _currentPosition = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
+      try {
+        _currentPosition = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 5), // Shorter timeout for faster startup
+          ),
+        );
+        
+        // Update initial position immediately
+        if (_currentPosition != null) {
+          await _updatePosition(_currentPosition!, forceUpdate: true);
+        }
+      } catch (e) {
+        debugPrint('Error getting current position, trying last known: $e');
+        final lastKnownPosition = await Geolocator.getLastKnownPosition();
+        if (lastKnownPosition != null) {
+          _currentPosition = lastKnownPosition;
+          await _updatePosition(_currentPosition!, forceUpdate: true);
+        }
+      }
       
-      // Update initial position immediately
-      await _updatePosition(_currentPosition!, forceUpdate: true);
-      
-      // Start position stream with optimized settings
+      // Start position stream with optimized settings for faster updates
       _positionStream = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          distanceFilter: 10, // Update every 10 meters of movement
-          timeLimit: Duration(seconds: 15),
+          distanceFilter: 2, // Update every 2 meters for more frequent updates
+          timeLimit: Duration(seconds: 5), // Shorter timeout
         ),
       ).listen(_onPositionUpdate, onError: _handlePositionError);
       
       // Save active delivery to preferences for recovery
       await _saveActiveDelivery(deliveryId);
       
-      // Start periodic updates for background tracking
-      _startPeriodicUpdates();
+      // Start very frequent UI updates
+      _startFrequentUpdates();
       
       // Ensure watchdog is running
       _startTrackingWatchdog();
@@ -125,7 +144,6 @@ class LocationService extends ChangeNotifier {
       return true;
     } catch (e) {
       debugPrint('❌ Error starting location tracking: $e');
-      // Don't clear the active delivery ID if we had an error - gives us a chance to recover
       if (!_isRecovering) {
         _isTracking = false;
       }
@@ -148,8 +166,11 @@ class LocationService extends ChangeNotifier {
     if (_errorCount >= 3 && !_isRecovering) {
       _isRecovering = true;
       
+      // Cancel existing retry timer
+      _locationRetryTimer?.cancel();
+      
       // Schedule recovery attempt
-      Future.delayed(const Duration(seconds: 15), () async {
+      _locationRetryTimer = Timer(const Duration(seconds: 5), () async {
         debugPrint('🔄 Attempting to recover tracking...');
         if (_activeDeliveryId != null) {
           await startTrackingDelivery(_activeDeliveryId!);
@@ -170,6 +191,8 @@ class LocationService extends ChangeNotifier {
       _updateTimer?.cancel();
       _updateTimer = null;
       
+      _locationRetryTimer?.cancel();
+      
       // Mark delivery as completed if requested
       if (completed && _activeDeliveryId != null) {
         await _deliveryService.updateRouteStatus(_activeDeliveryId!, 'completed');
@@ -189,16 +212,21 @@ class LocationService extends ChangeNotifier {
     }
   }
 
-  // Handler for position updates
+  // Handler for position updates - this creates local updates very quickly
   void _onPositionUpdate(Position position) async {
-    // Reset error count on successful update
-    _errorCount = 0;
     _currentPosition = position;
     
-    // Update Firestore with new position
-    await _updatePosition(position);
-    
+    // Always notify listeners for very fast UI updates
     notifyListeners();
+    
+    // Only update Firebase every few seconds to reduce server load
+    final now = DateTime.now();
+    if (_lastFirebaseUpdate == null || 
+        now.difference(_lastFirebaseUpdate!).inMilliseconds > _firebaseUpdateIntervalMs) {
+      await _updatePosition(position);
+      _lastFirebaseUpdate = now;
+      _errorCount = 0; // Reset error count on successful Firebase update
+    }
   }
   
   // Update position in Firestore
@@ -213,9 +241,12 @@ class LocationService extends ChangeNotifier {
       final location = GeoPoint(position.latitude, position.longitude);
       
       // Calculate speed if available
-      // Standard GPS speed is in m/s, but it can sometimes be unreliable
-      // So we calculate a more accurate speed based on consecutive positions
       double? speed = position.speed;
+      
+      // If speed is invalid, calculate a reasonable value
+      if (!speed.isFinite || speed <= 0) {
+        speed = 5.0; // Default to 5 m/s (about 11 mph)
+      }
       
       // Update delivery route with new location
       await _deliveryService.updateDriverLocation(
@@ -232,38 +263,37 @@ class LocationService extends ChangeNotifier {
     }
   }
   
-  // Start periodic background updates
-  void _startPeriodicUpdates() {
+  // Start very frequent UI updates
+  void _startFrequentUpdates() {
     _updateTimer?.cancel();
     
-    // Update every 30 seconds even if position hasn't changed significantly
-    _updateTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
-      if (_activeDeliveryId == null) return;
+    // Update UI very frequently even if position hasn't changed
+    _updateTimer = Timer.periodic(Duration(milliseconds: _fastUpdateIntervalMs), (_) async {
+      if (_activeDeliveryId == null || !_isTracking) return;
       
-      // Force tracking to be active for in-progress deliveries
-      if (!_isTracking) {
-        final routeDoc = await _firestore.collection('delivery_routes').doc(_activeDeliveryId!).get();
-        if (routeDoc.exists && routeDoc.data()?['status'] == 'in_progress') {
-          debugPrint('⚠️ Delivery is in progress but tracking was inactive - restarting tracking');
-          await startTrackingDelivery(_activeDeliveryId!);
-          return;
+      // Simply notify listeners to refresh UI with current position
+      // This creates the illusion of real-time tracking even if Firebase updates are less frequent
+      notifyListeners();
+      
+      // Every few seconds, also try to get a fresh position if stream isn't providing one
+      if (_lastFirebaseUpdate != null && 
+          DateTime.now().difference(_lastFirebaseUpdate!).inSeconds > 5) {
+        try {
+          final position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              timeLimit: Duration(seconds: 3),
+            ),
+          );
+          
+          _currentPosition = position;
+          await _updatePosition(position, forceUpdate: true);
+          _lastFirebaseUpdate = DateTime.now();
+          notifyListeners();
+        } catch (e) {
+          // Just log the error, don't disrupt the UI refresh
+          debugPrint('Error in background position refresh: $e');
         }
-      }
-      
-      try {
-        final position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            timeLimit: Duration(seconds: 10),
-          ),
-        );
-        
-        _currentPosition = position;
-        await _updatePosition(position, forceUpdate: true);
-        notifyListeners();
-      } catch (e) {
-        debugPrint('Error in periodic update: $e');
-        _handleTrackingError();
       }
     });
   }
@@ -272,8 +302,8 @@ class LocationService extends ChangeNotifier {
   void _startTrackingWatchdog() {
     _trackingWatchdog?.cancel();
     
-    // Check every 2 minutes that tracking is active for in-progress deliveries
-    _trackingWatchdog = Timer.periodic(const Duration(minutes: 2), (_) async {
+    // Check every 30 seconds that tracking is active for in-progress deliveries
+    _trackingWatchdog = Timer.periodic(const Duration(seconds: 30), (_) async {
       if (_activeDeliveryId == null) {
         // Check if there's an active delivery we should be tracking
         final deliveryId = await checkForActiveDelivery();
@@ -390,6 +420,7 @@ class LocationService extends ChangeNotifier {
       final user = _auth.currentUser;
       if (user == null) return null;
       
+      // First try to find deliveries where this user is explicitly the driver
       final snapshot = await _firestore
           .collection('delivery_routes')
           .where('driverId', isEqualTo: user.uid)
@@ -399,50 +430,29 @@ class LocationService extends ChangeNotifier {
       
       if (snapshot.docs.isNotEmpty) {
         final deliveryId = snapshot.docs.first.id;
-        debugPrint('Found active delivery: $deliveryId');
+        debugPrint('Found active delivery for driver: $deliveryId');
         return deliveryId;
       }
+      
+      // If not found, check if this user is assigned to any active deliveries
+      // by using a "currentDriver" field that might be different from the original driver
+      final assignedSnapshot = await _firestore
+          .collection('delivery_routes')
+          .where('currentDriver', isEqualTo: user.uid)
+          .where('status', isEqualTo: 'in_progress')
+          .limit(1)
+          .get();
+          
+      if (assignedSnapshot.docs.isNotEmpty) {
+        final deliveryId = assignedSnapshot.docs.first.id;
+        debugPrint('Found active delivery for assigned current driver: $deliveryId');
+        return deliveryId;
+      }
+      
       return null;
     } catch (e) {
       debugPrint('Error checking for active deliveries: $e');
       return null;
-    }
-  }
-  
-  // Get current progress of the active delivery
-  Future<double> getDeliveryProgress() async {
-    if (_activeDeliveryId == null) return 0.0;
-    
-    try {
-      final doc = await _firestore.collection('delivery_routes').doc(_activeDeliveryId!).get();
-      if (!doc.exists) return 0.0;
-      
-      final data = doc.data()!;
-      
-      // If there's a precalculated progress value, use it
-      if (data['metadata'] != null && 
-          data['metadata']['routeDetails'] != null && 
-          data['metadata']['routeDetails']['progress'] != null) {
-        return (data['metadata']['routeDetails']['progress'] as num).toDouble();
-      }
-      
-      // Otherwise estimate based on remaining distance vs total
-      if (data['metadata'] != null && 
-          data['metadata']['routeDetails'] != null) {
-        final remainingDistance = data['metadata']['routeDetails']['remainingDistance'];
-        final totalDistance = data['metadata']['routeDetails']['totalDistance'];
-        
-        if (remainingDistance != null && totalDistance != null) {
-          final progress = 1.0 - (remainingDistance / totalDistance);
-          return progress.clamp(0.0, 1.0);
-        }
-      }
-      
-      // If we can't calculate, return 0 for pending or 0.5 for in progress
-      return data['status'] == 'in_progress' ? 0.5 : 0.0;
-    } catch (e) {
-      debugPrint('Error getting delivery progress: $e');
-      return _isTracking ? 0.5 : 0.0; // Default to 50% if tracking active
     }
   }
   
@@ -451,6 +461,7 @@ class LocationService extends ChangeNotifier {
     _positionStream?.cancel();
     _updateTimer?.cancel();
     _trackingWatchdog?.cancel();
+    _locationRetryTimer?.cancel();
     super.dispose();
   }
 }

@@ -1349,56 +1349,45 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
 
   Widget _buildDriverDropdown() {
     return Consumer<StaffService>(
-      // Use Consumer to access the StaffService.
       builder: (context, staffService, _) {
         return StreamBuilder<List<UserModel>>(
-          // Use StreamBuilder to listen to the stream of staff members.
-          stream: staffService
-              .getStaffMembers(), // Get the stream of staff members.
+          stream: staffService.getStaffMembers(),
           builder: (context, snapshot) {
             if (snapshot.hasError) {
-              return Text(
-                  'Error: ${snapshot.error}'); // Show error message if there's an error.
+              return Text('Error: ${snapshot.error}');
             }
 
             if (!snapshot.hasData) {
-              return const Center(
-                  child:
-                      CircularProgressIndicator()); // Show loading indicator while data is loading.
+              return const Center(child: CircularProgressIndicator());
             }
 
+            // Modified: Allow any active staff to be a driver (removed role filter)
             final drivers = snapshot.data!
-                .where((staff) =>
-                    staff.role == 'driver' &&
-                    staff.employmentStatus ==
-                        'active') // Filter active drivers.
+                .where((staff) => staff.employmentStatus == 'active')
                 .toList();
 
             if (drivers.isEmpty) {
-              return const Text(
-                  'No available drivers'); // Show message if no drivers are available.
+              return const Text('No available staff members');
             }
 
             return DropdownButtonFormField<String>(
-              // Create a dropdown form field for selecting a driver.
-              value: _selectedDriverId, // Set the selected driver ID.
+              value: _selectedDriverId,
               decoration: const InputDecoration(
-                labelText: 'Select Driver', // Set the label text.
-                hintText: 'Choose a driver', // Set the hint text.
-                prefixIcon: Icon(Icons.person), // Set the prefix icon.
+                labelText: 'Select Driver',
+                hintText: 'Choose a driver',
+                prefixIcon: Icon(Icons.person),
               ),
               items: drivers.map((driver) {
                 return DropdownMenuItem(
-                  value: driver.uid, // Set the driver ID.
+                  value: driver.uid,
                   child: Text(
-                      '${driver.firstName} ${driver.lastName}'), // Set the driver name.
+                      '${driver.firstName} ${driver.lastName}${driver.role == 'driver' ? ' (Driver)' : ''}'),
                 );
               }).toList(),
-              onChanged: (value) => setState(() =>
-                  _selectedDriverId = value), // Update the selected driver ID.
+              onChanged: (value) => setState(() => _selectedDriverId = value),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please select a driver'; // Validate the input.
+                  return 'Please select a driver';
                 }
                 return null;
               },
@@ -1755,7 +1744,6 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
         metadata: metadata, // Add metadata.
       );
       await deliveryService.initializeRouteMetrics(metadata['routeId']);
-      
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

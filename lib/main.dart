@@ -65,7 +65,6 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key}); // Constructor for MyApp
-  
 
   @override
   Widget build(BuildContext context) {
@@ -74,34 +73,42 @@ class MyApp extends StatelessWidget {
         // Organization service should be first as other services depend on it
         ChangeNotifierProvider(create: (_) => OrganizationService()),
         Provider<AuthService>(create: (_) => AuthService()),
+        // Role permissions service
+        ChangeNotifierProvider(create: (_) => RolePermissions()),
         // Staff service depends on OrganizationService
         ChangeNotifierProvider(
-          create: (context) => StaffService(context.read<OrganizationService>()),
+          create: (context) =>
+              StaffService(context.read<OrganizationService>()),
         ),
         ChangeNotifierProvider(
-          create: (context) => ManifestService(context.read<OrganizationService>()),
+          create: (context) =>
+              ManifestService(context.read<OrganizationService>()),
         ),
         // Inventory service depends on OrganizationService
         ChangeNotifierProvider(
-          create: (context) => InventoryService(context.read<OrganizationService>()),
+          create: (context) =>
+              InventoryService(context.read<OrganizationService>()),
         ),
         // Vehicle service depends on OrganizationService
         ChangeNotifierProvider(
-          create: (context) => VehicleService(context.read<OrganizationService>()),
+          create: (context) =>
+              VehicleService(context.read<OrganizationService>()),
         ),
         // Delivery route service depends on OrganizationService
-        ChangeNotifierProvider(
+         ChangeNotifierProvider(
           create: (context) => DeliveryRouteService(
             context.read<OrganizationService>(),
+            context.read<RolePermissions>(),
           ),
         ),
+        // LocationService depends on DeliveryRouteService, so it must come AFTER
         ChangeNotifierProvider(
           create: (context) => LocationService(
-            Provider.of<DeliveryRouteService>(context, listen: false),
+            context.read<DeliveryRouteService>(),
           ),
         ),
-        // Role permissions service
-        ChangeNotifierProvider(create: (_) => RolePermissions()),
+
+        
         // Auth model should be last as it might depend on other services
         ChangeNotifierProvider(create: (_) => AuthModel()),
         // Task service depends on OrganizationService
@@ -124,11 +131,13 @@ class MyApp extends StatelessWidget {
         ),
         // Menu item service depends on OrganizationService
         ChangeNotifierProvider(
-          create: (context) => MenuItemService(context.read<OrganizationService>()),
+          create: (context) =>
+              MenuItemService(context.read<OrganizationService>()),
         ),
         // Customer service depends on OrganizationService
         ChangeNotifierProvider(
-          create: (context) => CustomerService(context.read<OrganizationService>()),
+          create: (context) =>
+              CustomerService(context.read<OrganizationService>()),
         ),
         // Add ThemeManager to enable dark mode toggling
         ChangeNotifierProvider(create: (_) => ThemeManager()),

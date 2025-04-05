@@ -6,7 +6,8 @@ class DeliveryRoute {
   final String id; // Unique identifier for the delivery route
   final String eventId; // Identifier for the associated event
   final String vehicleId; // Identifier for the vehicle used in the delivery
-  final String driverId; // Identifier for the driver assigned to the delivery
+  final String driverId; // Identifier for the originally assigned driver
+  final String? currentDriver; // Identifier for the current active driver (may be different from original)
   final String organizationId; // Identifier for the organization managing the delivery
   final DateTime startTime; // Start time of the delivery route
   final DateTime estimatedEndTime; // Estimated end time of the delivery route
@@ -27,6 +28,7 @@ class DeliveryRoute {
     required this.eventId, // Constructor parameter for eventId
     required this.vehicleId, // Constructor parameter for vehicleId
     required this.driverId, // Constructor parameter for driverId
+    this.currentDriver, // Constructor parameter for currentDriver
     required this.organizationId, // Constructor parameter for organizationId
     required this.startTime, // Constructor parameter for startTime
     required this.estimatedEndTime, // Constructor parameter for estimatedEndTime
@@ -48,6 +50,7 @@ class DeliveryRoute {
       'eventId': eventId, // Mapping eventId to a key-value pair
       'vehicleId': vehicleId, // Mapping vehicleId to a key-value pair
       'driverId': driverId, // Mapping driverId to a key-value pair
+      'currentDriver': currentDriver ?? driverId, // Use currentDriver if available, otherwise fall back to original driverId
       'organizationId': organizationId, // Mapping organizationId to a key-value pair
       'startTime': Timestamp.fromDate(startTime), // Converting startTime to Firestore Timestamp
       'estimatedEndTime': Timestamp.fromDate(estimatedEndTime), // Converting estimatedEndTime to Firestore Timestamp
@@ -78,6 +81,7 @@ class DeliveryRoute {
       eventId: map['eventId'] ?? '', // Extracting eventId from the map, defaulting to an empty string if null
       vehicleId: map['vehicleId'] ?? '', // Extracting vehicleId from the map, defaulting to an empty string if null
       driverId: map['driverId'] ?? '', // Extracting driverId from the map, defaulting to an empty string if null
+      currentDriver: map['currentDriver'], // Extracting currentDriver from the map
       organizationId: map['organizationId'] ?? '', // Extracting organizationId from the map, defaulting to an empty string if null
       startTime: getDateTimeFromTimestamp(map['startTime']) ?? DateTime.now(), // Safely convert Timestamp or use current time as default
       estimatedEndTime: getDateTimeFromTimestamp(map['estimatedEndTime']) ?? DateTime.now(), // Safely convert Timestamp or use current time as default
@@ -101,6 +105,7 @@ class DeliveryRoute {
     String? eventId, // Optional parameter for eventId
     String? vehicleId, // Optional parameter for vehicleId
     String? driverId, // Optional parameter for driverId
+    String? currentDriver, // Optional parameter for currentDriver
     DateTime? startTime, // Optional parameter for startTime
     DateTime? estimatedEndTime, // Optional parameter for estimatedEndTime
     DateTime? actualEndTime, // Optional parameter for actualEndTime
@@ -119,6 +124,7 @@ class DeliveryRoute {
       eventId: eventId ?? this.eventId, // Using the new eventId if provided, otherwise keeping the existing one
       vehicleId: vehicleId ?? this.vehicleId, // Using the new vehicleId if provided, otherwise keeping the existing one
       driverId: driverId ?? this.driverId, // Using the new driverId if provided, otherwise keeping the existing one
+      currentDriver: currentDriver ?? this.currentDriver, // Using the new currentDriver if provided, otherwise keeping the existing one
       organizationId: organizationId, // Keeping the same organizationId
       startTime: startTime ?? this.startTime, // Using the new startTime if provided, otherwise keeping the existing one
       estimatedEndTime: estimatedEndTime ?? this.estimatedEndTime, // Using the new estimatedEndTime if provided, otherwise keeping the existing one
@@ -135,7 +141,17 @@ class DeliveryRoute {
       updatedAt: DateTime.now(), // Setting updatedAt to the current time
     );
   }
-   double calculateProgress() {
+   // Get the active driver for this delivery (either current driver or original driver)
+  String get activeDriverId => currentDriver ?? driverId;
+  
+  // Check if the given user is the active driver
+  bool isActiveDriver(String userId) => activeDriverId == userId;
+  
+  // Check if this is a reassigned delivery (current driver differs from original)
+  bool get isReassigned => currentDriver != null && currentDriver != driverId;
+  
+  // Other methods remain the same...
+  double calculateProgress() {
     return DeliveryProgress.calculateProgress(
       waypoints: waypoints,
       currentLocation: currentLocation,
@@ -145,9 +161,9 @@ class DeliveryRoute {
       metadata: metadata,
     );
   }
-  
   // Get the estimated time remaining in minutes
   int get estimatedTimeRemainingMinutes {
+    // Implementation remains the same
     // If delivery is completed or cancelled, return 0
     if (status == 'completed' || status == 'cancelled') return 0;
     

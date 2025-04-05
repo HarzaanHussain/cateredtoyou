@@ -48,7 +48,7 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
     super.dispose();
   }
 
-  void _updateTimeLeft() {
+ void _updateTimeLeft() {
     // Function to update the time left
     if (!mounted) return; // Check if the widget is still mounted
 
@@ -86,7 +86,7 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
     });
   }
 
-  String _formatDuration(Duration duration) {
+   String _formatDuration(Duration duration) {
     // Function to format duration
     if (duration.isNegative) {
       // Handle negative durations by returning "0h 0m"
@@ -99,7 +99,8 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
     return '${duration.inMinutes}m'; // Format minutes
   }
 
-  String _formatTotalDistance() {
+
+   String _formatTotalDistance() {
     // Function to format total distance
     final totalDistance = widget.route.metadata?['routeDetails']?['totalDistance'];
     if (totalDistance == null) {
@@ -123,16 +124,17 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
       return 'Calculating...';
     }
     
-    final distanceInMiles = (totalDistance / 1609.34).toStringAsFixed(1);
+    // Convert to miles and ensure it's a valid number
+    final distanceMeters = totalDistance as num;
+    if (!distanceMeters.isFinite || distanceMeters <= 0) {
+      return 'Calculating...';
+    }
+    
+    final distanceInMiles = (distanceMeters / 1609.34).toStringAsFixed(1);
     return '$distanceInMiles mi total';
   }
 
-  // Helper function for the square root calculation
-  double sqrt(double value) {
-    return value <= 0 ? 0 : value.isNaN ? 0 : math.sqrt(value);
-  }
-
-  String _formatRemainingDistance() {
+ String _formatRemainingDistance() {
     // Function to format remaining distance
     if (widget.route.status == 'completed') {
       return '0 mi left';
@@ -144,7 +146,7 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
     
     // Try getting from metadata first
     final remainingDistance = widget.route.metadata?['routeDetails']?['remainingDistance'];
-    if (remainingDistance != null && remainingDistance is num) {
+    if (remainingDistance != null && remainingDistance is num && remainingDistance.isFinite) {
       final remainingMiles = (remainingDistance / 1609.34).toStringAsFixed(1);
       return '$remainingMiles mi left';
     }
@@ -157,17 +159,23 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
       // Basic distance calculation (simplified for example)
       final latDiff = currentLoc.latitude - destination.latitude;
       final lngDiff = currentLoc.longitude - destination.longitude;
-      final distance = math.sqrt(latDiff * latDiff + lngDiff * lngDiff) * 111000; // Rough meters
-      final distanceInMiles = (distance / 1609.34).toStringAsFixed(1);
       
-      return '$distanceInMiles mi left';
+      // Ensure the calculation doesn't produce NaN or Infinity
+      if (latDiff.isFinite && lngDiff.isFinite) {
+        final distanceSquared = latDiff * latDiff + lngDiff * lngDiff;
+        if (distanceSquared.isFinite && distanceSquared >= 0) {
+          final distance = math.sqrt(distanceSquared) * 111000; // Rough meters
+          final distanceInMiles = (distance / 1609.34).toStringAsFixed(1);
+          return '$distanceInMiles mi left';
+        }
+      }
     }
     
     // If we can't calculate, show total distance
     return _formatTotalDistance();
   }
 
-  String _formatTotalDuration() {
+ String _formatTotalDuration() {
     // Function to format total duration
     final startTime = widget.route.startTime; // Get start time
     final endTime = widget.route.estimatedEndTime; // Get end time
@@ -194,6 +202,7 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
     final elapsed = now.difference(startTime); // Calculate elapsed time
     return 'Elapsed: ${_formatDuration(elapsed)}'; // Return formatted elapsed time
   }
+
 
   Widget _buildAddressSection(BuildContext context) {
     // Function to build address section
@@ -422,7 +431,7 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
   }
   
   // Helper to get delivery progress
-  double _getDeliveryProgress() {
+ double _getDeliveryProgress() {
     // For pending deliveries, calculate progress based on time until start
     if (widget.route.status == 'pending') {
       final now = DateTime.now();
@@ -432,7 +441,12 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
         final remainingLeadTime = widget.route.startTime.difference(now).inSeconds;
         
         if (totalLeadTime <= 0) return 0.0;
-        return ((totalLeadTime - remainingLeadTime) / totalLeadTime).clamp(0.0, 0.99);
+        
+        final progress = ((totalLeadTime - remainingLeadTime) / totalLeadTime);
+        if (progress.isFinite && !progress.isNaN) {
+          return progress.clamp(0.0, 0.99);
+        }
+        return 0.5; // Default to 50% if calculation failed
       }
       return 0.99; // Almost ready to start
     }
@@ -440,24 +454,41 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
     // First check if there's a stored progress value
     if (widget.route.metadata?['routeDetails']?['progress'] != null) {
       final progress = widget.route.metadata!['routeDetails']['progress'];
-      if (progress is num) {
+      if (progress is num && progress.isFinite) {
         return progress.toDouble().clamp(0.0, 1.0);
       }
     }
     
+    // Return a safe default value for completed and other statuses
+    if (widget.route.status == 'completed') return 1.0;
+    if (widget.route.status == 'cancelled') return 0.0;
+    
     // Otherwise calculate based on DeliveryProgress helper
-    return widget.route.calculateProgress();
+    try {
+      return widget.route.calculateProgress();
+    } catch (e) {
+      debugPrint('Error calculating progress: $e');
+      return 0.5; // Default to 50% if calculation failed
+    }
   }
   
   // Format driver speed
   String _formatDriverSpeed() {
     final speed = widget.route.metadata?['currentSpeed'];
-    if (speed == null) return 'N/A';
+    if (speed == null || speed is! num || !speed.isFinite || speed <= 0) {
+      return 'N/A';
+    }
     
     // Convert m/s to mph
     final speedMph = (speed * 2.23694).toStringAsFixed(1);
     return '$speedMph mph';
   }
+  double sqrt(double value) {
+    if (value <= 0) return 0;
+    if (!value.isFinite) return 0;
+    return math.sqrt(value);
+  }
+
 
   Widget _buildProgressDetail(
     BuildContext context,
