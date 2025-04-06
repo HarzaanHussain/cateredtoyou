@@ -21,7 +21,7 @@ import 'package:cateredtoyou/services/role_permissions.dart';
 import 'package:cateredtoyou/services/inventory_service.dart';
 import 'package:cateredtoyou/services/customer_service.dart';
 import 'package:cateredtoyou/services/vehicle_service.dart';
-import 'package:cateredtoyou/services/theme_manager.dart'; // Provides dark mode toggle
+import 'package:cateredtoyou/services/theme_manager.dart'; // Provides dark mode toggle in settings 
 
 /// Class to handle secondary Firebase app initialization
 class FirebaseSecondary {
@@ -98,7 +98,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (context) => CustomerService(context.read<OrganizationService>()),
         ),
-        // Provide ThemeManager for dark mode toggle
+        //  ThemeManager for dark mode toggle
         ChangeNotifierProvider(create: (_) => ThemeManager()),
       ],
       child: Builder(builder: (context) {
@@ -106,16 +106,19 @@ class MyApp extends StatelessWidget {
         final themeManager = context.watch<ThemeManager>();
         final appRouter = AppRouter(authModel);
 
+
+        //THEME SETTINGS
+
         return MaterialApp.router(
           title: 'CateredToYou',
           debugShowCheckedModeBanner: false,
-          // Keep the light theme exactly as your partner designed it:
+          // LIGHT THEME
           theme: ThemeData(
             useMaterial3: true,
-            // (Your partner's light theme settings remain untouched)
+            // MAIN THEME
             colorScheme: const ColorScheme(
               brightness: Brightness.light,
-              primary: Color(0xFFFFC30B),  // For example, Honey Yellow
+              primary: Color(0xFFFFC30B),  // Honey Yellow
               onPrimary: Colors.white,
               secondary: Color(0xFFFFC30B),
               onSecondary: Colors.black,
@@ -184,7 +187,10 @@ class MyApp extends StatelessWidget {
               overlayColor: WidgetStateProperty.all(const Color(0xFFD4AF37)),
             ),
           ),
-          // Define your dark theme here (this is your work)
+
+          //
+          // ---DARK THEME--
+          // 
           darkTheme: ThemeData(
             useMaterial3: true,
             colorScheme: const ColorScheme(
