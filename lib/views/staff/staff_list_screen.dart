@@ -51,7 +51,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF2C3E50), // Change this to your desired color
+      backgroundColor: const Color(0xFFFBC72B), // Yellow background
       bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         leading: IconButton(
