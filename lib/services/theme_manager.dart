@@ -1,8 +1,32 @@
 import 'package:flutter/material.dart';
 
+
+
+//lightweight theme manager for dark mode 
+class ThemeManager extends ChangeNotifier {
+  bool _isDarkMode = false;
+  
+  // Getter for the current dark mode status.
+  bool get isDarkMode => _isDarkMode;
+  
+  // Getter that returns the current ThemeMode.
+  ThemeMode get themeMode => _isDarkMode ? ThemeMode.dark : ThemeMode.light;
+  
+  // Toggle the dark mode flag and notify listeners so MaterialApp rebuilds.
+  void toggleTheme(bool value) {
+    _isDarkMode = value;
+    notifyListeners();
+  }
+}
+
+
+/// Robust Theme Manager Implementation should we choose to use.
+/// 
+/// 
+/// 
 /// Manages the current theme mode (light/dark) 
 /// Currently disabled 
-class ThemeManager extends ChangeNotifier {
+/*class ThemeManager extends ChangeNotifier {
   bool _isDarkMode = false;
   
   bool get isDarkMode => _isDarkMode;
@@ -13,8 +37,10 @@ class ThemeManager extends ChangeNotifier {
     _isDarkMode = isDark;
     notifyListeners();
   }
-}
-// Thomas OG light theme 
+} */
+//
+//
+// Thomas OG light Theme
 
 //
 //
@@ -22,7 +48,7 @@ class ThemeManager extends ChangeNotifier {
 final ThemeData lightTheme = ThemeData(
   useMaterial3: true,
   primaryColor: const Color(0xFFFBC72B),
-  scaffoldBackgroundColor: const Color(0xFFFCF8F2), // Off-white background
+  scaffoldBackgroundColor: const Color(0xFFFCF8F2), // Off-white background / this should be white
   colorScheme: ColorScheme.fromSeed(
     seedColor: const Color(0xFFFBC72B),
     brightness: Brightness.light,
