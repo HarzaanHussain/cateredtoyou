@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Manages the current theme mode (light/dark)
+/// Manages the current theme mode (light/dark) 
+/// Currently disabled 
 class ThemeManager extends ChangeNotifier {
   bool _isDarkMode = false;
   
@@ -13,8 +14,11 @@ class ThemeManager extends ChangeNotifier {
     notifyListeners();
   }
 }
+// Thomas OG light theme 
 
-/// Thomas's original light theme (yellow scheme) with an explicit scaffold background
+//
+//
+/*
 final ThemeData lightTheme = ThemeData(
   useMaterial3: true,
   primaryColor: const Color(0xFFFBC72B),
@@ -78,4 +82,4 @@ final ThemeData darkTheme = ThemeData(
     foregroundColor: Colors.white,
     elevation: 4,
   ),
-);
+);  */
