@@ -12,7 +12,7 @@ class CustomTextField extends StatelessWidget {
   final bool readOnly;
   final VoidCallback? onTap;
     final void Function(String)? onChanged;
-  final void Function(String)? onFieldSubmitted; //add this for allowind enter on login screen
+  final void Function(String)? onFieldSubmitted; //add this for allowing enter on login screen
 
   const CustomTextField({
     super.key,
