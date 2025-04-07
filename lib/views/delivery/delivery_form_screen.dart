@@ -3,6 +3,7 @@ import 'package:cateredtoyou/models/user_model.dart'; // Importing the user mode
 import 'package:cateredtoyou/models/vehicle_model.dart'; // Importing the vehicle model.
 import 'package:cateredtoyou/services/staff_service.dart'; // Importing the staff service.
 import 'package:cateredtoyou/services/vehicle_service.dart'; // Importing the vehicle service.
+import 'package:cateredtoyou/utils/auto_complete.dart';
 import 'package:cateredtoyou/views/delivery/widgets/delivery_map.dart'; // Importing the delivery map widget.
 import 'package:cateredtoyou/views/delivery/widgets/delivery_map_controller.dart'; // Importing the delivery map controller.
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
@@ -274,157 +275,186 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          'https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}', // URL for reverse geocoding.
+          'https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}',
         ),
         headers: {
           'Accept': 'application/json',
-          'User-Agent':
-              'CateredToYou/1.0', // User-Agent header for the request.
+          'User-Agent': 'CateredToYou/1.0',
         },
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body); // Decode JSON response.
-        final address = data['display_name']; // Get address from response.
+        final data = json.decode(response.body);
+        final address = data['display_name'];
         setState(() {
           if (isPickup) {
-            _pickupAddressController.text = address; // Set pickup address.
+            _pickupAddressController.text = address;
           } else {
-            _deliveryAddressController.text = address; // Set delivery address.
+            _deliveryAddressController.text = address;
           }
         });
       }
     } catch (e) {
-      _handleError(
-          'Error getting address', e); // Handle error if getting address fails.
+      _handleError('Error getting address', e);
     }
   }
 
-  Future<void> _searchAddress(String query, bool isPickup) async {
-    if (query.length < 3) return; // Return if query is too short.
+  // Future<void> _getAddressFromCoordinates(
+  //     LatLng location, bool isPickup) async {
+  //   try {
+  //     final response = await http.get(
+  //       Uri.parse(
+  //         'https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}', // URL for reverse geocoding.
+  //       ),
+  //       headers: {
+  //         'Accept': 'application/json',
+  //         'User-Agent':
+  //             'CateredToYou/1.0', // User-Agent header for the request.
+  //       },
+  //     );
 
-    _debounceTimer?.cancel(); // Cancel previous debounce timer.
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
-      try {
-        setState(() => _isLoading = true); // Set loading state to true.
+  //     if (response.statusCode == 200) {
+  //       final data = json.decode(response.body); // Decode JSON response.
+  //       final address = data['display_name']; // Get address from response.
+  //       setState(() {
+  //         if (isPickup) {
+  //           _pickupAddressController.text = address; // Set pickup address.
+  //         } else {
+  //           _deliveryAddressController.text = address; // Set delivery address.
+  //         }
+  //       });
+  //     }
+  //   } catch (e) {
+  //     _handleError(
+  //         'Error getting address', e); // Handle error if getting address fails.
+  //   }
+  // }
 
-        final response = await http.get(
-          Uri.parse(
-            'https://nominatim.openstreetmap.org/search?format=json&q=$query&limit=5&countrycodes=us', // URL for address search.
-          ),
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent':
-                'CateredToYou/1.0', // User-Agent header for the request.
-          },
-        );
+  // Future<void> _searchAddress(String query, bool isPickup) async {
+  //   if (query.length < 3) return; // Return if query is too short.
 
-        if (!mounted) return;
+  //   _debounceTimer?.cancel(); // Cancel previous debounce timer.
+  //   _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
+  //     try {
+  //       setState(() => _isLoading = true); // Set loading state to true.
 
-        if (response.statusCode == 200) {
-          final results =
-              json.decode(response.body) as List; // Decode JSON response.
-          if (results.isNotEmpty) {
-            await _showAddressSuggestions(
-                results, isPickup); // Show address suggestions.
-          }
-        }
-      } catch (e) {
-        _handleError('Error searching address',
-            e); // Handle error if searching address fails.
-      } finally {
-        if (mounted) {
-          setState(() => _isLoading = false); // Set loading state to false.
-        }
-      }
-    });
-  }
+  //       final response = await http.get(
+  //         Uri.parse(
+  //           'https://nominatim.openstreetmap.org/search?format=json&q=$query&limit=5&countrycodes=us', // URL for address search.
+  //         ),
+  //         headers: {
+  //           'Accept': 'application/json',
+  //           'User-Agent':
+  //               'CateredToYou/1.0', // User-Agent header for the request.
+  //         },
+  //       );
 
-  Future<void> _showAddressSuggestions(List results, bool isPickup) async {
-    if (!mounted) return;
+  //       if (!mounted) return;
 
-    final selected = await showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.4,
-        minChildSize: 0.2,
-        maxChildSize: 0.75,
-        builder: (context, scrollController) => Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20)), // Rounded top corners.
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurfaceVariant
-                      .withAlpha((0.4 * 255).toInt()), // Handle color.
-                  borderRadius: BorderRadius.circular(2), // Rounded handle.
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  itemCount: results.length,
-                  itemBuilder: (context, index) {
-                    final result = results[index];
-                    return ListTile(
-                      leading: const Icon(Icons.location_on), // Location icon.
-                      title: Text(
-                        result['display_name'],
-                        maxLines: 2,
-                        overflow:
-                            TextOverflow.ellipsis, // Ellipsis for long text.
-                      ),
-                      onTap: () => Navigator.pop(
-                          context, result), // Return selected result.
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  //       if (response.statusCode == 200) {
+  //         final results =
+  //             json.decode(response.body) as List; // Decode JSON response.
+  //         if (results.isNotEmpty) {
+  //           await _showAddressSuggestions(
+  //               results, isPickup); // Show address suggestions.
+  //         }
+  //       }
+  //     } catch (e) {
+  //       _handleError('Error searching address',
+  //           e); // Handle error if searching address fails.
+  //     } finally {
+  //       if (mounted) {
+  //         setState(() => _isLoading = false); // Set loading state to false.
+  //       }
+  //     }
+  //   });
+  // }
 
-    if (selected != null) {
-      final latLng = LatLng(
-        double.parse(selected['lat']),
-        double.parse(selected['lon']),
-      );
+  // Future<void> _showAddressSuggestions(List results, bool isPickup) async {
+  //   if (!mounted) return;
 
-      setState(() {
-        if (isPickup) {
-          _pickupLocation = latLng; // Set pickup location.
-          _pickupAddressController.text =
-              selected['display_name']; // Set pickup address.
-        } else {
-          _deliveryLocation = latLng; // Set delivery location.
-          _deliveryAddressController.text =
-              selected['display_name']; // Set delivery address.
-        }
-      });
+  //   final selected = await showModalBottomSheet<Map<String, dynamic>>(
+  //     context: context,
+  //     isScrollControlled: true,
+  //     backgroundColor: Colors.transparent,
+  //     builder: (context) => DraggableScrollableSheet(
+  //       initialChildSize: 0.4,
+  //       minChildSize: 0.2,
+  //       maxChildSize: 0.75,
+  //       builder: (context, scrollController) => Container(
+  //         decoration: BoxDecoration(
+  //           color: Theme.of(context).colorScheme.surface,
+  //           borderRadius: const BorderRadius.vertical(
+  //               top: Radius.circular(20)), // Rounded top corners.
+  //         ),
+  //         child: Column(
+  //           mainAxisSize: MainAxisSize.min,
+  //           children: [
+  //             Container(
+  //               margin: const EdgeInsets.symmetric(vertical: 12),
+  //               width: 40,
+  //               height: 4,
+  //               decoration: BoxDecoration(
+  //                 color: Theme.of(context)
+  //                     .colorScheme
+  //                     .onSurfaceVariant
+  //                     .withAlpha((0.4 * 255).toInt()), // Handle color.
+  //                 borderRadius: BorderRadius.circular(2), // Rounded handle.
+  //               ),
+  //             ),
+  //             Expanded(
+  //               child: ListView.builder(
+  //                 controller: scrollController,
+  //                 itemCount: results.length,
+  //                 itemBuilder: (context, index) {
+  //                   final result = results[index];
+  //                   return ListTile(
+  //                     leading: const Icon(Icons.location_on), // Location icon.
+  //                     title: Text(
+  //                       result['display_name'],
+  //                       maxLines: 2,
+  //                       overflow:
+  //                           TextOverflow.ellipsis, // Ellipsis for long text.
+  //                     ),
+  //                     onTap: () => Navigator.pop(
+  //                         context, result), // Return selected result.
+  //                   );
+  //                 },
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //       ),
+  //     ),
+  //   );
 
-      _updateMapMarkersAndPolylines(); // Update map markers and polylines.
+  //   if (selected != null) {
+  //     final latLng = LatLng(
+  //       double.parse(selected['lat']),
+  //       double.parse(selected['lon']),
+  //     );
 
-      if (_pickupLocation != null && _deliveryLocation != null) {
-        await _getRouteDetails(); // Get route details if both locations are set.
-      }
+  //     setState(() {
+  //       if (isPickup) {
+  //         _pickupLocation = latLng; // Set pickup location.
+  //         _pickupAddressController.text =
+  //             selected['display_name']; // Set pickup address.
+  //       } else {
+  //         _deliveryLocation = latLng; // Set delivery location.
+  //         _deliveryAddressController.text =
+  //             selected['display_name']; // Set delivery address.
+  //       }
+  //     });
 
-      _updateMapBounds(); // Update map bounds.
-    }
-  }
+  //     _updateMapMarkersAndPolylines(); // Update map markers and polylines.
+
+  //     if (_pickupLocation != null && _deliveryLocation != null) {
+  //       await _getRouteDetails(); // Get route details if both locations are set.
+  //     }
+
+  //     _updateMapBounds(); // Update map bounds.
+  //   }
+  // }
 
   Future<void> _getRouteDetails() async {
     if (_pickupLocation == null || _deliveryLocation == null) return;
@@ -697,53 +727,82 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
   }
 
   Widget _buildAddressInput({
-    required TextEditingController
-        controller, // Required controller for the input.
-    required String label, // Required label for the input.
-    required String hint, // Required hint for the input.
-    required bool
-        isPickup, // Required flag to indicate if this is the pickup address input.
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required bool isPickup,
   }) {
-    return TextFormField(
-      controller: controller, // Set the controller for the input.
-      decoration: InputDecoration(
-        labelText: label, // Set the label text.
-        hintText: hint, // Set the hint text.
-        prefixIcon: const Icon(Icons.location_on), // Set the prefix icon.
-        border: const OutlineInputBorder(), // Set the border style.
-        suffixIcon: controller.text.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.clear), // Set the clear icon.
-                onPressed: () {
-                  controller.clear(); // Clear the input text.
-                  setState(() {
-                    if (isPickup) {
-                      _pickupLocation = null; // Clear the pickup location.
-                    } else {
-                      _deliveryLocation = null; // Clear the delivery location.
-                    }
-                    _updateMapMarkersAndPolylines(); // Update the map markers and polylines.
-                  });
-                },
-              )
-            : null, // Show the clear icon only if the input text is not empty.
-      ),
-      onChanged: (value) {
-        if (value.length > 3) {
-          _searchAddress(value,
-              isPickup); // Search for the address if the input text length is greater than 3.
-        }
-      },
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return isPickup
-              ? 'Please enter pickup location'
-              : 'Please enter delivery location'; // Validate the input.
-        }
-        return null;
+    return AddressAutoComplete(
+      controller: controller,
+      label: label,
+      hint: hint,
+      isPickup: isPickup,
+      onLocationSelected: (location) {
+        setState(() {
+          if (isPickup) {
+            _pickupLocation = location;
+          } else {
+            _deliveryLocation = location;
+          }
+
+          _updateMapMarkersAndPolylines();
+          if (_pickupLocation != null && _deliveryLocation != null) {
+            _getRouteDetails();
+            _updateMapBounds();
+          }
+        });
       },
     );
   }
+
+  // Widget _buildAddressInput({
+  //   required TextEditingController
+  //       controller, // Required controller for the input.
+  //   required String label, // Required label for the input.
+  //   required String hint, // Required hint for the input.
+  //   required bool
+  //       isPickup, // Required flag to indicate if this is the pickup address input.
+  // }) {
+  //   return TextFormField(
+  //     controller: controller, // Set the controller for the input.
+  //     decoration: InputDecoration(
+  //       labelText: label, // Set the label text.
+  //       hintText: hint, // Set the hint text.
+  //       prefixIcon: const Icon(Icons.location_on), // Set the prefix icon.
+  //       border: const OutlineInputBorder(), // Set the border style.
+  //       suffixIcon: controller.text.isNotEmpty
+  //           ? IconButton(
+  //               icon: const Icon(Icons.clear), // Set the clear icon.
+  //               onPressed: () {
+  //                 controller.clear(); // Clear the input text.
+  //                 setState(() {
+  //                   if (isPickup) {
+  //                     _pickupLocation = null; // Clear the pickup location.
+  //                   } else {
+  //                     _deliveryLocation = null; // Clear the delivery location.
+  //                   }
+  //                   _updateMapMarkersAndPolylines(); // Update the map markers and polylines.
+  //                 });
+  //               },
+  //             )
+  //           : null, // Show the clear icon only if the input text is not empty.
+  //     ),
+  //     onChanged: (value) {
+  //       if (value.length > 3) {
+  //         _searchAddress(value,
+  //             isPickup); // Search for the address if the input text length is greater than 3.
+  //       }
+  //     },
+  //     validator: (value) {
+  //       if (value == null || value.isEmpty) {
+  //         return isPickup
+  //             ? 'Please enter pickup location'
+  //             : 'Please enter delivery location'; // Validate the input.
+  //       }
+  //       return null;
+  //     },
+  //   );
+  // }
 
   Widget _buildMapSection() {
     return SizedBox(
@@ -985,51 +1044,72 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
   }
 
   Widget _buildEventSection() {
-    final orgService = context.read<OrganizationService>(); // Access the OrganizationService to fetch the current user's organization.
+    final orgService = context.read<
+        OrganizationService>(); // Access the OrganizationService to fetch the current user's organization.
 
     return FutureBuilder<String?>(
-      future: orgService.getCurrentUserOrganization().then((org) => org?.id), // Fetch the current user's organization ID asynchronously.
+      future: orgService.getCurrentUserOrganization().then((org) =>
+          org?.id), // Fetch the current user's organization ID asynchronously.
       builder: (context, orgSnapshot) {
         if (!orgSnapshot.hasData) {
-          return const Center(child: CircularProgressIndicator()); // Show a loading indicator while the organization data is being fetched.
+          return const Center(
+              child:
+                  CircularProgressIndicator()); // Show a loading indicator while the organization data is being fetched.
         }
 
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start of the column.
+          crossAxisAlignment: CrossAxisAlignment
+              .start, // Align children to the start of the column.
           children: [
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('events') // Access the 'events' collection in Firestore.
-                  .where('organizationId', isEqualTo: orgSnapshot.data) // Filter events by the current user's organization ID.
-                  .where('status', whereIn: ['confirmed', 'in_progress']).snapshots(), // Filter events with statuses 'confirmed' or 'in_progress'.
+                  .collection(
+                      'events') // Access the 'events' collection in Firestore.
+                  .where('organizationId',
+                      isEqualTo: orgSnapshot
+                          .data) // Filter events by the current user's organization ID.
+                  .where('status', whereIn: [
+                'confirmed',
+                'in_progress'
+              ]).snapshots(), // Filter events with statuses 'confirmed' or 'in_progress'.
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return Text('Error: ${snapshot.error}'); // Display an error message if there's an issue with the Firestore query.
+                  return Text(
+                      'Error: ${snapshot.error}'); // Display an error message if there's an issue with the Firestore query.
                 }
 
                 if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator()); // Show a loading indicator while event data is being fetched.
+                  return const Center(
+                      child:
+                          CircularProgressIndicator()); // Show a loading indicator while event data is being fetched.
                 }
 
-                final events = snapshot.data!.docs; // Retrieve the list of event documents.
+                final events = snapshot
+                    .data!.docs; // Retrieve the list of event documents.
 
                 return DropdownButtonFormField<String>(
-                  value: _selectedEventId, // Set the currently selected event ID.
+                  value:
+                      _selectedEventId, // Set the currently selected event ID.
                   decoration: const InputDecoration(
                     labelText: 'Select Event', // Label for the dropdown.
-                    hintText: 'Choose an event for delivery', // Hint text for the dropdown.
-                    prefixIcon: Icon(Icons.event), // Icon to indicate the dropdown is for events.
+                    hintText:
+                        'Choose an event for delivery', // Hint text for the dropdown.
+                    prefixIcon: Icon(Icons
+                        .event), // Icon to indicate the dropdown is for events.
                   ),
                   items: events.map((doc) {
-                    final data = doc.data() as Map<String, dynamic>; // Extract the event data from the document.
+                    final data = doc.data() as Map<String,
+                        dynamic>; // Extract the event data from the document.
                     return DropdownMenuItem(
                       value: doc.id, // Set the event ID as the value.
-                      child: Text(data['name'] ?? 'Unnamed Event'), // Display the event name or a fallback if it's unnamed.
+                      child: Text(data['name'] ??
+                          'Unnamed Event'), // Display the event name or a fallback if it's unnamed.
                     );
                   }).toList(), // Convert the list of events into dropdown menu items.
                   onChanged: (value) {
                     if (value != null) {
-                      _handleEventSelection(value); // Handle the event selection and fetch its details.
+                      _handleEventSelection(
+                          value); // Handle the event selection and fetch its details.
                     }
                   },
                   validator: (value) {
@@ -1045,33 +1125,45 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
             // Display manifest status - moved outside the dropdown
             if (_isLoadingManifest)
               Padding(
-                padding: const EdgeInsets.only(top: 8.0), // Add spacing above the loading indicator.
+                padding: const EdgeInsets.only(
+                    top: 8.0), // Add spacing above the loading indicator.
                 child: Row(
                   children: const [
                     SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2), // Show a small loading indicator for manifest loading.
+                      child: CircularProgressIndicator(
+                          strokeWidth:
+                              2), // Show a small loading indicator for manifest loading.
                     ),
-                    SizedBox(width: 8), // Add spacing between the indicator and the text.
-                    Text('Loading manifest...'), // Inform the user that the manifest is being loaded.
+                    SizedBox(
+                        width:
+                            8), // Add spacing between the indicator and the text.
+                    Text(
+                        'Loading manifest...'), // Inform the user that the manifest is being loaded.
                   ],
                 ),
               )
             else if (_manifestError != null)
               Padding(
-                padding: const EdgeInsets.only(top: 8.0), // Add spacing above the error message.
+                padding: const EdgeInsets.only(
+                    top: 8.0), // Add spacing above the error message.
                 child: Text(
                   _manifestError!, // Display the manifest error message.
-                  style: TextStyle(color: Colors.red.shade700), // Style the error message in red.
+                  style: TextStyle(
+                      color: Colors
+                          .red.shade700), // Style the error message in red.
                 ),
               )
             else if (_manifest != null)
               Padding(
-                padding: const EdgeInsets.only(top: 8.0), // Add spacing above the manifest status.
+                padding: const EdgeInsets.only(
+                    top: 8.0), // Add spacing above the manifest status.
                 child: Text(
                   'Manifest loaded: ${_manifest!.items.length} items', // Display the number of items in the loaded manifest.
-                  style: const TextStyle(color: Colors.green), // Style the message in green to indicate success.
+                  style: const TextStyle(
+                      color: Colors
+                          .green), // Style the message in green to indicate success.
                 ),
               ),
           ],
