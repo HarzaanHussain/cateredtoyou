@@ -32,7 +32,7 @@ class TrackDeliveryScreen extends StatefulWidget {
   State<TrackDeliveryScreen> createState() => _TrackDeliveryScreenState();
 }
 
-class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
+class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsBindingObserver, TickerProviderStateMixin {
   late StreamSubscription<DocumentSnapshot> _routeSubscription;
   final MapController _mapController = MapController();
 
@@ -40,6 +40,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   List<LatLng> _routePoints = [];
   List<Marker> _markers = [];
   List<Polyline> _polylines = [];
+  final List<LatLng> _recentPositions = []; // Store recent positions for trail effect
 
   bool _isLoading = true;
   Timer? _routeUpdateTimer;
@@ -47,6 +48,11 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   bool _showInfoCard = true;
   bool _isManagementUser = false;
   bool _isActiveDriver = false;
+  
+  // Action feedback states
+  bool _isProcessingAction = false;
+  String? _actionFeedback;
+  bool _isActionSuccess = false;
 
   // Location tracking status variables
   bool _isUpdatingLocation = false;
@@ -54,20 +60,36 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   String _lastUpdateTime = '';
   DateTime? _lastLocationUpdateTime;
 
-  // Animation variables
+  // Enhanced animation variables
   LatLng? _animatedDriverPosition;
-  Timer? _animationTimer;
+  LatLng? _previousDriverPosition;
+  double _currentHeading = 0.0;
+  double _currentSpeed = 0.0;
+  DateTime? _lastPositionTimestamp;
+  AnimationController? _animationController;
+  Animation<double>? _animation;
+  Timer? _predictionTimer;
   Timer? _visualRefreshTimer;
+
+  // Pulse animation for marker
+  AnimationController? _pulseController;
+  Animation<double>? _pulseAnimation;
 
   // Constants
   static const String osmRoutingUrl =
       'https://router.project-osrm.org/route/v1/driving/';
   static const double _defaultZoom = 13.0;
+  static const int _predictiveUpdateFrequencyMs = 50; // Very frequent updates for smooth animation
+  static const int _maxRecentPositions = 10; // Number of positions to keep for trail
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _currentRoute = widget.route;
+
+    // Set up animation controllers
+    _setupAnimationControllers();
 
     // Immediately calculate and populate route metrics for initial view
     _calculateRouteMetrics(widget.route);
@@ -76,15 +98,193 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
     _fetchRouteDetails();
     _setupRefreshTimer();
     _checkUserPermissions();
+    
+    // Start predictive updates immediately
+    _startPredictiveUpdates();
+  }
+  
+  void _setupAnimationControllers() {
+    // Main animation controller for position transitions
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500), // Smoother, longer animation
+    );
+    
+    _animation = CurvedAnimation(
+      parent: _animationController!,
+      curve: Curves.easeInOutCubic, // More natural movement curve
+    );
+    
+    // Pulse animation for recently updated position
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.5)
+      .chain(CurveTween(curve: Curves.easeInOutSine))
+      .animate(_pulseController!);
+    
+    // Listen to animation updates to refresh the UI
+    _animationController!.addListener(() {
+      if (mounted) {
+        setState(() {
+          // Calculate the animated position based on animation progress
+          _updateAnimatedPosition();
+        });
+      }
+    });
+    
+    _pulseController!.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _pulseController!.reverse();
+      } else if (status == AnimationStatus.dismissed) {
+        _pulseController!.forward();
+      }
+    });
+    
+    // Start pulse animation
+    _pulseController!.forward();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _routeSubscription.cancel();
     _routeUpdateTimer?.cancel();
-    _animationTimer?.cancel();
+    _predictionTimer?.cancel();
     _visualRefreshTimer?.cancel();
+    _animationController?.dispose();
+    _pulseController?.dispose();
     super.dispose();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When app resumes, refresh data and restart animations
+    if (state == AppLifecycleState.resumed) {
+      _refreshData();
+      
+      // Restart animation controllers if needed
+      if (_animationController?.isAnimating == false) {
+        _animationController?.reset();
+      }
+      
+      if (_pulseController?.isAnimating == false) {
+        _pulseController?.forward();
+      }
+    }
+  }
+  
+  // Start predictive updates for smoother animation
+  void _startPredictiveUpdates() {
+    _predictionTimer?.cancel();
+  return;
+    /*_predictionTimer = Timer.periodic(
+      Duration(milliseconds: _predictiveUpdateFrequencyMs),
+      (_) {
+        if (mounted && _currentRoute?.status == 'in_progress') {
+          _predictNextPosition();
+          setState(() {}); // Update UI with predicted position
+        }
+      },
+    );*/
+  }
+  
+  // Predict next position based on speed, heading and time elapsed
+  void _predictNextPosition() {
+    if (_animatedDriverPosition == null || 
+        _currentRoute?.currentLocation == null || 
+        _currentHeading.isNaN ||
+        _lastPositionTimestamp == null) {
+      return;
+    }
+    
+    // Skip prediction if animation is actively running
+    if (_animationController?.isAnimating == true) {
+      return;
+    }
+    
+    // Get current time
+    final now = DateTime.now();
+    
+    // Calculate time elapsed since last update
+    final elapsedMs = now.difference(_lastPositionTimestamp!).inMilliseconds;
+    if (elapsedMs <= 0) return;
+    
+    // Convert speed from m/s to degrees/ms
+    // 111,320 meters per degree at equator (approximate)
+    final double speedFactor = _currentSpeed / 111320 / 1000;
+    
+    // Don't predict if speed is too low
+    if (_currentSpeed < 1.0) return;
+    
+    // Calculate movement distance
+    final double distance = speedFactor * elapsedMs;
+    
+    // Convert heading to radians and calculate new position
+    final double headingRad = _currentHeading * (math.pi / 180);
+    final double lat = _animatedDriverPosition!.latitude + distance * math.cos(headingRad);
+    final double lng = _animatedDriverPosition!.longitude + distance * math.sin(headingRad);
+    
+    // Update animated position
+    _animatedDriverPosition = LatLng(lat, lng);
+    
+    // Update trail positions (once every few predictions)
+    if (_recentPositions.isEmpty || 
+        calculateDistance(_recentPositions.last, _animatedDriverPosition!) > 0.0005) {
+      _updateTrailPositions(_animatedDriverPosition!);
+    }
+    
+    // Update map markers
+    _updateMapMarkers();
+  }
+  
+  // Calculate distance between two points
+  double calculateDistance(LatLng p1, LatLng p2) {
+    return math.sqrt(math.pow(p2.latitude - p1.latitude, 2) + 
+                     math.pow(p2.longitude - p1.longitude, 2));
+  }
+  
+  // Update trail positions for visual effect
+  void _updateTrailPositions(LatLng newPosition) {
+    _recentPositions.add(newPosition);
+    if (_recentPositions.length > _maxRecentPositions) {
+      _recentPositions.removeAt(0);
+    }
+  }
+  
+  // Manual refresh function
+  Future<void> _refreshData() async {
+    if (_currentRoute == null) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // Force a refresh by directly fetching the document
+      final docSnapshot = await FirebaseFirestore.instance
+          .collection('delivery_routes')
+          .doc(_currentRoute!.id)
+          .get();
+      
+      if (docSnapshot.exists) {
+        await _handleRouteUpdate(docSnapshot);
+      }
+      
+      // Also re-fetch route details
+      await _fetchRouteDetails();
+      await _checkUserPermissions();
+    } catch (e) {
+      debugPrint('Error refreshing data: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _checkUserPermissions() async {
@@ -98,12 +298,14 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
     }
 
     final isManager = await isManagementUser(context);
-    final isDriver = await isActiveDeliveryDriver(widget.route.id, userId);
+    final isDriver = userId == _currentRoute?.currentDriver || userId == _currentRoute?.driverId;
 
-    setState(() {
-      _isManagementUser = isManager;
-      _isActiveDriver = isDriver;
-    });
+    if (mounted) {
+      setState(() {
+        _isManagementUser = isManager;
+        _isActiveDriver = isDriver;
+      });
+    }
   }
 
   void _setupRouteSubscription() {
@@ -111,24 +313,31 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         .collection('delivery_routes')
         .doc(widget.route.id)
         .snapshots()
-        .listen(_handleRouteUpdate);
+        .listen((snapshot) {
+          if (mounted) {
+            _handleRouteUpdate(snapshot);
+          }
+        }, onError: (error) {
+          debugPrint('Error in route subscription: $error');
+          _showSnackBar('Error getting updates. Pull down to refresh.', isError: true);
+        });
   }
 
   void _setupRefreshTimer() {
-    // Main update timer for data refresh - every 30 seconds
+    // Main update timer for data refresh - every 15 seconds
     _routeUpdateTimer = Timer.periodic(
-      const Duration(seconds: 30),
+      const Duration(seconds: 15), // Less frequent backend refresh
       (_) => _updateDeliveryMetrics(),
     );
 
-    // Visual refresh timer for smoother animations - every 500ms
+    // Visual refresh timer for smoother animations - every 100ms for fluid updates
     _visualRefreshTimer = Timer.periodic(
-      const Duration(milliseconds: 500),
+      const Duration(milliseconds: 100),
       (_) {
         if (mounted && _currentRoute?.status == 'in_progress') {
-          setState(() {
-            // This triggers a rebuild, keeping animations smoother
-          });
+          // Force map marker refresh for smooth animation
+          _updateMapMarkers();
+          setState(() {});
         }
       },
     );
@@ -241,7 +450,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   }
 
   double _degreesToRadians(double degrees) {
-    return degrees * (3.14159 / 180);
+    return degrees * (math.pi / 180);
   }
 
   double sin(double rad) => math.sin(rad);
@@ -249,7 +458,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   double atan2(double y, double x) => math.atan2(y, x);
   double sqrt(double value) => value <= 0 ? 0 : math.sqrt(value);
 
-  void _handleRouteUpdate(DocumentSnapshot snapshot) async {
+  Future<void> _handleRouteUpdate(DocumentSnapshot snapshot) async {
     if (!mounted || !snapshot.exists) return;
 
     try {
@@ -276,6 +485,15 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
       // Create route object with the sanitized data
       final newRoute = DeliveryRoute.fromMap(safeData, snapshot.id);
 
+      // Check if the status changed
+      final statusChanged = _currentRoute?.status != newRoute.status;
+      if (statusChanged && newRoute.status == 'completed') {
+        _showSnackBar('Delivery completed successfully!', isError: false);
+        
+        // If delivery is completed, check if we need to update permissions
+        await _checkUserPermissions();
+      }
+
       final locationChanged = newRoute.currentLocation?.latitude !=
               _currentRoute?.currentLocation?.latitude ||
           newRoute.currentLocation?.longitude !=
@@ -284,13 +502,30 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
       if (locationChanged && newRoute.currentLocation != null) {
         // Location was updated - update the tracking indicators
         _lastLocationUpdateTime = DateTime.now();
+        _lastPositionTimestamp = DateTime.now();
         _locationUpdatedRecently = true;
         _lastUpdateTime =
             DateFormat('h:mm:ss a').format(_lastLocationUpdateTime!);
 
-        // Set up smooth animation of the driver marker
-        _setupSmoothMarkerAnimation(
-            _currentRoute?.currentLocation, newRoute.currentLocation!);
+        // Update speed and heading for better prediction
+        _currentHeading = newRoute.currentHeading ?? 0.0;
+        _currentSpeed = (newRoute.metadata?['currentSpeed'] as num?)?.toDouble() ?? 5.0;
+
+        // Save previous position for animation
+        if (_currentRoute?.currentLocation != null) {
+          _previousDriverPosition = LatLng(
+            _currentRoute!.currentLocation!.latitude,
+            _currentRoute!.currentLocation!.longitude,
+          );
+        }
+
+        // Setup enhanced animation
+        _setupEnhancedAnimation(
+            _previousDriverPosition, 
+            LatLng(
+              newRoute.currentLocation!.latitude,
+              newRoute.currentLocation!.longitude,
+            ));
 
         // Reset "recently updated" after 10 seconds
         Future.delayed(const Duration(seconds: 10), () {
@@ -307,6 +542,11 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         } catch (e) {
           debugPrint('Error calculating ETA: $e');
         }
+      }
+
+      // Check if we need to update permission states
+      if (_currentRoute?.currentDriver != newRoute.currentDriver) {
+        await _checkUserPermissions();
       }
 
       setState(() {
@@ -329,14 +569,11 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         _isFirstLoad = false;
         _performInitialMapPreview();
       } else if (locationChanged && _currentRoute?.status == 'in_progress') {
-        // Only auto-center if we're not already animating (for smoother experience)
-        if (_animationTimer == null) {
+        // Center on driver for significant location changes
+        if (!_animationController!.isAnimating) {
           _centerOnDriver();
         }
       }
-
-      // Also check if user permissions have changed (e.g., if they were reassigned)
-      await _checkUserPermissions();
     } catch (e) {
       debugPrint('Error processing route update: $e');
       if (mounted) {
@@ -348,77 +585,45 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
     }
   }
 
-  void _setupSmoothMarkerAnimation(
-      GeoPoint? oldLocation, GeoPoint newLocation) {
-    // Cancel any existing animation
-    _animationTimer?.cancel();
-
-    // If this is the first location update, just set the position directly
-    if (oldLocation == null) {
-      _animatedDriverPosition =
-          LatLng(newLocation.latitude, newLocation.longitude);
-      return;
-    }
-
-    // Set up animation parameters
-    final startLat = oldLocation.latitude;
-    final startLng = oldLocation.longitude;
-    final endLat = newLocation.latitude;
-    final endLng = newLocation.longitude;
-
-    // Calculate distance to determine animation duration
-    final distance =
-        _calculateStraightLineDistance(startLat, startLng, endLat, endLng);
-
-    // Set animation duration based on distance (longer for larger jumps)
-    // but keep it under 2 seconds for responsiveness
-    final animationDuration = (distance > 0.5)
-        ? Duration(milliseconds: 1500)
-        : Duration(milliseconds: (distance * 2000).clamp(300, 1000).toInt());
-
-    // Number of animation steps (more for smoother animation)
-    const steps = 20;
-    final stepDuration =
-        Duration(milliseconds: animationDuration.inMilliseconds ~/ steps);
-
-    // Initialize with start position
-    _animatedDriverPosition = LatLng(startLat, startLng);
-    int currentStep = 0;
-
-    // Create animation timer
-    _animationTimer = Timer.periodic(stepDuration, (timer) {
-      currentStep++;
-
-      if (currentStep >= steps) {
-        // Animation complete - set final position
-        if (mounted) {
-          setState(() {
-            _animatedDriverPosition = LatLng(endLat, endLng);
-          });
-        }
-        timer.cancel();
-        _animationTimer = null;
-        return;
-      }
-
-      // Calculate intermediate position using easeInOut curve for smoother motion
-      final progress = _easeInOut(currentStep / steps);
-      final lat = startLat + (endLat - startLat) * progress;
-      final lng = startLng + (endLng - startLng) * progress;
-
-      if (mounted) {
-        setState(() {
-          _animatedDriverPosition = LatLng(lat, lng);
-          _updateMapMarkers(); // Update markers with new animated position
-        });
-      }
-    });
+ void _setupEnhancedAnimation(LatLng? oldPosition, LatLng newPosition) {
+  // If no previous position, just set directly
+  if (oldPosition == null) {
+    _animatedDriverPosition = newPosition;
+    _updateTrailPositions(newPosition);
+    return;
   }
+  
+  // Reset animation controller to prevent continuous animations
+  _animationController?.reset();
+  
+  // Turn off pulse effect - can cause issues with position display
+  _pulseController?.reset();
+  _pulseController?.stop();
+  
+  // Set position directly instead of animating (prevents drift)
+  _animatedDriverPosition = newPosition;
+  _previousDriverPosition = newPosition;
+  
+  // Add position to trail immediately
+  _updateTrailPositions(newPosition);
+  
+  // Update markers immediately
+  _updateMapMarkers();
+  
+  debugPrint('📍 Position set directly: ${newPosition.latitude}, ${newPosition.longitude}');
+}
 
-  // Easing function for smoother animation
-  double _easeInOut(double t) {
-    return t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1;
+
+  // Update animated position based on animation progress
+  void _updateAnimatedPosition() {
+  // Directly use current location to prevent drift
+  if (_currentRoute?.currentLocation != null) {
+    _animatedDriverPosition = LatLng(
+      _currentRoute!.currentLocation!.latitude,
+      _currentRoute!.currentLocation!.longitude,
+    );
   }
+}
 
   Future<void> _calculateUpdatedETA(DeliveryRoute route) async {
     if (route.currentLocation == null || route.waypoints.isEmpty) return;
@@ -604,11 +809,12 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
   }
 
   void _updateMapMarkers() {
-    if (!mounted || _currentRoute == null) return;
+  if (!mounted || _currentRoute == null) return;
 
-    final markers = <Marker>[];
+  final markers = <Marker>[];
 
-    // Add pickup marker
+  // Add pickup marker
+  if (_currentRoute!.waypoints.isNotEmpty) {
     markers.add(MapMarkerHelper.createMarker(
       point: LatLng(
         _currentRoute!.waypoints.first.latitude,
@@ -619,8 +825,10 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
       icon: Icons.store,
       title: 'Pickup',
     ));
+  }
 
-    // Add delivery marker
+  // Add delivery marker
+  if (_currentRoute!.waypoints.length > 1) {
     markers.add(MapMarkerHelper.createMarker(
       point: LatLng(
         _currentRoute!.waypoints.last.latitude,
@@ -631,61 +839,120 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
       icon: Icons.location_on,
       title: 'Delivery',
     ));
+  }
 
-    // Use animated position for the driver marker if available
-    if (_animatedDriverPosition != null ||
-        _currentRoute!.currentLocation != null) {
-      // Determine which position to use (animated or actual)
-      final markerPos = _animatedDriverPosition ??
-          LatLng(_currentRoute!.currentLocation!.latitude,
-              _currentRoute!.currentLocation!.longitude);
+  // DISABLED trail markers to prevent position drift
+  /*
+  if (_recentPositions.isNotEmpty) {
+    for (int i = 0; i < _recentPositions.length - 1; i++) {
+      final opacity = 0.3 * (i / _recentPositions.length);
+      final size = 5.0 + (i * 2);
+      
+      // Only add every other point to avoid clutter
+      if (i % 2 == 0) {
+        markers.add(
+          Marker(
+            point: _recentPositions[i],
+            width: size,
+            height: size,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.blue.withAlpha((opacity * 255).toInt()),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        );
+      }
+    }
+  }
+  */
+  
+  // Use ONLY the real current location (no animated position)
+  if (_currentRoute!.currentLocation != null) {
+    // Use the actual position from Firestore, not animated
+    final markerPos = LatLng(
+      _currentRoute!.currentLocation!.latitude,
+      _currentRoute!.currentLocation!.longitude
+    );
 
-      markers.add(
-        Marker(
-          point: markerPos,
-          width: 60,
-          height: 60,
-          child: Stack(
-            children: [
-              Transform.rotate(
-                angle: (_currentRoute!.currentHeading ?? 0) * (3.14159 / 180),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withAlpha((0.4 * 255).toInt()),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.navigation,
-                    color: Colors.blue,
-                    size: 34,
+    // Get current heading (with fallback)
+    final heading = _currentRoute!.currentHeading ?? 0.0;
+
+    // Add simple driver marker without animations
+    markers.add(
+      Marker(
+        point: markerPos,
+        width: 60,
+        height: 60,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Driver icon with proper rotation
+            Transform.rotate(
+              angle: heading * (math.pi / 180),
+              child: Container(
+                width: 45,
+                height: 45,
+                decoration: BoxDecoration(
+                  color: Colors.blue.withAlpha((0.8 * 255).toInt()),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha((0.3 * 255).toInt()),
+                      blurRadius: 5,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                  border: Border.all(
+                    color: Colors.white,
+                    width: 2,
                   ),
                 ),
+                child: const Icon(
+                  Icons.navigation,
+                  color: Colors.white,
+                  size: 24,
+                ),
               ),
-              const Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Text(
+            ),
+            
+            // Label below
+            Positioned(
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha((0.2 * 255).toInt()),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: const Text(
                   'Driver',
-                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.blue,
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
-                    backgroundColor: Colors.white,
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
-    }
-
-    setState(() {
-      _markers = markers;
-    });
+      ),
+    );
   }
+
+  setState(() {
+    _markers = markers;
+  });
+}
 
   void _performInitialMapPreview() {
     if (_routePoints.isEmpty) return;
@@ -745,11 +1012,9 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
     final uri = Uri(scheme: scheme, path: phone);
     if (!await launchUrl(uri)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Could not ${scheme == 'tel' ? 'call' : 'message'} driver'),
-          ),
+        _showSnackBar(
+          'Could not ${scheme == 'tel' ? 'call' : 'message'} driver', 
+          isError: true
         );
       }
     }
@@ -767,15 +1032,21 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open navigation app')),
-        );
+        _showSnackBar('Could not open navigation app', isError: true);
       }
     }
   }
 
   // Management Actions
   Future<void> _takeOverDelivery() async {
+    if (_isProcessingAction) return;
+    
+    setState(() {
+      _isProcessingAction = true;
+      _actionFeedback = 'Taking over delivery...';
+      _isActionSuccess = false;
+    });
+    
     try {
       final deliveryService =
           Provider.of<DeliveryRouteService>(context, listen: false);
@@ -791,27 +1062,44 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You have taken over this delivery')),
-        );
+        setState(() {
+          _isProcessingAction = false;
+          _actionFeedback = 'Successfully taken over delivery';
+          _isActionSuccess = true;
+        });
+        
+        _showSnackBar('You have taken over this delivery', isError: false);
 
         // Refresh user permissions
         await _checkUserPermissions();
+        
+        // Force refresh data
+        await _refreshData();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
+        setState(() {
+          _isProcessingAction = false;
+          _actionFeedback = 'Error: ${e.toString()}';
+          _isActionSuccess = false;
+        });
+        
+        _showSnackBar('Error: ${e.toString()}', isError: true);
       }
     }
   }
 
   Future<void> _showReassignDialog() async {
-    await showDialog(
+    final result = await showDialog(
       context: context,
       builder: (context) => ReassignDriverDialog(route: _currentRoute!),
     );
+    
+    if (result == true) {
+      // Driver was successfully reassigned, refresh data
+      await _refreshData();
+      await _checkUserPermissions();
+    }
   }
 
   Future<void> _showDeleteDialog() async {
@@ -854,6 +1142,11 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
     );
 
     if (confirmed == true && mounted) {
+      setState(() {
+        _isProcessingAction = true;
+        _actionFeedback = 'Deleting delivery...';
+      });
+      
       try {
         final deliveryService =
             Provider.of<DeliveryRouteService>(context, listen: false);
@@ -861,18 +1154,30 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
             reason: reasonController.text);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Delivery deleted')),
-          );
+          setState(() {
+            _isProcessingAction = false;
+            _actionFeedback = 'Delivery deleted successfully';
+            _isActionSuccess = true;
+          });
+          
+          _showSnackBar('Delivery deleted', isError: false);
 
-          // Pop back to previous screen
-          Navigator.of(context).pop();
+          // Pop back to previous screen after a short delay
+          Future.delayed(const Duration(seconds: 1), () {
+            if (mounted) {
+              Navigator.of(context).pop(true); // Return true to indicate changes
+            }
+          });
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${e.toString()}')),
-          );
+          setState(() {
+            _isProcessingAction = false;
+            _actionFeedback = 'Error: ${e.toString()}';
+            _isActionSuccess = false;
+          });
+          
+          _showSnackBar('Error: ${e.toString()}', isError: true);
         }
       }
     }
@@ -960,6 +1265,11 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
     );
 
     if (confirmed == true && mounted) {
+      setState(() {
+        _isProcessingAction = true;
+        _actionFeedback = 'Updating delivery times...';
+      });
+      
       try {
         final now = DateTime.now();
 
@@ -991,18 +1301,165 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
         });
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Delivery times updated')),
-          );
+          setState(() {
+            _isProcessingAction = false;
+            _actionFeedback = 'Delivery times updated successfully';
+            _isActionSuccess = true;
+          });
+          
+          _showSnackBar('Delivery times updated', isError: false);
+          
+          // Force refresh
+          await _refreshData();
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${e.toString()}')),
-          );
+          setState(() {
+            _isProcessingAction = false;
+            _actionFeedback = 'Error: ${e.toString()}';
+            _isActionSuccess = false;
+          });
+          
+          _showSnackBar('Error: ${e.toString()}', isError: true);
         }
       }
     }
+  }
+  
+  Future<void> _startDelivery() async {
+    if (_isProcessingAction) return;
+    
+    setState(() {
+      _isProcessingAction = true;
+      _actionFeedback = 'Starting delivery...';
+      _isActionSuccess = false;
+    });
+    
+    try {
+      final deliveryService =
+          Provider.of<DeliveryRouteService>(context, listen: false);
+      final locationService =
+          Provider.of<LocationService>(context, listen: false);
+
+      // Update status in Firestore
+      await deliveryService.updateRouteStatus(_currentRoute!.id, 'in_progress');
+
+      // Start location tracking
+      await locationService.startTrackingDelivery(_currentRoute!.id);
+
+      if (mounted) {
+        setState(() {
+          _isProcessingAction = false;
+          _actionFeedback = 'Delivery started successfully';
+          _isActionSuccess = true;
+        });
+        
+        _showSnackBar('Delivery started successfully', isError: false);
+        
+        // Force refresh
+        await _refreshData();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessingAction = false;
+          _actionFeedback = 'Error: ${e.toString()}';
+          _isActionSuccess = false;
+        });
+        
+        _showSnackBar('Error starting delivery: $e', isError: true);
+      }
+    }
+  }
+
+  Future<void> _completeDelivery() async {
+    if (_isProcessingAction) return;
+    
+    // Show confirmation dialog
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Complete Delivery'),
+        content: const Text(
+            'Are you sure you want to mark this delivery as completed?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Complete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    setState(() {
+      _isProcessingAction = true;
+      _actionFeedback = 'Completing delivery...';
+      _isActionSuccess = false;
+    });
+    
+    try {
+      final deliveryService =
+          Provider.of<DeliveryRouteService>(context, listen: false);
+      final locationService =
+          Provider.of<LocationService>(context, listen: false);
+
+      // Update status in Firestore
+      await deliveryService.updateRouteStatus(_currentRoute!.id, 'completed');
+
+      // Stop location tracking
+      if (locationService.activeDeliveryId == _currentRoute!.id) {
+        await locationService.stopTrackingDelivery(completed: true);
+      }
+
+      if (mounted) {
+        setState(() {
+          _isProcessingAction = false;
+          _actionFeedback = 'Delivery completed successfully';
+          _isActionSuccess = true;
+        });
+        
+        _showSnackBar('Delivery completed successfully', isError: false);
+        
+        // Force refresh
+        await _refreshData();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessingAction = false;
+          _actionFeedback = 'Error: ${e.toString()}';
+          _isActionSuccess = false;
+        });
+        
+        _showSnackBar('Error completing delivery: $e', isError: true);
+      }
+    }
+  }
+  
+  void _showSnackBar(String message, {required bool isError}) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Theme.of(context).colorScheme.error : null,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+        action: SnackBarAction(
+          label: 'OK',
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -1026,145 +1483,380 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
             onPressed: _performInitialMapPreview,
             tooltip: 'View entire route',
           ),
+          if (_currentRoute?.status == 'in_progress')
+            IconButton(
+              icon: const Icon(Icons.navigation),
+              onPressed: _openGoogleMapsNavigation,
+              tooltip: 'Open in Google Maps',
+            ),
           IconButton(
-            icon: const Icon(Icons.navigation),
-            onPressed: _openGoogleMapsNavigation,
-            tooltip: 'Open in Google Maps',
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshData,
+            tooltip: 'Refresh data',
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Stack(
-              children: [
-                DeliveryMap(
-                  mapController: _mapController,
-                  markers: _markers,
-                  polylines: _polylines,
-                  initialPosition: _currentRoute?.currentLocation != null
-                      ? LatLng(
-                          _currentRoute!.currentLocation!.latitude,
-                          _currentRoute!.currentLocation!.longitude,
-                        )
-                      : LatLng(
-                          _currentRoute!.waypoints.first.latitude,
-                          _currentRoute!.waypoints.first.longitude,
-                        ),
-                  isLoading: _isLoading,
-                ),
-
-                // Position the loaded items section at the top with proper padding
-                if (_showInfoCard &&
-                    _currentRoute != null &&
-                    _currentRoute!.metadata != null &&
-                    _currentRoute!.metadata!['loadedItems'] != null)
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    top: 16,
-                    child: LoadedItemsSection(
-                      items: List<Map<String, dynamic>>.from(
-                          _currentRoute!.metadata!['loadedItems']),
-                      allItemsLoaded:
-                          _currentRoute!.metadata!['vehicleHasAllItems'] ??
-                              false,
-                    ),
+      body: RefreshIndicator(
+        onRefresh: _refreshData,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Stack(
+                children: [
+                  DeliveryMap(
+                    mapController: _mapController,
+                    markers: _markers,
+                    polylines: _polylines,
+                    initialPosition: _currentRoute?.currentLocation != null
+                        ? LatLng(
+                            _currentRoute!.currentLocation!.latitude,
+                            _currentRoute!.currentLocation!.longitude,
+                          )
+                        : LatLng(
+                            _currentRoute!.waypoints.first.latitude,
+                            _currentRoute!.waypoints.first.longitude,
+                          ),
+                    isLoading: _isLoading,
                   ),
 
-                // Management actions section
-                if (_isManagementUser || _isActiveDriver)
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: _showInfoCard
-                        ? 250
-                        : 16, // Position above or at bottom depending on info card
-                    child: Card(
-                      elevation: 4,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
+                  // Position the loaded items section at the top with proper padding
+                  if (_showInfoCard &&
+                      _currentRoute != null &&
+                      _currentRoute!.metadata != null &&
+                      _currentRoute!.metadata!['loadedItems'] != null)
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      top: 16,
+                      child: LoadedItemsSection(
+                        items: List<Map<String, dynamic>>.from(
+                            _currentRoute!.metadata!['loadedItems']),
+                        allItemsLoaded:
+                            _currentRoute!.metadata!['vehicleHasAllItems'] ??
+                                false,
+                      ),
+                    ),
+
+                  // Management actions section - NEW IMPROVED VERSION
+                  if ((_isManagementUser || _isActiveDriver) && 
+                      _currentRoute != null && 
+                      (_currentRoute!.status == 'pending' || _currentRoute!.status == 'in_progress'))
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: _showInfoCard ? 250 : 16,
+                      child: Card(
+                        elevation: 4,
+                        clipBehavior: Clip.antiAlias,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.admin_panel_settings,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Management Actions',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Action buttons
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
+                            // Header with collapsible functionality
+                            Container(
+                              color: Theme.of(context).colorScheme.primaryContainer,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                               child: Row(
                                 children: [
-                                  if (!_isActiveDriver &&
-                                      _currentRoute!.status != 'completed' &&
-                                      _currentRoute!.status != 'cancelled')
-                                    _buildActionButton(
-                                      icon: Icons.person_add,
-                                      label: 'Take Over',
-                                      color: Colors.blue,
-                                      onPressed: _takeOverDelivery,
+                                  Icon(
+                                    Icons.admin_panel_settings,
+                                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Delivery Actions',
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
                                     ),
-                                  if (_isManagementUser &&
-                                      _currentRoute!.status != 'completed' &&
-                                      _currentRoute!.status != 'cancelled')
-                                    _buildActionButton(
+                                  ),
+                                  const Spacer(),
+                                  if (_isProcessingAction)
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            
+                            // Feedback area (when an action is in progress or completed)
+                            if (_actionFeedback != null)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                color: _isActionSuccess 
+                                  ? Colors.green.withAlpha((0.1 * 255).toInt())
+                                  : _isProcessingAction 
+                                    ? Colors.blue.withAlpha((0.1 * 255).toInt())
+                                    : Colors.red.withAlpha((0.1 * 255).toInt()),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _isActionSuccess 
+                                        ? Icons.check_circle 
+                                        : _isProcessingAction 
+                                          ? Icons.hourglass_top
+                                          : Icons.error,
+                                      size: 16, 
+                                      color: _isActionSuccess 
+                                        ? Colors.green 
+                                        : _isProcessingAction 
+                                          ? Colors.blue
+                                          : Colors.red,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _actionFeedback!,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: _isActionSuccess 
+                                            ? Colors.green 
+                                            : _isProcessingAction 
+                                              ? Colors.blue
+                                              : Colors.red,
+                                        ),
+                                      ),
+                                    ),
+                                    if (_actionFeedback != null && !_isProcessingAction)
+                                      IconButton(
+                                        icon: const Icon(Icons.close, size: 14),
+                                        onPressed: () {
+                                          setState(() {
+                                            _actionFeedback = null;
+                                          });
+                                        },
+                                        color: _isActionSuccess ? Colors.green : Colors.red,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                  ],
+                                ),
+                              ),
+
+                            // Action buttons - using Grid for better organization
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: GridView.count(
+                                crossAxisCount: 3,
+                                crossAxisSpacing: 8,
+                                mainAxisSpacing: 16,
+                                childAspectRatio: 1.0,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                children: [
+                                  // Driver-specific actions
+                                  if (_isActiveDriver) ...[
+                                    if (_currentRoute!.status == 'pending')
+                                      _buildGridActionButton(
+                                        icon: Icons.play_arrow,
+                                        label: 'Start',
+                                        color: Colors.green,
+                                        onPressed: !_isProcessingAction ? _startDelivery : null,
+                                      ),
+                                      
+                                    if (_currentRoute!.status == 'in_progress')
+                                      _buildGridActionButton(
+                                        icon: Icons.check_circle,
+                                        label: 'Complete',
+                                        color: Colors.green,
+                                        onPressed: !_isProcessingAction ? _completeDelivery : null,
+                                      ),
+                                      
+                                    if (_currentRoute!.status == 'in_progress')
+                                      _buildGridActionButton(
+                                        icon: Icons.navigation,
+                                        label: 'Navigate',
+                                        color: Colors.blue,
+                                        onPressed: !_isProcessingAction ? _openGoogleMapsNavigation : null,
+                                      ),
+                                  ],
+                                  
+                                  // Management-specific actions  
+                                  if (_isManagementUser) ...[
+                                    _buildGridActionButton(
                                       icon: Icons.edit,
-                                      label: 'Edit',
-                                      color:
-                                          Theme.of(context).colorScheme.primary,
-                                      onPressed: _showEditDialog,
+                                      label: 'Edit Times',
+                                      color: Theme.of(context).colorScheme.primary,
+                                      onPressed: !_isProcessingAction ? _showEditDialog : null,
                                     ),
-                                  if (_isManagementUser &&
-                                      _currentRoute!.status != 'completed' &&
-                                      _currentRoute!.status != 'cancelled')
-                                    _buildActionButton(
-                                      icon: Icons.delete,
-                                      label: 'Delete',
-                                      color:
-                                          Theme.of(context).colorScheme.error,
-                                      onPressed: _showDeleteDialog,
-                                    ),
-                                  if (_isManagementUser &&
-                                      _currentRoute!.status != 'completed' &&
-                                      _currentRoute!.status != 'cancelled')
-                                    _buildActionButton(
+                                      
+                                    _buildGridActionButton(
                                       icon: Icons.swap_horiz,
                                       label: 'Reassign',
                                       color: Colors.orange,
-                                      onPressed: _showReassignDialog,
+                                      onPressed: !_isProcessingAction ? _showReassignDialog : null,
                                     ),
-                                  if (_isActiveDriver &&
-                                      _currentRoute!.status == 'in_progress')
-                                    _buildActionButton(
-                                      icon: Icons.check_circle,
-                                      label: 'Complete',
-                                      color: Colors.green,
-                                      onPressed: () => _completeDelivery(),
+                                      
+                                    _buildGridActionButton(
+                                      icon: Icons.delete,
+                                      label: 'Delete',
+                                      color: Theme.of(context).colorScheme.error,
+                                      onPressed: !_isProcessingAction ? _showDeleteDialog : null,
                                     ),
-                                  if (_isActiveDriver &&
-                                      _currentRoute!.status == 'pending')
-                                    _buildActionButton(
-                                      icon: Icons.play_arrow,
-                                      label: 'Start',
-                                      color: Colors.green,
-                                      onPressed: () => _startDelivery(),
+                                  ],
+                                  
+                                  // Actions for non-active drivers
+                                  if (!_isActiveDriver && _currentRoute!.status != 'completed' && _currentRoute!.status != 'cancelled')
+                                    _buildGridActionButton(
+                                      icon: Icons.person_add,
+                                      label: 'Take Over',
+                                      color: Colors.blue,
+                                      onPressed: !_isProcessingAction ? _takeOverDelivery : null,
+                                    ),
+                                    
+                                  // Contact driver action (available to everyone)
+                                  _buildGridActionButton(
+                                    icon: Icons.phone,
+                                    label: 'Contact Driver',
+                                    color: Theme.of(context).colorScheme.secondary,
+                                    onPressed: !_isProcessingAction ? _showDriverContactSheet : null,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // DeliveryInfoCard at the bottom - only show if not hidden
+                  if (_showInfoCard && _currentRoute != null)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: DeliveryInfoCard(
+                        route: _currentRoute!,
+                        onDriverInfoTap: _showDriverContactSheet,
+                        onContactDriverTap: _showDriverContactSheet,
+                      ),
+                    ),
+
+                  // Enhanced location update indicator
+                  if (_currentRoute?.currentLocation != null &&
+                      _currentRoute?.status == 'in_progress')
+                    Positioned(
+                      left: 16,
+                      top: 16,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withAlpha((0.8 * 255).toInt()),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha((0.2 * 255).toInt()),
+                              blurRadius: 5,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _isUpdatingLocation
+                                ? SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.blue,
+                                    ),
+                                  )
+                                : Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: _locationUpdatedRecently
+                                          ? Colors.blue
+                                          : Colors.orange,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: _locationUpdatedRecently
+                                            ? Colors.blue.withAlpha((0.5 * 255).toInt())
+                                            : Colors.orange.withAlpha((0.5 * 255).toInt()),
+                                          blurRadius: 4,
+                                          spreadRadius: 1,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _locationUpdatedRecently
+                                  ? 'Live Tracking'
+                                  : 'Last update: $_lastUpdateTime',
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                  // Completion status overlay for completed/cancelled deliveries
+                  if (_currentRoute != null && (_currentRoute!.status == 'completed' || _currentRoute!.status == 'cancelled'))
+                    Positioned(
+                      top: 16,
+                      left: 16,
+                      right: 16,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: _currentRoute!.status == 'completed' 
+                            ? Colors.green.withAlpha((0.9 * 255).toInt())
+                            : Colors.red.withAlpha((0.9 * 255).toInt()),
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha((0.2 * 255).toInt()),
+                              blurRadius: 5,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _currentRoute!.status == 'completed' 
+                                ? Icons.check_circle 
+                                : Icons.cancel,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _currentRoute!.status == 'completed' 
+                                      ? 'Delivery Completed' 
+                                      : 'Delivery Cancelled',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  if (_currentRoute!.actualEndTime != null)
+                                    Text(
+                                      'on ${DateFormat('MMM d, yyyy').format(_currentRoute!.actualEndTime!)} at ${DateFormat('h:mm a').format(_currentRoute!.actualEndTime!)}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                 ],
                               ),
@@ -1173,70 +1865,9 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
                         ),
                       ),
                     ),
-                  ),
-
-                // DeliveryInfoCard at the bottom - only show if not hidden
-                if (_showInfoCard && _currentRoute != null)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: DeliveryInfoCard(
-                      route: _currentRoute!,
-                      onDriverInfoTap: _showDriverContactSheet,
-                      onContactDriverTap: _showDriverContactSheet,
-                    ),
-                  ),
-
-                // Add location update indicator (when tracking is active)
-                if (_currentRoute?.currentLocation != null &&
-                    _currentRoute?.status == 'in_progress')
-                  Positioned(
-                    left: 16,
-                    top: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withAlpha((0.7 * 255).toInt()),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _isUpdatingLocation
-                              ? const SizedBox(
-                                  width: 12,
-                                  height: 12,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.green,
-                                  ),
-                                )
-                              : Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: _locationUpdatedRecently
-                                        ? Colors.green
-                                        : Colors.orange,
-                                  ),
-                                ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _locationUpdatedRecently
-                                ? 'Live Tracking'
-                                : 'Last update: $_lastUpdateTime',
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+                ],
+              ),
+      ),
       floatingActionButton: _currentRoute?.currentLocation != null
           ? FloatingActionButton(
               mini: true,
@@ -1246,106 +1877,54 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> {
           : null,
     );
   }
-
-  Widget _buildActionButton({
+  
+  Widget _buildGridActionButton({
     required IconData icon,
     required String label,
     required Color color,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 16.0),
-      child: SizedBox(
-        width: 120, // Add a fixed width constraint
-        child: ElevatedButton.icon(
-          icon: Icon(icon, color: color),
-          label: Text(label, style: TextStyle(color: color)),
-          style: ElevatedButton.styleFrom(
-            foregroundColor: color,
-            backgroundColor: color.withAlpha((0.1 * 255).toInt()),
-            side: BorderSide(color: color.withAlpha((0.5 * 255).toInt())),
+    final isDisabled = onPressed == null;
+    
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
+        child: Opacity(
+          opacity: isDisabled ? 0.5 : 1.0,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withAlpha((0.1 * 255).toInt()),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: color, width: 2),
+                ),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
-          onPressed: onPressed,
         ),
       ),
     );
-  }
-
-  Future<void> _startDelivery() async {
-    try {
-      final deliveryService =
-          Provider.of<DeliveryRouteService>(context, listen: false);
-      final locationService =
-          Provider.of<LocationService>(context, listen: false);
-
-      // Update status in Firestore
-      await deliveryService.updateRouteStatus(_currentRoute!.id, 'in_progress');
-
-      // Start location tracking
-      await locationService.startTrackingDelivery(_currentRoute!.id);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Delivery started successfully')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error starting delivery: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _completeDelivery() async {
-    try {
-      final deliveryService =
-          Provider.of<DeliveryRouteService>(context, listen: false);
-      final locationService =
-          Provider.of<LocationService>(context, listen: false);
-
-      // Show confirmation dialog
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Complete Delivery'),
-          content: const Text(
-              'Are you sure you want to mark this delivery as completed?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Complete'),
-            ),
-          ],
-        ),
-      );
-
-      if (confirm != true || !mounted) return;
-
-      // Update status in Firestore
-      await deliveryService.updateRouteStatus(_currentRoute!.id, 'completed');
-
-      // Stop location tracking
-      if (locationService.activeDeliveryId == _currentRoute!.id) {
-        await locationService.stopTrackingDelivery(completed: true);
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Delivery completed successfully')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error completing delivery: $e')),
-        );
-      }
-    }
   }
 }

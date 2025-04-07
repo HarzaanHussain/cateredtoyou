@@ -17,36 +17,8 @@ class DeliveryRouteService extends ChangeNotifier {
   DeliveryRouteService(this._organizationService, this._rolePermissions);
 
   // Helper method to calculate distance between two points using Haversine formula
-  double _calculateDistance(
-    double startLat,
-    double startLng,
-    double endLat,
-    double endLng,
-  ) {
-    // Implementation remains the same
-    const double earthRadius = 6371.0; // Earth's radius in kilometers
-
-    // Convert latitude and longitude to radians
-    final startLatRad = _degreesToRadians(startLat);
-    final startLngRad = _degreesToRadians(startLng);
-    final endLatRad = _degreesToRadians(endLat);
-    final endLngRad = _degreesToRadians(endLng);
-
-    // Calculate differences
-    final dLat = endLatRad - startLatRad;
-    final dLng = endLngRad - startLngRad;
-
-    // Haversine formula
-    final a = _square(sin(dLat / 2)) +
-        cos(startLatRad) * cos(endLatRad) * _square(sin(dLng / 2));
-    final c = 2 * asin(sqrt(a));
-
-    return earthRadius * c; // Return the distance in kilometers
-  }
 
   // Helper math functions
-  double _square(double value) => value * value;
-  double _degreesToRadians(double degrees) => degrees * (3.14159 / 180.0);
   double sin(double rad) => math.sin(rad);
   double cos(double rad) => math.cos(rad);
   double asin(double value) => math.asin(value.clamp(-1.0, 1.0));
@@ -408,7 +380,7 @@ class DeliveryRouteService extends ChangeNotifier {
   }
 
   // Update route progress details based on current location
- Future<void> updateDriverLocation(String routeId, GeoPoint location,
+Future<void> updateDriverLocation(String routeId, GeoPoint location,
     {double? heading, double? speed}) async {
   try {
     final currentUser = _auth.currentUser;
@@ -421,8 +393,6 @@ class DeliveryRouteService extends ChangeNotifier {
 
     // Check if user is the active driver
     if (!route.isActiveDriver(currentUser.uid)) {
-      // Remove auto driver assignment logic
-      // Instead, throw an error if the user is not the assigned driver
       throw 'You must be assigned to this delivery to update its location';
     }
 
@@ -430,7 +400,8 @@ class DeliveryRouteService extends ChangeNotifier {
     if (route.status != 'in_progress') {
       throw 'Delivery must be in progress to update location';
     }
-
+    
+    // ALWAYS UPDATE - No filtering of small changes
     final updateData = {
       'currentLocation': location,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -448,8 +419,8 @@ class DeliveryRouteService extends ChangeNotifier {
 
     await _firestore.collection('delivery_routes').doc(routeId).update(updateData);
 
-    // Calculate and update route progress details
-    await _updateProgressDetails(routeId, location);
+    // Calculate and update route progress details in a separate operation
+    _updateProgressDetails(routeId, location);
 
     debugPrint('🚚 DRIVER LOCATION UPDATED: ${location.latitude}, ${location.longitude}');
   } catch (e) {

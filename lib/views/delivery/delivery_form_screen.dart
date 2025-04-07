@@ -5,6 +5,7 @@ import 'package:cateredtoyou/services/staff_service.dart'; // Importing the staf
 import 'package:cateredtoyou/services/vehicle_service.dart'; // Importing the vehicle service.
 import 'package:cateredtoyou/views/delivery/widgets/delivery_map.dart'; // Importing the delivery map widget.
 import 'package:cateredtoyou/views/delivery/widgets/delivery_map_controller.dart'; // Importing the delivery map controller.
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
 import 'package:flutter_map/flutter_map.dart'; // Importing flutter_map for map functionalities.
 import 'package:latlong2/latlong.dart'; // Importing latlong2 for handling geographical coordinates.
@@ -741,6 +742,7 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Delivery'), // Set the app bar title.
+        
       ),
       body: Form(
         key: _formKey, // Set the form key for validation.
@@ -762,6 +764,7 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
           ],
         ),
       ),
+       bottomNavigationBar: const BottomToolbar(), 
     );
   }
 
