@@ -299,163 +299,6 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
     }
   }
 
-  // Future<void> _getAddressFromCoordinates(
-  //     LatLng location, bool isPickup) async {
-  //   try {
-  //     final response = await http.get(
-  //       Uri.parse(
-  //         'https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}', // URL for reverse geocoding.
-  //       ),
-  //       headers: {
-  //         'Accept': 'application/json',
-  //         'User-Agent':
-  //             'CateredToYou/1.0', // User-Agent header for the request.
-  //       },
-  //     );
-
-  //     if (response.statusCode == 200) {
-  //       final data = json.decode(response.body); // Decode JSON response.
-  //       final address = data['display_name']; // Get address from response.
-  //       setState(() {
-  //         if (isPickup) {
-  //           _pickupAddressController.text = address; // Set pickup address.
-  //         } else {
-  //           _deliveryAddressController.text = address; // Set delivery address.
-  //         }
-  //       });
-  //     }
-  //   } catch (e) {
-  //     _handleError(
-  //         'Error getting address', e); // Handle error if getting address fails.
-  //   }
-  // }
-
-  // Future<void> _searchAddress(String query, bool isPickup) async {
-  //   if (query.length < 3) return; // Return if query is too short.
-
-  //   _debounceTimer?.cancel(); // Cancel previous debounce timer.
-  //   _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
-  //     try {
-  //       setState(() => _isLoading = true); // Set loading state to true.
-
-  //       final response = await http.get(
-  //         Uri.parse(
-  //           'https://nominatim.openstreetmap.org/search?format=json&q=$query&limit=5&countrycodes=us', // URL for address search.
-  //         ),
-  //         headers: {
-  //           'Accept': 'application/json',
-  //           'User-Agent':
-  //               'CateredToYou/1.0', // User-Agent header for the request.
-  //         },
-  //       );
-
-  //       if (!mounted) return;
-
-  //       if (response.statusCode == 200) {
-  //         final results =
-  //             json.decode(response.body) as List; // Decode JSON response.
-  //         if (results.isNotEmpty) {
-  //           await _showAddressSuggestions(
-  //               results, isPickup); // Show address suggestions.
-  //         }
-  //       }
-  //     } catch (e) {
-  //       _handleError('Error searching address',
-  //           e); // Handle error if searching address fails.
-  //     } finally {
-  //       if (mounted) {
-  //         setState(() => _isLoading = false); // Set loading state to false.
-  //       }
-  //     }
-  //   });
-  // }
-
-  // Future<void> _showAddressSuggestions(List results, bool isPickup) async {
-  //   if (!mounted) return;
-
-  //   final selected = await showModalBottomSheet<Map<String, dynamic>>(
-  //     context: context,
-  //     isScrollControlled: true,
-  //     backgroundColor: Colors.transparent,
-  //     builder: (context) => DraggableScrollableSheet(
-  //       initialChildSize: 0.4,
-  //       minChildSize: 0.2,
-  //       maxChildSize: 0.75,
-  //       builder: (context, scrollController) => Container(
-  //         decoration: BoxDecoration(
-  //           color: Theme.of(context).colorScheme.surface,
-  //           borderRadius: const BorderRadius.vertical(
-  //               top: Radius.circular(20)), // Rounded top corners.
-  //         ),
-  //         child: Column(
-  //           mainAxisSize: MainAxisSize.min,
-  //           children: [
-  //             Container(
-  //               margin: const EdgeInsets.symmetric(vertical: 12),
-  //               width: 40,
-  //               height: 4,
-  //               decoration: BoxDecoration(
-  //                 color: Theme.of(context)
-  //                     .colorScheme
-  //                     .onSurfaceVariant
-  //                     .withAlpha((0.4 * 255).toInt()), // Handle color.
-  //                 borderRadius: BorderRadius.circular(2), // Rounded handle.
-  //               ),
-  //             ),
-  //             Expanded(
-  //               child: ListView.builder(
-  //                 controller: scrollController,
-  //                 itemCount: results.length,
-  //                 itemBuilder: (context, index) {
-  //                   final result = results[index];
-  //                   return ListTile(
-  //                     leading: const Icon(Icons.location_on), // Location icon.
-  //                     title: Text(
-  //                       result['display_name'],
-  //                       maxLines: 2,
-  //                       overflow:
-  //                           TextOverflow.ellipsis, // Ellipsis for long text.
-  //                     ),
-  //                     onTap: () => Navigator.pop(
-  //                         context, result), // Return selected result.
-  //                   );
-  //                 },
-  //               ),
-  //             ),
-  //           ],
-  //         ),
-  //       ),
-  //     ),
-  //   );
-
-  //   if (selected != null) {
-  //     final latLng = LatLng(
-  //       double.parse(selected['lat']),
-  //       double.parse(selected['lon']),
-  //     );
-
-  //     setState(() {
-  //       if (isPickup) {
-  //         _pickupLocation = latLng; // Set pickup location.
-  //         _pickupAddressController.text =
-  //             selected['display_name']; // Set pickup address.
-  //       } else {
-  //         _deliveryLocation = latLng; // Set delivery location.
-  //         _deliveryAddressController.text =
-  //             selected['display_name']; // Set delivery address.
-  //       }
-  //     });
-
-  //     _updateMapMarkersAndPolylines(); // Update map markers and polylines.
-
-  //     if (_pickupLocation != null && _deliveryLocation != null) {
-  //       await _getRouteDetails(); // Get route details if both locations are set.
-  //     }
-
-  //     _updateMapBounds(); // Update map bounds.
-  //   }
-  // }
-
   Future<void> _getRouteDetails() async {
     if (_pickupLocation == null || _deliveryLocation == null) return;
 
@@ -754,55 +597,6 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
       },
     );
   }
-
-  // Widget _buildAddressInput({
-  //   required TextEditingController
-  //       controller, // Required controller for the input.
-  //   required String label, // Required label for the input.
-  //   required String hint, // Required hint for the input.
-  //   required bool
-  //       isPickup, // Required flag to indicate if this is the pickup address input.
-  // }) {
-  //   return TextFormField(
-  //     controller: controller, // Set the controller for the input.
-  //     decoration: InputDecoration(
-  //       labelText: label, // Set the label text.
-  //       hintText: hint, // Set the hint text.
-  //       prefixIcon: const Icon(Icons.location_on), // Set the prefix icon.
-  //       border: const OutlineInputBorder(), // Set the border style.
-  //       suffixIcon: controller.text.isNotEmpty
-  //           ? IconButton(
-  //               icon: const Icon(Icons.clear), // Set the clear icon.
-  //               onPressed: () {
-  //                 controller.clear(); // Clear the input text.
-  //                 setState(() {
-  //                   if (isPickup) {
-  //                     _pickupLocation = null; // Clear the pickup location.
-  //                   } else {
-  //                     _deliveryLocation = null; // Clear the delivery location.
-  //                   }
-  //                   _updateMapMarkersAndPolylines(); // Update the map markers and polylines.
-  //                 });
-  //               },
-  //             )
-  //           : null, // Show the clear icon only if the input text is not empty.
-  //     ),
-  //     onChanged: (value) {
-  //       if (value.length > 3) {
-  //         _searchAddress(value,
-  //             isPickup); // Search for the address if the input text length is greater than 3.
-  //       }
-  //     },
-  //     validator: (value) {
-  //       if (value == null || value.isEmpty) {
-  //         return isPickup
-  //             ? 'Please enter pickup location'
-  //             : 'Please enter delivery location'; // Validate the input.
-  //       }
-  //       return null;
-  //     },
-  //   );
-  // }
 
   Widget _buildMapSection() {
     return SizedBox(
@@ -1187,12 +981,19 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
         final data = eventDoc.data()!;
         final startDate = (data['startDate'] as Timestamp).toDate();
         final endDate = (data['endDate'] as Timestamp).toDate();
+        final location = data['location'] as String?;
 
         setState(() {
           _selectedEventId = value;
           _selectedEventName = data['name'];
           _eventStartDate = startDate;
           _eventEndDate = endDate;
+
+          if (location != null && location.isNotEmpty) {
+            _deliveryAddressController.text = location;
+            // this triggers a search to get the coordinates of this address for the map
+            _searchLocationFromEventAddress(location);
+          }
 
           // Reset time selections when event changes
           _startTime = null;
@@ -1224,6 +1025,42 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _searchLocationFromEventAddress(String address) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(address)}&limit=1&countrycodes=us',
+        ),
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'CateredToYou/1.0',
+        },
+      );
+      if (response.statusCode == 200) {
+        final results = json.decode(response.body) as List;
+        if (results.isNotEmpty) {
+          final result = results.first;
+          final latlng = LatLng(
+            double.parse(result['lat']),
+            double.parse(result['lon']),
+          );
+
+          setState(() {
+            _deliveryLocation = latlng;
+          });
+
+          _updateMapMarkersAndPolylines();
+          if (_pickupLocation != null && _deliveryLocation != null) {
+            await _getRouteDetails();
+            _updateMapBounds();
+          }
+        }
+      }
+    } catch (e) {
+      _handleError("Error getting coordinates for event location", e);
     }
   }
 
