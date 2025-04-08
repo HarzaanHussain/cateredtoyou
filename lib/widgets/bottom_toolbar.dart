@@ -42,7 +42,8 @@ class _BottomToolbarState extends State<BottomToolbar> {
   @override
   Widget build(BuildContext context) {
     return BottomAppBar(
-      height: 68, // Further reduced from 70 to 68
+      color: Color(0xFFFFC30B),
+      height: 70, // Further reduced from 70 to 68
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -155,7 +156,8 @@ class _BottomToolbarState extends State<BottomToolbar> {
         width: 54, // Further reduced from 58
         height: 54, // Further reduced from 58
         decoration: BoxDecoration(
-          color: Theme.of(context).primaryColor,
+          // color: Theme.of(context).primaryColor,
+          color: Color(0xFFFFC30B),
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
