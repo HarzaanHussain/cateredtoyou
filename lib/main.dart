@@ -150,8 +150,7 @@ class MyApp extends StatelessWidget {
             ),
             scaffoldBackgroundColor: Colors.white, // background is white
             appBarTheme: const AppBarTheme(
-              backgroundColor: Color(0xFFFFC30B), // appbar uses honey yellow
-              foregroundColor: Colors.white,
+              backgroundColor: Colors.white, // appbar uses honey yellow
               elevation: 4,
             ),
             elevatedButtonTheme: ElevatedButtonThemeData(
