@@ -21,7 +21,7 @@ class HomeScreen extends StatelessWidget {
     final rolePermissions = context.read<RolePermissions>();
 
     return Scaffold(
-      backgroundColor: Color(0xFFFFC533), // Set background color to orange
+      backgroundColor: Color(0xFFFAF9F6), // Set background color to orange
       appBar: const CustomAppBar(title: 'CateredToYou'),
       drawer: const CustomDrawer(),
       bottomNavigationBar: const BottomToolbar(),
