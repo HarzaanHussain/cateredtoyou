@@ -1,8 +1,10 @@
 import 'package:cateredtoyou/models/customer_model.dart';
+import 'package:cateredtoyou/utils/auto_complete.dart';
 import 'package:cateredtoyou/widgets/event_metadata_selection.dart';
 import 'package:cateredtoyou/widgets/staff_assignment.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -35,6 +37,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
   final _guestCountController = TextEditingController();
   final _minStaffController = TextEditingController();
   final _notesController = TextEditingController();
+  LatLng? _eventLocation;
 
   // Page controller for multi-step form
   late PageController _pageController;
@@ -589,17 +592,27 @@ class _EventEditScreenState extends State<EventEditScreen> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
-                  CustomTextField(
-                    controller: _locationController,
-                    label: 'Location',
-                    prefixIcon: Icons.location_on,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter a location';
-                      }
-                      return null;
-                    },
-                  ),
+                  AddressAutoComplete(
+                      controller: _locationController,
+                      label: 'Event Location',
+                      hint: 'Enter event venue address',
+                      isPickup: false,
+                      onLocationSelected: (location) {
+                        setState(() {
+                          _eventLocation = location;
+                        });
+                      }),
+                  // CustomTextField(
+                  //   controller: _locationController,
+                  //   label: 'Location',
+                  //   prefixIcon: Icons.location_on,
+                  //   validator: (value) {
+                  //     if (value == null || value.isEmpty) {
+                  //       return 'Please enter a location';
+                  //     }
+                  //     return null;
+                  //   },
+                  // ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
