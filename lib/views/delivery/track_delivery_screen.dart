@@ -20,6 +20,33 @@ import 'package:cateredtoyou/utils/permission_helpers.dart';
 import 'package:cateredtoyou/services/delivery_route_service.dart';
 import 'package:cateredtoyou/services/location_service.dart';
 
+class DragController {
+  double dragStart = 0.0;
+  double initialHeight = 120.0; // Min panel height
+  double currentHeight = 120.0;
+
+  void startDrag(DragStartDetails details) {
+    dragStart = details.globalPosition.dy;
+    initialHeight = currentHeight;
+  }
+
+  void updateDrag(DragUpdateDetails details) {
+    final delta = dragStart - details.globalPosition.dy;
+    currentHeight = (initialHeight + delta).clamp(120.0, 500.0);
+  }
+
+  void endDrag(DragEndDetails details) {
+    // Snap to min or max height based on velocity and current position
+    if (details.velocity.pixelsPerSecond.dy.abs() > 200) {
+      // Fast drag
+      currentHeight = details.velocity.pixelsPerSecond.dy > 0 ? 120.0 : 500.0;
+    } else {
+      // Slow drag - snap to nearest
+      currentHeight = currentHeight > (120.0 + 500.0) / 2 ? 500.0 : 120.0;
+    }
+  }
+}
+
 class TrackDeliveryScreen extends StatefulWidget {
   final DeliveryRoute route;
 
@@ -32,7 +59,8 @@ class TrackDeliveryScreen extends StatefulWidget {
   State<TrackDeliveryScreen> createState() => _TrackDeliveryScreenState();
 }
 
-class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsBindingObserver, TickerProviderStateMixin {
+class _TrackDeliveryScreenState extends State<TrackDeliveryScreen>
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   late StreamSubscription<DocumentSnapshot> _routeSubscription;
   final MapController _mapController = MapController();
 
@@ -40,15 +68,17 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
   List<LatLng> _routePoints = [];
   List<Marker> _markers = [];
   List<Polyline> _polylines = [];
-  final List<LatLng> _recentPositions = []; // Store recent positions for trail effect
+  final List<LatLng> _recentPositions = [];
 
   bool _isLoading = true;
   Timer? _routeUpdateTimer;
   bool _isFirstLoad = true;
-  bool _showInfoCard = true;
+  bool _isInfoExpanded = false; // Track if info panel is expanded
   bool _isManagementUser = false;
   bool _isActiveDriver = false;
-  
+
+  // Drag controller instance
+
   // Action feedback states
   bool _isProcessingAction = false;
   String? _actionFeedback;
@@ -63,24 +93,23 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
   // Enhanced animation variables
   LatLng? _animatedDriverPosition;
   LatLng? _previousDriverPosition;
-  double _currentHeading = 0.0;
-  double _currentSpeed = 0.0;
-  DateTime? _lastPositionTimestamp;
   AnimationController? _animationController;
-  Animation<double>? _animation;
   Timer? _predictionTimer;
   Timer? _visualRefreshTimer;
 
   // Pulse animation for marker
   AnimationController? _pulseController;
-  Animation<double>? _pulseAnimation;
+
+  // Panel controller animation
+  AnimationController? _panelController;
 
   // Constants
   static const String osmRoutingUrl =
       'https://router.project-osrm.org/route/v1/driving/';
   static const double _defaultZoom = 13.0;
-  static const int _predictiveUpdateFrequencyMs = 50; // Very frequent updates for smooth animation
-  static const int _maxRecentPositions = 10; // Number of positions to keep for trail
+  static const int _maxRecentPositions = 10;
+  static const double _minPanelHeight = 120.0; // collapsed height
+  static const double _maxPanelHeight = 500.0; // expanded height
 
   @override
   void initState() {
@@ -98,33 +127,30 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
     _fetchRouteDetails();
     _setupRefreshTimer();
     _checkUserPermissions();
-    
+
     // Start predictive updates immediately
     _startPredictiveUpdates();
   }
-  
+
   void _setupAnimationControllers() {
     // Main animation controller for position transitions
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500), // Smoother, longer animation
+      duration: const Duration(milliseconds: 1500),
     );
-    
-    _animation = CurvedAnimation(
-      parent: _animationController!,
-      curve: Curves.easeInOutCubic, // More natural movement curve
-    );
-    
+
     // Pulse animation for recently updated position
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     );
-    
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.5)
-      .chain(CurveTween(curve: Curves.easeInOutSine))
-      .animate(_pulseController!);
-    
+
+    // Panel slide animation
+    _panelController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+
     // Listen to animation updates to refresh the UI
     _animationController!.addListener(() {
       if (mounted) {
@@ -134,7 +160,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
         });
       }
     });
-    
+
     _pulseController!.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         _pulseController!.reverse();
@@ -142,7 +168,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
         _pulseController!.forward();
       }
     });
-    
+
     // Start pulse animation
     _pulseController!.forward();
   }
@@ -156,96 +182,33 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
     _visualRefreshTimer?.cancel();
     _animationController?.dispose();
     _pulseController?.dispose();
+    _panelController?.dispose();
     super.dispose();
   }
-  
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // When app resumes, refresh data and restart animations
     if (state == AppLifecycleState.resumed) {
       _refreshData();
-      
+
       // Restart animation controllers if needed
       if (_animationController?.isAnimating == false) {
         _animationController?.reset();
       }
-      
+
       if (_pulseController?.isAnimating == false) {
         _pulseController?.forward();
       }
     }
   }
-  
+
   // Start predictive updates for smoother animation
   void _startPredictiveUpdates() {
     _predictionTimer?.cancel();
-  return;
-    /*_predictionTimer = Timer.periodic(
-      Duration(milliseconds: _predictiveUpdateFrequencyMs),
-      (_) {
-        if (mounted && _currentRoute?.status == 'in_progress') {
-          _predictNextPosition();
-          setState(() {}); // Update UI with predicted position
-        }
-      },
-    );*/
+    return;
   }
-  
-  // Predict next position based on speed, heading and time elapsed
-  void _predictNextPosition() {
-    if (_animatedDriverPosition == null || 
-        _currentRoute?.currentLocation == null || 
-        _currentHeading.isNaN ||
-        _lastPositionTimestamp == null) {
-      return;
-    }
-    
-    // Skip prediction if animation is actively running
-    if (_animationController?.isAnimating == true) {
-      return;
-    }
-    
-    // Get current time
-    final now = DateTime.now();
-    
-    // Calculate time elapsed since last update
-    final elapsedMs = now.difference(_lastPositionTimestamp!).inMilliseconds;
-    if (elapsedMs <= 0) return;
-    
-    // Convert speed from m/s to degrees/ms
-    // 111,320 meters per degree at equator (approximate)
-    final double speedFactor = _currentSpeed / 111320 / 1000;
-    
-    // Don't predict if speed is too low
-    if (_currentSpeed < 1.0) return;
-    
-    // Calculate movement distance
-    final double distance = speedFactor * elapsedMs;
-    
-    // Convert heading to radians and calculate new position
-    final double headingRad = _currentHeading * (math.pi / 180);
-    final double lat = _animatedDriverPosition!.latitude + distance * math.cos(headingRad);
-    final double lng = _animatedDriverPosition!.longitude + distance * math.sin(headingRad);
-    
-    // Update animated position
-    _animatedDriverPosition = LatLng(lat, lng);
-    
-    // Update trail positions (once every few predictions)
-    if (_recentPositions.isEmpty || 
-        calculateDistance(_recentPositions.last, _animatedDriverPosition!) > 0.0005) {
-      _updateTrailPositions(_animatedDriverPosition!);
-    }
-    
-    // Update map markers
-    _updateMapMarkers();
-  }
-  
-  // Calculate distance between two points
-  double calculateDistance(LatLng p1, LatLng p2) {
-    return math.sqrt(math.pow(p2.latitude - p1.latitude, 2) + 
-                     math.pow(p2.longitude - p1.longitude, 2));
-  }
-  
+
   // Update trail positions for visual effect
   void _updateTrailPositions(LatLng newPosition) {
     _recentPositions.add(newPosition);
@@ -253,26 +216,26 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
       _recentPositions.removeAt(0);
     }
   }
-  
+
   // Manual refresh function
   Future<void> _refreshData() async {
     if (_currentRoute == null) return;
-    
+
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       // Force a refresh by directly fetching the document
       final docSnapshot = await FirebaseFirestore.instance
           .collection('delivery_routes')
           .doc(_currentRoute!.id)
           .get();
-      
+
       if (docSnapshot.exists) {
         await _handleRouteUpdate(docSnapshot);
       }
-      
+
       // Also re-fetch route details
       await _fetchRouteDetails();
       await _checkUserPermissions();
@@ -298,7 +261,8 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
     }
 
     final isManager = await isManagementUser(context);
-    final isDriver = userId == _currentRoute?.currentDriver || userId == _currentRoute?.driverId;
+    final isDriver = userId == _currentRoute?.currentDriver ||
+        userId == _currentRoute?.driverId;
 
     if (mounted) {
       setState(() {
@@ -314,19 +278,20 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
         .doc(widget.route.id)
         .snapshots()
         .listen((snapshot) {
-          if (mounted) {
-            _handleRouteUpdate(snapshot);
-          }
-        }, onError: (error) {
-          debugPrint('Error in route subscription: $error');
-          _showSnackBar('Error getting updates. Pull down to refresh.', isError: true);
-        });
+      if (mounted) {
+        _handleRouteUpdate(snapshot);
+      }
+    }, onError: (error) {
+      debugPrint('Error in route subscription: $error');
+      _showSnackBar('Error getting updates. Pull down to refresh.',
+          isError: true);
+    });
   }
 
   void _setupRefreshTimer() {
     // Main update timer for data refresh - every 15 seconds
     _routeUpdateTimer = Timer.periodic(
-      const Duration(seconds: 15), // Less frequent backend refresh
+      const Duration(seconds: 15),
       (_) => _updateDeliveryMetrics(),
     );
 
@@ -489,7 +454,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
       final statusChanged = _currentRoute?.status != newRoute.status;
       if (statusChanged && newRoute.status == 'completed') {
         _showSnackBar('Delivery completed successfully!', isError: false);
-        
+
         // If delivery is completed, check if we need to update permissions
         await _checkUserPermissions();
       }
@@ -502,14 +467,11 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
       if (locationChanged && newRoute.currentLocation != null) {
         // Location was updated - update the tracking indicators
         _lastLocationUpdateTime = DateTime.now();
-        _lastPositionTimestamp = DateTime.now();
         _locationUpdatedRecently = true;
         _lastUpdateTime =
             DateFormat('h:mm:ss a').format(_lastLocationUpdateTime!);
 
         // Update speed and heading for better prediction
-        _currentHeading = newRoute.currentHeading ?? 0.0;
-        _currentSpeed = (newRoute.metadata?['currentSpeed'] as num?)?.toDouble() ?? 5.0;
 
         // Save previous position for animation
         if (_currentRoute?.currentLocation != null) {
@@ -521,7 +483,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
 
         // Setup enhanced animation
         _setupEnhancedAnimation(
-            _previousDriverPosition, 
+            _previousDriverPosition,
             LatLng(
               newRoute.currentLocation!.latitude,
               newRoute.currentLocation!.longitude,
@@ -585,45 +547,45 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
     }
   }
 
- void _setupEnhancedAnimation(LatLng? oldPosition, LatLng newPosition) {
-  // If no previous position, just set directly
-  if (oldPosition == null) {
-    _animatedDriverPosition = newPosition;
-    _updateTrailPositions(newPosition);
-    return;
-  }
-  
-  // Reset animation controller to prevent continuous animations
-  _animationController?.reset();
-  
-  // Turn off pulse effect - can cause issues with position display
-  _pulseController?.reset();
-  _pulseController?.stop();
-  
-  // Set position directly instead of animating (prevents drift)
-  _animatedDriverPosition = newPosition;
-  _previousDriverPosition = newPosition;
-  
-  // Add position to trail immediately
-  _updateTrailPositions(newPosition);
-  
-  // Update markers immediately
-  _updateMapMarkers();
-  
-  debugPrint('📍 Position set directly: ${newPosition.latitude}, ${newPosition.longitude}');
-}
+  void _setupEnhancedAnimation(LatLng? oldPosition, LatLng newPosition) {
+    // If no previous position, just set directly
+    if (oldPosition == null) {
+      _animatedDriverPosition = newPosition;
+      _updateTrailPositions(newPosition);
+      return;
+    }
 
+    // Reset animation controller to prevent continuous animations
+    _animationController?.reset();
+
+    // Turn off pulse effect - can cause issues with position display
+    _pulseController?.reset();
+    _pulseController?.stop();
+
+    // Set position directly instead of animating (prevents drift)
+    _animatedDriverPosition = newPosition;
+    _previousDriverPosition = newPosition;
+
+    // Add position to trail immediately
+    _updateTrailPositions(newPosition);
+
+    // Update markers immediately
+    _updateMapMarkers();
+
+    debugPrint(
+        '📍 Position set directly: ${newPosition.latitude}, ${newPosition.longitude}');
+  }
 
   // Update animated position based on animation progress
   void _updateAnimatedPosition() {
-  // Directly use current location to prevent drift
-  if (_currentRoute?.currentLocation != null) {
-    _animatedDriverPosition = LatLng(
-      _currentRoute!.currentLocation!.latitude,
-      _currentRoute!.currentLocation!.longitude,
-    );
+    // Directly use current location to prevent drift
+    if (_currentRoute?.currentLocation != null) {
+      _animatedDriverPosition = LatLng(
+        _currentRoute!.currentLocation!.latitude,
+        _currentRoute!.currentLocation!.longitude,
+      );
+    }
   }
-}
 
   Future<void> _calculateUpdatedETA(DeliveryRoute route) async {
     if (route.currentLocation == null || route.waypoints.isEmpty) return;
@@ -809,150 +771,118 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
   }
 
   void _updateMapMarkers() {
-  if (!mounted || _currentRoute == null) return;
+    if (!mounted || _currentRoute == null) return;
 
-  final markers = <Marker>[];
+    final markers = <Marker>[];
 
-  // Add pickup marker
-  if (_currentRoute!.waypoints.isNotEmpty) {
-    markers.add(MapMarkerHelper.createMarker(
-      point: LatLng(
-        _currentRoute!.waypoints.first.latitude,
-        _currentRoute!.waypoints.first.longitude,
-      ),
-      id: 'pickup',
-      color: Colors.green,
-      icon: Icons.store,
-      title: 'Pickup',
-    ));
-  }
-
-  // Add delivery marker
-  if (_currentRoute!.waypoints.length > 1) {
-    markers.add(MapMarkerHelper.createMarker(
-      point: LatLng(
-        _currentRoute!.waypoints.last.latitude,
-        _currentRoute!.waypoints.last.longitude,
-      ),
-      id: 'delivery',
-      color: Colors.red,
-      icon: Icons.location_on,
-      title: 'Delivery',
-    ));
-  }
-
-  // DISABLED trail markers to prevent position drift
-  /*
-  if (_recentPositions.isNotEmpty) {
-    for (int i = 0; i < _recentPositions.length - 1; i++) {
-      final opacity = 0.3 * (i / _recentPositions.length);
-      final size = 5.0 + (i * 2);
-      
-      // Only add every other point to avoid clutter
-      if (i % 2 == 0) {
-        markers.add(
-          Marker(
-            point: _recentPositions[i],
-            width: size,
-            height: size,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.blue.withAlpha((opacity * 255).toInt()),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-        );
-      }
-    }
-  }
-  */
-  
-  // Use ONLY the real current location (no animated position)
-  if (_currentRoute!.currentLocation != null) {
-    // Use the actual position from Firestore, not animated
-    final markerPos = LatLng(
-      _currentRoute!.currentLocation!.latitude,
-      _currentRoute!.currentLocation!.longitude
-    );
-
-    // Get current heading (with fallback)
-    final heading = _currentRoute!.currentHeading ?? 0.0;
-
-    // Add simple driver marker without animations
-    markers.add(
-      Marker(
-        point: markerPos,
-        width: 60,
-        height: 60,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Driver icon with proper rotation
-            Transform.rotate(
-              angle: heading * (math.pi / 180),
-              child: Container(
-                width: 45,
-                height: 45,
-                decoration: BoxDecoration(
-                  color: Colors.blue.withAlpha((0.8 * 255).toInt()),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha((0.3 * 255).toInt()),
-                      blurRadius: 5,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                  border: Border.all(
-                    color: Colors.white,
-                    width: 2,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.navigation,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-            ),
-            
-            // Label below
-            Positioned(
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha((0.2 * 255).toInt()),
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: const Text(
-                  'Driver',
-                  style: TextStyle(
-                    color: Colors.blue,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
-          ],
+    // Add pickup marker
+    if (_currentRoute!.waypoints.isNotEmpty) {
+      markers.add(MapMarkerHelper.createMarker(
+        point: LatLng(
+          _currentRoute!.waypoints.first.latitude,
+          _currentRoute!.waypoints.first.longitude,
         ),
-      ),
-    );
-  }
+        id: 'pickup',
+        color: Colors.green,
+        icon: Icons.store,
+        title: 'Pickup',
+      ));
+    }
 
-  setState(() {
-    _markers = markers;
-  });
-}
+    // Add delivery marker
+    if (_currentRoute!.waypoints.length > 1) {
+      markers.add(MapMarkerHelper.createMarker(
+        point: LatLng(
+          _currentRoute!.waypoints.last.latitude,
+          _currentRoute!.waypoints.last.longitude,
+        ),
+        id: 'delivery',
+        color: Colors.red,
+        icon: Icons.location_on,
+        title: 'Delivery',
+      ));
+    }
+
+    if (_currentRoute!.currentLocation != null) {
+      final markerPos = LatLng(_currentRoute!.currentLocation!.latitude,
+          _currentRoute!.currentLocation!.longitude);
+
+      final heading = _currentRoute!.currentHeading ?? 0.0;
+
+      markers.add(
+        Marker(
+          point: markerPos,
+          width: 60,
+          height: 60,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Driver icon with proper rotation
+              Transform.rotate(
+                angle: heading * (math.pi / 180),
+                child: Container(
+                  width: 45,
+                  height: 45,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withAlpha((0.8 * 255).toInt()),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha((0.3 * 255).toInt()),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.navigation,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+
+              // Label below
+              Positioned(
+                bottom: 0,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha((0.2 * 255).toInt()),
+                        blurRadius: 3,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: const Text(
+                    'Driver',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    setState(() {
+      _markers = markers;
+    });
+  }
 
   void _performInitialMapPreview() {
     if (_routePoints.isEmpty) return;
@@ -1013,9 +943,8 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
     if (!await launchUrl(uri)) {
       if (mounted) {
         _showSnackBar(
-          'Could not ${scheme == 'tel' ? 'call' : 'message'} driver', 
-          isError: true
-        );
+            'Could not ${scheme == 'tel' ? 'call' : 'message'} driver',
+            isError: true);
       }
     }
   }
@@ -1040,13 +969,13 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
   // Management Actions
   Future<void> _takeOverDelivery() async {
     if (_isProcessingAction) return;
-    
+
     setState(() {
       _isProcessingAction = true;
       _actionFeedback = 'Taking over delivery...';
       _isActionSuccess = false;
     });
-    
+
     try {
       final deliveryService =
           Provider.of<DeliveryRouteService>(context, listen: false);
@@ -1067,12 +996,12 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
           _actionFeedback = 'Successfully taken over delivery';
           _isActionSuccess = true;
         });
-        
+
         _showSnackBar('You have taken over this delivery', isError: false);
 
         // Refresh user permissions
         await _checkUserPermissions();
-        
+
         // Force refresh data
         await _refreshData();
       }
@@ -1083,7 +1012,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
           _actionFeedback = 'Error: ${e.toString()}';
           _isActionSuccess = false;
         });
-        
+
         _showSnackBar('Error: ${e.toString()}', isError: true);
       }
     }
@@ -1094,7 +1023,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
       context: context,
       builder: (context) => ReassignDriverDialog(route: _currentRoute!),
     );
-    
+
     if (result == true) {
       // Driver was successfully reassigned, refresh data
       await _refreshData();
@@ -1146,7 +1075,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
         _isProcessingAction = true;
         _actionFeedback = 'Deleting delivery...';
       });
-      
+
       try {
         final deliveryService =
             Provider.of<DeliveryRouteService>(context, listen: false);
@@ -1159,13 +1088,14 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
             _actionFeedback = 'Delivery deleted successfully';
             _isActionSuccess = true;
           });
-          
+
           _showSnackBar('Delivery deleted', isError: false);
 
           // Pop back to previous screen after a short delay
           Future.delayed(const Duration(seconds: 1), () {
             if (mounted) {
-              Navigator.of(context).pop(true); // Return true to indicate changes
+              Navigator.of(context)
+                  .pop(true); // Return true to indicate changes
             }
           });
         }
@@ -1176,7 +1106,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
             _actionFeedback = 'Error: ${e.toString()}';
             _isActionSuccess = false;
           });
-          
+
           _showSnackBar('Error: ${e.toString()}', isError: true);
         }
       }
@@ -1269,7 +1199,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
         _isProcessingAction = true;
         _actionFeedback = 'Updating delivery times...';
       });
-      
+
       try {
         final now = DateTime.now();
 
@@ -1306,9 +1236,9 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
             _actionFeedback = 'Delivery times updated successfully';
             _isActionSuccess = true;
           });
-          
+
           _showSnackBar('Delivery times updated', isError: false);
-          
+
           // Force refresh
           await _refreshData();
         }
@@ -1319,22 +1249,22 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
             _actionFeedback = 'Error: ${e.toString()}';
             _isActionSuccess = false;
           });
-          
+
           _showSnackBar('Error: ${e.toString()}', isError: true);
         }
       }
     }
   }
-  
+
   Future<void> _startDelivery() async {
     if (_isProcessingAction) return;
-    
+
     setState(() {
       _isProcessingAction = true;
       _actionFeedback = 'Starting delivery...';
       _isActionSuccess = false;
     });
-    
+
     try {
       final deliveryService =
           Provider.of<DeliveryRouteService>(context, listen: false);
@@ -1353,9 +1283,9 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
           _actionFeedback = 'Delivery started successfully';
           _isActionSuccess = true;
         });
-        
+
         _showSnackBar('Delivery started successfully', isError: false);
-        
+
         // Force refresh
         await _refreshData();
       }
@@ -1366,7 +1296,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
           _actionFeedback = 'Error: ${e.toString()}';
           _isActionSuccess = false;
         });
-        
+
         _showSnackBar('Error starting delivery: $e', isError: true);
       }
     }
@@ -1374,7 +1304,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
 
   Future<void> _completeDelivery() async {
     if (_isProcessingAction) return;
-    
+
     // Show confirmation dialog
     final confirm = await showDialog<bool>(
       context: context,
@@ -1402,7 +1332,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
       _actionFeedback = 'Completing delivery...';
       _isActionSuccess = false;
     });
-    
+
     try {
       final deliveryService =
           Provider.of<DeliveryRouteService>(context, listen: false);
@@ -1423,9 +1353,9 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
           _actionFeedback = 'Delivery completed successfully';
           _isActionSuccess = true;
         });
-        
+
         _showSnackBar('Delivery completed successfully', isError: false);
-        
+
         // Force refresh
         await _refreshData();
       }
@@ -1436,15 +1366,26 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
           _actionFeedback = 'Error: ${e.toString()}';
           _isActionSuccess = false;
         });
-        
+
         _showSnackBar('Error completing delivery: $e', isError: true);
       }
     }
   }
-  
+
+  void _toggleInfoPanel() {
+    setState(() {
+      _isInfoExpanded = !_isInfoExpanded;
+      if (_isInfoExpanded) {
+        _panelController?.forward();
+      } else {
+        _panelController?.reverse();
+      }
+    });
+  }
+
   void _showSnackBar(String message, {required bool isError}) {
     if (!mounted) return;
-    
+
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1462,422 +1403,204 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_currentRoute?.metadata?['eventName'] ?? 'Track Delivery'),
-        actions: [
-          // Add visibility toggle to the app bar for consistency
-          IconButton(
-            icon: Icon(_showInfoCard ? Icons.visibility_off : Icons.visibility),
-            onPressed: () {
-              setState(() {
-                _showInfoCard = !_showInfoCard;
-              });
-            },
-            tooltip: _showInfoCard ? 'Hide Details' : 'Show Details',
-          ),
-          IconButton(
-            icon: const Icon(Icons.my_location),
-            onPressed: _performInitialMapPreview,
-            tooltip: 'View entire route',
-          ),
-          if (_currentRoute?.status == 'in_progress')
-            IconButton(
-              icon: const Icon(Icons.navigation),
-              onPressed: _openGoogleMapsNavigation,
-              tooltip: 'Open in Google Maps',
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshData,
-            tooltip: 'Refresh data',
+  // Build the expandable mini status card for the collapsed state
+  Widget _buildMiniStatusCard() {
+    if (_currentRoute == null) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    final status = _currentRoute!.status;
+
+    // Get status color
+    Color statusColor;
+    switch (status) {
+      case 'pending':
+        statusColor = Colors.orange;
+        break;
+      case 'in_progress':
+        statusColor = Colors.blue;
+        break;
+      case 'completed':
+        statusColor = Colors.green;
+        break;
+      case 'cancelled':
+        statusColor = Colors.red;
+        break;
+      default:
+        statusColor = Colors.grey;
+    }
+
+    // Format ETA
+    final etaText =
+        DateFormat('h:mm a').format(_currentRoute!.estimatedEndTime);
+
+    // Get remaining time
+    String remainingTime = '';
+    if (status == 'in_progress') {
+      final now = DateTime.now();
+      final difference = _currentRoute!.estimatedEndTime.difference(now);
+
+      if (difference.isNegative) {
+        remainingTime = 'Delayed';
+      } else if (difference.inHours > 0) {
+        remainingTime =
+            '${difference.inHours}h ${difference.inMinutes.remainder(60)}m';
+      } else {
+        remainingTime = '${difference.inMinutes}m';
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha((0.1 * 255).toInt()),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _refreshData,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Stack(
-                children: [
-                  DeliveryMap(
-                    mapController: _mapController,
-                    markers: _markers,
-                    polylines: _polylines,
-                    initialPosition: _currentRoute?.currentLocation != null
-                        ? LatLng(
-                            _currentRoute!.currentLocation!.latitude,
-                            _currentRoute!.currentLocation!.longitude,
-                          )
-                        : LatLng(
-                            _currentRoute!.waypoints.first.latitude,
-                            _currentRoute!.waypoints.first.longitude,
-                          ),
-                    isLoading: _isLoading,
-                  ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Pull handle
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey.withAlpha((0.3 * 255).toInt()),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
 
-                  // Position the loaded items section at the top with proper padding
-                  if (_showInfoCard &&
-                      _currentRoute != null &&
-                      _currentRoute!.metadata != null &&
-                      _currentRoute!.metadata!['loadedItems'] != null)
-                    Positioned(
-                      left: 16,
-                      right: 16,
-                      top: 16,
-                      child: LoadedItemsSection(
-                        items: List<Map<String, dynamic>>.from(
-                            _currentRoute!.metadata!['loadedItems']),
-                        allItemsLoaded:
-                            _currentRoute!.metadata!['vehicleHasAllItems'] ??
-                                false,
+          // Status row
+          Row(
+            children: [
+              // Status indicator
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withAlpha((0.1 * 255).toInt()),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: statusColor.withAlpha((0.3 * 255).toInt())),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      status == 'pending'
+                          ? Icons.schedule
+                          : status == 'in_progress'
+                              ? Icons.local_shipping
+                              : status == 'completed'
+                                  ? Icons.check_circle
+                                  : Icons.cancel,
+                      color: statusColor,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      status == 'pending'
+                          ? 'Scheduled'
+                          : status == 'in_progress'
+                              ? 'In Progress'
+                              : status == 'completed'
+                                  ? 'Delivered'
+                                  : 'Cancelled',
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
                       ),
                     ),
-
-                  // Management actions section - NEW IMPROVED VERSION
-                  if ((_isManagementUser || _isActiveDriver) && 
-                      _currentRoute != null && 
-                      (_currentRoute!.status == 'pending' || _currentRoute!.status == 'in_progress'))
-                    Positioned(
-                      left: 16,
-                      right: 16,
-                      bottom: _showInfoCard ? 250 : 16,
-                      child: Card(
-                        elevation: 4,
-                        clipBehavior: Clip.antiAlias,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Header with collapsible functionality
-                            Container(
-                              color: Theme.of(context).colorScheme.primaryContainer,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.admin_panel_settings,
-                                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Delivery Actions',
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  if (_isProcessingAction)
-                                    SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            
-                            // Feedback area (when an action is in progress or completed)
-                            if (_actionFeedback != null)
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                color: _isActionSuccess 
-                                  ? Colors.green.withAlpha((0.1 * 255).toInt())
-                                  : _isProcessingAction 
-                                    ? Colors.blue.withAlpha((0.1 * 255).toInt())
-                                    : Colors.red.withAlpha((0.1 * 255).toInt()),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      _isActionSuccess 
-                                        ? Icons.check_circle 
-                                        : _isProcessingAction 
-                                          ? Icons.hourglass_top
-                                          : Icons.error,
-                                      size: 16, 
-                                      color: _isActionSuccess 
-                                        ? Colors.green 
-                                        : _isProcessingAction 
-                                          ? Colors.blue
-                                          : Colors.red,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _actionFeedback!,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: _isActionSuccess 
-                                            ? Colors.green 
-                                            : _isProcessingAction 
-                                              ? Colors.blue
-                                              : Colors.red,
-                                        ),
-                                      ),
-                                    ),
-                                    if (_actionFeedback != null && !_isProcessingAction)
-                                      IconButton(
-                                        icon: const Icon(Icons.close, size: 14),
-                                        onPressed: () {
-                                          setState(() {
-                                            _actionFeedback = null;
-                                          });
-                                        },
-                                        color: _isActionSuccess ? Colors.green : Colors.red,
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(),
-                                        visualDensity: VisualDensity.compact,
-                                      ),
-                                  ],
-                                ),
-                              ),
-
-                            // Action buttons - using Grid for better organization
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: GridView.count(
-                                crossAxisCount: 3,
-                                crossAxisSpacing: 8,
-                                mainAxisSpacing: 16,
-                                childAspectRatio: 1.0,
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                children: [
-                                  // Driver-specific actions
-                                  if (_isActiveDriver) ...[
-                                    if (_currentRoute!.status == 'pending')
-                                      _buildGridActionButton(
-                                        icon: Icons.play_arrow,
-                                        label: 'Start',
-                                        color: Colors.green,
-                                        onPressed: !_isProcessingAction ? _startDelivery : null,
-                                      ),
-                                      
-                                    if (_currentRoute!.status == 'in_progress')
-                                      _buildGridActionButton(
-                                        icon: Icons.check_circle,
-                                        label: 'Complete',
-                                        color: Colors.green,
-                                        onPressed: !_isProcessingAction ? _completeDelivery : null,
-                                      ),
-                                      
-                                    if (_currentRoute!.status == 'in_progress')
-                                      _buildGridActionButton(
-                                        icon: Icons.navigation,
-                                        label: 'Navigate',
-                                        color: Colors.blue,
-                                        onPressed: !_isProcessingAction ? _openGoogleMapsNavigation : null,
-                                      ),
-                                  ],
-                                  
-                                  // Management-specific actions  
-                                  if (_isManagementUser) ...[
-                                    _buildGridActionButton(
-                                      icon: Icons.edit,
-                                      label: 'Edit Times',
-                                      color: Theme.of(context).colorScheme.primary,
-                                      onPressed: !_isProcessingAction ? _showEditDialog : null,
-                                    ),
-                                      
-                                    _buildGridActionButton(
-                                      icon: Icons.swap_horiz,
-                                      label: 'Reassign',
-                                      color: Colors.orange,
-                                      onPressed: !_isProcessingAction ? _showReassignDialog : null,
-                                    ),
-                                      
-                                    _buildGridActionButton(
-                                      icon: Icons.delete,
-                                      label: 'Delete',
-                                      color: Theme.of(context).colorScheme.error,
-                                      onPressed: !_isProcessingAction ? _showDeleteDialog : null,
-                                    ),
-                                  ],
-                                  
-                                  // Actions for non-active drivers
-                                  if (!_isActiveDriver && _currentRoute!.status != 'completed' && _currentRoute!.status != 'cancelled')
-                                    _buildGridActionButton(
-                                      icon: Icons.person_add,
-                                      label: 'Take Over',
-                                      color: Colors.blue,
-                                      onPressed: !_isProcessingAction ? _takeOverDelivery : null,
-                                    ),
-                                    
-                                  // Contact driver action (available to everyone)
-                                  _buildGridActionButton(
-                                    icon: Icons.phone,
-                                    label: 'Contact Driver',
-                                    color: Theme.of(context).colorScheme.secondary,
-                                    onPressed: !_isProcessingAction ? _showDriverContactSheet : null,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  // DeliveryInfoCard at the bottom - only show if not hidden
-                  if (_showInfoCard && _currentRoute != null)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: DeliveryInfoCard(
-                        route: _currentRoute!,
-                        onDriverInfoTap: _showDriverContactSheet,
-                        onContactDriverTap: _showDriverContactSheet,
-                      ),
-                    ),
-
-                  // Enhanced location update indicator
-                  if (_currentRoute?.currentLocation != null &&
-                      _currentRoute?.status == 'in_progress')
-                    Positioned(
-                      left: 16,
-                      top: 16,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withAlpha((0.8 * 255).toInt()),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha((0.2 * 255).toInt()),
-                              blurRadius: 5,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _isUpdatingLocation
-                                ? SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.blue,
-                                    ),
-                                  )
-                                : Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: _locationUpdatedRecently
-                                          ? Colors.blue
-                                          : Colors.orange,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: _locationUpdatedRecently
-                                            ? Colors.blue.withAlpha((0.5 * 255).toInt())
-                                            : Colors.orange.withAlpha((0.5 * 255).toInt()),
-                                          blurRadius: 4,
-                                          spreadRadius: 1,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _locationUpdatedRecently
-                                  ? 'Live Tracking'
-                                  : 'Last update: $_lastUpdateTime',
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    
-                  // Completion status overlay for completed/cancelled deliveries
-                  if (_currentRoute != null && (_currentRoute!.status == 'completed' || _currentRoute!.status == 'cancelled'))
-                    Positioned(
-                      top: 16,
-                      left: 16,
-                      right: 16,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: _currentRoute!.status == 'completed' 
-                            ? Colors.green.withAlpha((0.9 * 255).toInt())
-                            : Colors.red.withAlpha((0.9 * 255).toInt()),
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha((0.2 * 255).toInt()),
-                              blurRadius: 5,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _currentRoute!.status == 'completed' 
-                                ? Icons.check_circle 
-                                : Icons.cancel,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    _currentRoute!.status == 'completed' 
-                                      ? 'Delivery Completed' 
-                                      : 'Delivery Cancelled',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  if (_currentRoute!.actualEndTime != null)
-                                    Text(
-                                      'on ${DateFormat('MMM d, yyyy').format(_currentRoute!.actualEndTime!)} at ${DateFormat('h:mm a').format(_currentRoute!.actualEndTime!)}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
+                  ],
+                ),
               ),
+
+              const SizedBox(width: 12),
+
+              // ETA or completion info
+              Expanded(
+                child: status == 'in_progress'
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ETA: $etaText',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            remainingTime,
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      )
+                    : status == 'completed'
+                        ? Text(
+                            'Delivered at ${_currentRoute!.actualEndTime != null ? DateFormat("h:mm a").format(_currentRoute!.actualEndTime!) : etaText}',
+                            style: theme.textTheme.bodyMedium,
+                          )
+                        : status == 'pending'
+                            ? Text(
+                                'Scheduled for ${DateFormat("h:mm a").format(_currentRoute!.startTime)}',
+                                style: theme.textTheme.bodyMedium,
+                              )
+                            : const Text(
+                                'Delivery cancelled',
+                                style: TextStyle(color: Colors.red),
+                              ),
+              ),
+
+              // Action button
+              IconButton(
+                icon: Icon(
+                  _isInfoExpanded
+                      ? Icons.keyboard_arrow_down
+                      : Icons.keyboard_arrow_up,
+                  color: theme.colorScheme.primary,
+                ),
+                onPressed: _toggleInfoPanel,
+                tooltip: _isInfoExpanded ? 'Show less' : 'Show more',
+              ),
+            ],
+          ),
+
+          // Progress bar
+          if (status == 'in_progress' || status == 'completed')
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: LinearProgressIndicator(
+                value: status == 'completed'
+                    ? 1.0
+                    : (_currentRoute!.metadata?['routeDetails']?['progress']
+                                as num?)
+                            ?.toDouble() ??
+                        0.5,
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  status == 'completed'
+                      ? Colors.green
+                      : theme.colorScheme.primary,
+                ),
+                minHeight: 4,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+        ],
       ),
-      floatingActionButton: _currentRoute?.currentLocation != null
-          ? FloatingActionButton(
-              mini: true,
-              onPressed: _centerOnDriver,
-              child: const Icon(Icons.gps_fixed),
-            )
-          : null,
     );
   }
-  
+
+  // Compact grid action button with text below
   Widget _buildGridActionButton({
     required IconData icon,
     required String label,
@@ -1885,7 +1608,7 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
     required VoidCallback? onPressed,
   }) {
     final isDisabled = onPressed == null;
-    
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1924,6 +1647,615 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen> with WidgetsB
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_currentRoute?.metadata?['eventName'] ?? 'Track Delivery'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.my_location),
+            onPressed: _performInitialMapPreview,
+            tooltip: 'View entire route',
+          ),
+          if (_currentRoute?.status == 'in_progress')
+            IconButton(
+              icon: const Icon(Icons.navigation),
+              onPressed: _openGoogleMapsNavigation,
+              tooltip: 'Open in Google Maps',
+            ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshData,
+            tooltip: 'Refresh data',
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refreshData,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Stack(
+                children: [
+                  // Base layer: The map
+                  DeliveryMap(
+                    mapController: _mapController,
+                    markers: _markers,
+                    polylines: _polylines,
+                    initialPosition: _currentRoute?.currentLocation != null
+                        ? LatLng(
+                            _currentRoute!.currentLocation!.latitude,
+                            _currentRoute!.currentLocation!.longitude,
+                          )
+                        : LatLng(
+                            _currentRoute!.waypoints.first.latitude,
+                            _currentRoute!.waypoints.first.longitude,
+                          ),
+                    isLoading: _isLoading,
+                  ),
+
+                  // Loaded items section at the top (if needed)
+                  if (_currentRoute != null &&
+                      _currentRoute!.metadata != null &&
+                      _currentRoute!.metadata!['loadedItems'] != null)
+                    Positioned(
+                      top: 16,
+                      left: 16,
+                      right: 16,
+                      child: SafeArea(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 100),
+                          child: SingleChildScrollView(
+                            child: LoadedItemsSection(
+                              items: List<Map<String, dynamic>>.from(
+                                  _currentRoute!.metadata!['loadedItems']),
+                              allItemsLoaded: _currentRoute!
+                                      .metadata!['vehicleHasAllItems'] ??
+                                  false,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Live tracking indicator - always visible and minimal
+                  if (_currentRoute?.currentLocation != null &&
+                      _currentRoute?.status == 'in_progress')
+                    Positioned(
+                      top: 16,
+                      left: 16,
+                      child: SafeArea(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withAlpha((0.8 * 255).toInt()),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    Colors.black.withAlpha((0.2 * 255).toInt()),
+                                blurRadius: 5,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _isUpdatingLocation
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.blue,
+                                      ),
+                                    )
+                                  : Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: _locationUpdatedRecently
+                                            ? Colors.blue
+                                            : Colors.orange,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: _locationUpdatedRecently
+                                                ? Colors.blue.withAlpha(
+                                                    (0.5 * 255).toInt())
+                                                : Colors.orange.withAlpha(
+                                                    (0.5 * 255).toInt()),
+                                            blurRadius: 4,
+                                            spreadRadius: 1,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _locationUpdatedRecently
+                                    ? 'Live Tracking'
+                                    : 'Last update: $_lastUpdateTime',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Completion status overlay
+                  if (_currentRoute != null &&
+                      (_currentRoute!.status == 'completed' ||
+                          _currentRoute!.status == 'cancelled'))
+                    Positioned(
+                      top: 16,
+                      left: 16,
+                      right: 16,
+                      child: SafeArea(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _currentRoute!.status == 'completed'
+                                ? Colors.green.withAlpha((0.9 * 255).toInt())
+                                : Colors.red.withAlpha((0.9 * 255).toInt()),
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    Colors.black.withAlpha((0.2 * 255).toInt()),
+                                blurRadius: 5,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _currentRoute!.status == 'completed'
+                                    ? Icons.check_circle
+                                    : Icons.cancel,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _currentRoute!.status == 'completed'
+                                          ? 'Delivery Completed'
+                                          : 'Delivery Cancelled',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    if (_currentRoute!.actualEndTime != null)
+                                      Text(
+                                        'on ${DateFormat('MMM d, yyyy').format(_currentRoute!.actualEndTime!)} at ${DateFormat('h:mm a').format(_currentRoute!.actualEndTime!)}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Bottom panels (sliding up)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                      height:
+                          _isInfoExpanded ? _maxPanelHeight : _minPanelHeight,
+                      child: Column(
+                        children: [
+                          // Mini status card (always visible)
+                          GestureDetector(
+                            onTap: _toggleInfoPanel,
+                            child: _buildMiniStatusCard(),
+                          ),
+
+                          // Expanded content (conditionally visible)
+                          if (_isInfoExpanded)
+                            Expanded(
+                              child: Container(
+                                color: Theme.of(context).colorScheme.surface,
+                                child: SingleChildScrollView(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Delivery Info Card
+                                      if (_currentRoute != null)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                              left: 16,
+                                              right: 16,
+                                              bottom: 16,
+                                              top: 8),
+                                          child: DeliveryInfoCard(
+                                            route: _currentRoute!,
+                                            onDriverInfoTap:
+                                                _showDriverContactSheet,
+                                            onContactDriverTap:
+                                                _showDriverContactSheet,
+                                          ),
+                                        ),
+
+                                      // Management actions
+                                      if ((_isManagementUser ||
+                                              _isActiveDriver) &&
+                                          _currentRoute != null &&
+                                          (_currentRoute!.status == 'pending' ||
+                                              _currentRoute!.status ==
+                                                  'in_progress'))
+                                        Container(
+                                          margin: const EdgeInsets.only(
+                                            left: 16,
+                                            right: 16,
+                                            bottom: 16,
+                                          ),
+                                          child: Card(
+                                            elevation: 4,
+                                            clipBehavior: Clip.antiAlias,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                // Header
+                                                Container(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primaryContainer,
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 16,
+                                                      vertical: 12),
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons
+                                                            .admin_panel_settings,
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .onPrimaryContainer,
+                                                        size: 20,
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      Text(
+                                                        'Delivery Actions',
+                                                        style: Theme.of(context)
+                                                            .textTheme
+                                                            .titleMedium
+                                                            ?.copyWith(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              color: Theme.of(
+                                                                      context)
+                                                                  .colorScheme
+                                                                  .onPrimaryContainer,
+                                                            ),
+                                                      ),
+                                                      const Spacer(),
+                                                      if (_isProcessingAction)
+                                                        SizedBox(
+                                                          width: 16,
+                                                          height: 16,
+                                                          child:
+                                                              CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                            color: Theme.of(
+                                                                    context)
+                                                                .colorScheme
+                                                                .onPrimaryContainer,
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                ),
+
+                                                // Feedback area
+                                                if (_actionFeedback != null)
+                                                  Container(
+                                                    width: double.infinity,
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 16,
+                                                        vertical: 8),
+                                                    color: _isActionSuccess
+                                                        ? Colors.green
+                                                            .withAlpha((0.1 *
+                                                                    255)
+                                                                .toInt())
+                                                        : _isProcessingAction
+                                                            ? Colors.blue
+                                                                .withAlpha(
+                                                                    (0.1 * 255)
+                                                                        .toInt())
+                                                            : Colors.red
+                                                                .withAlpha((0.1 *
+                                                                        255)
+                                                                    .toInt()),
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(
+                                                          _isActionSuccess
+                                                              ? Icons
+                                                                  .check_circle
+                                                              : _isProcessingAction
+                                                                  ? Icons
+                                                                      .hourglass_top
+                                                                  : Icons.error,
+                                                          size: 16,
+                                                          color: _isActionSuccess
+                                                              ? Colors.green
+                                                              : _isProcessingAction
+                                                                  ? Colors.blue
+                                                                  : Colors.red,
+                                                        ),
+                                                        const SizedBox(
+                                                            width: 8),
+                                                        Expanded(
+                                                          child: Text(
+                                                            _actionFeedback!,
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              color: _isActionSuccess
+                                                                  ? Colors.green
+                                                                  : _isProcessingAction
+                                                                      ? Colors.blue
+                                                                      : Colors.red,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        if (_actionFeedback !=
+                                                                null &&
+                                                            !_isProcessingAction)
+                                                          IconButton(
+                                                            icon: const Icon(
+                                                                Icons.close,
+                                                                size: 14),
+                                                            onPressed: () {
+                                                              setState(() {
+                                                                _actionFeedback =
+                                                                    null;
+                                                              });
+                                                            },
+                                                            color:
+                                                                _isActionSuccess
+                                                                    ? Colors
+                                                                        .green
+                                                                    : Colors
+                                                                        .red,
+                                                            padding:
+                                                                EdgeInsets.zero,
+                                                            constraints:
+                                                                const BoxConstraints(),
+                                                            visualDensity:
+                                                                VisualDensity
+                                                                    .compact,
+                                                          ),
+                                                      ],
+                                                    ),
+                                                  ),
+
+                                                // Action buttons
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.all(16),
+                                                  child: LayoutBuilder(
+                                                    builder:
+                                                        (context, constraints) {
+                                                      // Responsive grid based on available width
+                                                      final crossCount =
+                                                          constraints.maxWidth >
+                                                                  600
+                                                              ? 6
+                                                              : constraints
+                                                                          .maxWidth >
+                                                                      400
+                                                                  ? 3
+                                                                  : 2;
+
+                                                      return GridView(
+                                                        shrinkWrap: true,
+                                                        physics:
+                                                            const NeverScrollableScrollPhysics(),
+                                                        gridDelegate:
+                                                            SliverGridDelegateWithFixedCrossAxisCount(
+                                                          crossAxisCount:
+                                                              crossCount,
+                                                          crossAxisSpacing: 8,
+                                                          mainAxisSpacing: 16,
+                                                          childAspectRatio: 1.0,
+                                                        ),
+                                                        children: [
+                                                          // Driver-specific actions
+                                                          if (_isActiveDriver) ...[
+                                                            if (_currentRoute!
+                                                                    .status ==
+                                                                'pending')
+                                                              _buildGridActionButton(
+                                                                icon: Icons
+                                                                    .play_arrow,
+                                                                label: 'Start',
+                                                                color: Colors
+                                                                    .green,
+                                                                onPressed:
+                                                                    !_isProcessingAction
+                                                                        ? _startDelivery
+                                                                        : null,
+                                                              ),
+                                                            if (_currentRoute!
+                                                                    .status ==
+                                                                'in_progress')
+                                                              _buildGridActionButton(
+                                                                icon: Icons
+                                                                    .check_circle,
+                                                                label:
+                                                                    'Complete',
+                                                                color: Colors
+                                                                    .green,
+                                                                onPressed:
+                                                                    !_isProcessingAction
+                                                                        ? _completeDelivery
+                                                                        : null,
+                                                              ),
+                                                            if (_currentRoute!
+                                                                    .status ==
+                                                                'in_progress')
+                                                              _buildGridActionButton(
+                                                                icon: Icons
+                                                                    .navigation,
+                                                                label:
+                                                                    'Navigate',
+                                                                color:
+                                                                    Colors.blue,
+                                                                onPressed:
+                                                                    !_isProcessingAction
+                                                                        ? _openGoogleMapsNavigation
+                                                                        : null,
+                                                              ),
+                                                          ],
+
+                                                          // Management-specific actions
+                                                          if (_isManagementUser) ...[
+                                                            _buildGridActionButton(
+                                                              icon: Icons.edit,
+                                                              label:
+                                                                  'Edit Times',
+                                                              color: Theme.of(
+                                                                      context)
+                                                                  .colorScheme
+                                                                  .primary,
+                                                              onPressed:
+                                                                  !_isProcessingAction
+                                                                      ? _showEditDialog
+                                                                      : null,
+                                                            ),
+                                                            _buildGridActionButton(
+                                                              icon: Icons
+                                                                  .swap_horiz,
+                                                              label: 'Reassign',
+                                                              color:
+                                                                  Colors.orange,
+                                                              onPressed:
+                                                                  !_isProcessingAction
+                                                                      ? _showReassignDialog
+                                                                      : null,
+                                                            ),
+                                                            _buildGridActionButton(
+                                                              icon:
+                                                                  Icons.delete,
+                                                              label: 'Delete',
+                                                              color: Theme.of(
+                                                                      context)
+                                                                  .colorScheme
+                                                                  .error,
+                                                              onPressed:
+                                                                  !_isProcessingAction
+                                                                      ? _showDeleteDialog
+                                                                      : null,
+                                                            ),
+                                                          ],
+
+                                                          // Actions for non-active drivers
+                                                          if (!_isActiveDriver &&
+                                                              _currentRoute!
+                                                                      .status !=
+                                                                  'completed' &&
+                                                              _currentRoute!
+                                                                      .status !=
+                                                                  'cancelled')
+                                                            _buildGridActionButton(
+                                                              icon: Icons
+                                                                  .person_add,
+                                                              label:
+                                                                  'Take Over',
+                                                              color:
+                                                                  Colors.blue,
+                                                              onPressed:
+                                                                  !_isProcessingAction
+                                                                      ? _takeOverDelivery
+                                                                      : null,
+                                                            ),
+
+                                                          // Contact driver action
+                                                          _buildGridActionButton(
+                                                            icon: Icons.phone,
+                                                            label:
+                                                                'Contact Driver',
+                                                            color: Theme.of(
+                                                                    context)
+                                                                .colorScheme
+                                                                .secondary,
+                                                            onPressed:
+                                                                !_isProcessingAction
+                                                                    ? _showDriverContactSheet
+                                                                    : null,
+                                                          ),
+                                                        ],
+                                                      );
+                                                    },
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // FAB for centering on driver
+                  if (_currentRoute?.currentLocation != null)
+                    Positioned(
+                      right: 16,
+                      bottom: _isInfoExpanded
+                          ? _maxPanelHeight + 16
+                          : _minPanelHeight + 16,
+                      child: FloatingActionButton(
+                        mini: true,
+                        onPressed: _centerOnDriver,
+                        child: const Icon(Icons.gps_fixed),
+                      ),
+                    ),
+                ],
+              ),
       ),
     );
   }

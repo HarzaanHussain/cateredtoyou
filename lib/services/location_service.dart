@@ -303,57 +303,7 @@ class LocationService extends ChangeNotifier {
   void _createEstimatedPosition() {
      debugPrint('⚠️ Position estimation disabled to prevent drift');
   return;
-    /*if (_lastValidPosition == null || _lastPositionTimestamp == null) return;
-
-    final now = DateTime.now();
-    final timeDiff = now.difference(_lastPositionTimestamp!).inSeconds;
-
-    // Only estimate if we have a reasonable time difference
-    if (timeDiff < 1 || timeDiff > 60) return;
-
-    try {
-      // Calculate new position based on last heading and speed
-      final distanceMeters = _currentSpeed * timeDiff;
-      final headingRadians = _currentHeading * (3.14159 / 180);
-
-      // Earth's radius in meters at the equator
-      const double earthRadius = 6378137.0;
-
-      // Calculate new position
-      final lastLat = _lastValidPosition!.latitude;
-      final lastLng = _lastValidPosition!.longitude;
-
-      // Convert distance to latitude degrees (approximate)
-      final latChange = (distanceMeters * Math.cos(headingRadians)) /
-          (earthRadius * (3.14159 / 180));
-
-      // Convert distance to longitude degrees (approximate)
-      final lngChange = (distanceMeters * Math.sin(headingRadians)) /
-          (earthRadius * Math.cos(lastLat * (3.14159 / 180)) * (3.14159 / 180));
-
-      // Create estimated position
-      final estimatedPosition = Position(
-        latitude: lastLat + latChange,
-        longitude: lastLng + lngChange,
-        timestamp: DateTime.now(),
-        accuracy:
-            _lastValidPosition!.accuracy * 2, // Lower accuracy for estimated
-        altitude: _lastValidPosition!.altitude,
-        altitudeAccuracy: 0.0, // Default value for altitude accuracy
-        heading: _currentHeading,
-        headingAccuracy: 0.0, // Default value for heading accuracy
-        speed: _currentSpeed,
-        speedAccuracy: 0,
-        floor: _lastValidPosition!.floor,
-        isMocked: true, // Mark as mocked/estimated
-      );
-
-      // Use the estimated position
-      _onPositionUpdate(estimatedPosition, isEstimated: true);
-      debugPrint('⚠️ Using estimated position due to tracking errors');
-    } catch (e) {
-      debugPrint('Error creating estimated position: $e');
-    }*/
+   
   }
 
   // Stop tracking location

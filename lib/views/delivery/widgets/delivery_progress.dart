@@ -339,8 +339,7 @@ class DeliveryProgress extends StatelessWidget {
     }
   }
 
-  // THIS IS THE MISSING METHOD that caused the error
-  // Static method to calculate progress based on various parameters
+ 
   static double calculateProgress({
     required List<GeoPoint> waypoints,
     GeoPoint? currentLocation,

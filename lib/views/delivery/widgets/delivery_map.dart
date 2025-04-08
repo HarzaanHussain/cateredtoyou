@@ -1,118 +1,130 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
-import 'dart:math' as math;
-import 'dart:io';
+import 'dart:io'; // Provides access to platform-specific APIs for file, socket, and network operations.
+
+import 'package:flutter/foundation.dart'; // Provides tools for debugging and platform detection.
+import 'package:flutter/material.dart'; // Provides the core Flutter UI framework.
+import 'package:flutter_map/flutter_map.dart'; // Provides the Flutter Map library for rendering maps.
+import 'package:latlong2/latlong.dart'; // Provides LatLng class for geographical coordinates.
+import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart'; // Adds support for cancellable tile loading in Flutter Map.
+import 'dart:math' as math; // Provides mathematical functions and constants.
 
 class DeliveryMap extends StatefulWidget {
-  final MapController mapController;
-  final List<Marker> markers;
-  final List<Polyline> polylines;
-  final LatLng initialPosition;
-  final double initialZoom;
-  final bool isLoading;
-  final Function(TapPosition, LatLng)? onMapTap;
-  final VoidCallback? onMapReady;
-  final bool showUserLocation;
-  
+  final MapController mapController; // Controller to manage map state and interactions.
+  final List<Marker> markers; // List of markers to display on the map.
+  final List<Polyline> polylines; // List of polylines to display routes on the map.
+  final LatLng initialPosition; // Initial geographical position of the map.
+  final double initialZoom; // Initial zoom level of the map.
+  final bool isLoading; // Indicates whether the map is in a loading state.
+  final Function(TapPosition, LatLng)? onMapTap; // Callback for handling map tap events.
+  final VoidCallback? onMapReady; // Callback for when the map is fully initialized.
+  final bool showUserLocation; // Whether to show the user's current location on the map.
+
   // Advanced options
-  final bool showMapTypeButton;
-  final bool showTrafficButton;
-  final bool showScaleBar;
-  final bool showAttribution;
-  final bool showZoomButtons;
+  final bool showMapTypeButton; // Whether to show the button for changing map styles.
+  final bool showTrafficButton; // Whether to show the button for toggling traffic overlay.
+  final bool showScaleBar; // Whether to show the scale bar on the map.
+  final bool showAttribution; // Whether to show attribution text for map data.
+  final bool showZoomButtons; // Whether to show zoom in/out buttons.
 
   const DeliveryMap({
-    super.key,
-    required this.mapController,
-    required this.markers,
-    required this.polylines,
-    required this.initialPosition,
-    this.initialZoom = 13.0,
-    this.isLoading = false,
-    this.onMapTap,
-    this.onMapReady,
-    this.showUserLocation = true,
-    this.showMapTypeButton = true,
-    this.showTrafficButton = false,
-    this.showScaleBar = true,
-    this.showAttribution = true,
-    this.showZoomButtons = true,
+    super.key, // Passes the widget's key to the superclass.
+    required this.mapController, // Ensures the map controller is provided.
+    required this.markers, // Ensures the markers list is provided.
+    required this.polylines, // Ensures the polylines list is provided.
+    required this.initialPosition, // Ensures the initial position is provided.
+    this.initialZoom = 13.0, // Sets a default zoom level if not provided.
+    this.isLoading = false, // Defaults to not loading if not specified.
+    this.onMapTap, // Optional callback for map tap events.
+    this.onMapReady, // Optional callback for when the map is ready.
+    this.showUserLocation = true, // Defaults to showing user location.
+    this.showMapTypeButton = true, // Defaults to showing the map type button.
+    this.showTrafficButton = false, // Defaults to hiding the traffic button.
+    this.showScaleBar = true, // Defaults to showing the scale bar.
+    this.showAttribution = true, // Defaults to showing attribution text.
+    this.showZoomButtons = true, // Defaults to showing zoom buttons.
   });
 
   @override
-  State<DeliveryMap> createState() => _DeliveryMapState();
+  State<DeliveryMap> createState() => _DeliveryMapState(); // Creates the state for this widget.
 }
 
 class _DeliveryMapState extends State<DeliveryMap> with SingleTickerProviderStateMixin {
-  bool _showTraffic = false;
-  String _currentMapStyle = 'streets';
-  bool _isStyleSelectVisible = false;
-  late AnimationController _styleSelectController;
-  bool _isOffline = false;
-  
+  bool _showTraffic = false; // Tracks whether the traffic overlay is enabled.
+  String _currentMapStyle = 'streets'; // Tracks the currently selected map style.
+  bool _isStyleSelectVisible = false; // Tracks whether the map style selector is visible.
+  late AnimationController _styleSelectController; // Animation controller for the style selector.
+  bool _isOffline = false; // Tracks whether the app is offline.
+
   // Map styles options
   final Map<String, String> _mapStyles = {
-    'streets': 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    'satellite': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    'dark': 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    'light': 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    'streets': 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', // URL for streets map style.
+    'satellite': 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', // URL for satellite map style.
+    'dark': 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', // URL for dark map style.
+    'light': 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', // URL for light map style.
   };
-  
+
   final Map<String, String> _mapStyleLabels = {
-    'streets': 'Streets',
-    'satellite': 'Satellite',
-    'dark': 'Dark',
-    'light': 'Light',
+    'streets': 'Streets', // Label for streets map style.
+    'satellite': 'Satellite', // Label for satellite map style.
+    'dark': 'Dark', // Label for dark map style.
+    'light': 'Light', // Label for light map style.
   };
 
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize animation controller for map style selector
     _styleSelectController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
+      vsync: this, // Uses this widget as the ticker provider.
+      duration: const Duration(milliseconds: 300), // Sets the animation duration to 300ms.
     );
-    
+
     // Check for internet connectivity
     _checkConnectivity();
-    
+
     // Call onMapReady callback if provided
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.onMapReady != null) {
-        widget.onMapReady!();
+        widget.onMapReady!(); // Invokes the onMapReady callback after the first frame.
       }
     });
   }
 
   @override
   void dispose() {
-    _styleSelectController.dispose();
+    _styleSelectController.dispose(); // Disposes the animation controller to free resources.
     super.dispose();
   }
-  
-  // Check for internet connectivity
-  Future<void> _checkConnectivity() async {
-    try {
-      final result = await InternetAddress.lookup('google.com');
-      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+Future<void> _checkConnectivity() async {
+  try {
+    // For web platforms, skip the actual network check since it's not supported
+    if (kIsWeb) {
+      if (mounted) {
         setState(() {
-          _isOffline = false;
-        });
-      } else {
-        setState(() {
-          _isOffline = true;
+          _isOffline = false; // Default to assuming online for web
         });
       }
-    } on SocketException catch (_) {
+      debugPrint('Web platform detected, skipping connectivity check');
+      return;
+    }
+
+    // For native platforms (Android, iOS, etc.), perform actual connectivity check
+    final result = await InternetAddress.lookup('google.com');
+    if (mounted) {
+      setState(() {
+        _isOffline = result.isEmpty || result[0].rawAddress.isEmpty;
+      });
+    }
+  } catch (e) {
+    // If there's any error, assume we're offline
+    if (mounted) {
       setState(() {
         _isOffline = true;
       });
     }
+    debugPrint('Connectivity check error: $e');
   }
+}
   
   void _toggleStyleSelector() {
     setState(() {

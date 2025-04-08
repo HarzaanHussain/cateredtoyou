@@ -1,4 +1,5 @@
 import 'dart:async'; // Importing the async library for using Timer and Future.
+import 'package:cateredtoyou/models/delivery_route_model.dart';
 import 'package:cateredtoyou/models/user_model.dart'; // Importing the user model.
 import 'package:cateredtoyou/models/vehicle_model.dart'; // Importing the vehicle model.
 import 'package:cateredtoyou/services/staff_service.dart'; // Importing the staff service.
@@ -352,7 +353,6 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
         : _deliveryAddressKey.currentContext?.findRenderObject() as RenderBox?;
 
     if (textFieldBox == null) {
-      // Fallback to modal bottom sheet if we can't find the text field position
       await _showAddressSuggestionsBottomSheet(results, isPickup);
       return;
     }
@@ -362,7 +362,6 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
     final textFieldSize = textFieldBox.size;
 
     // Calculate the position for the popup
-    // Position it below the text field with a small offset
     final offset = Offset(0, textFieldSize.height + 5);
     final position = textFieldPosition + offset;
 
@@ -373,8 +372,7 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
         position.dx,
         position.dy,
         position.dx + textFieldSize.width,
-        position.dy +
-            20.0, // This value doesn't matter much as the menu adapts its height
+        position.dy + 20.0,
       ),
       elevation: 8,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -742,7 +740,6 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Delivery'), // Set the app bar title.
-        
       ),
       body: Form(
         key: _formKey, // Set the form key for validation.
@@ -764,7 +761,7 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
           ],
         ),
       ),
-       bottomNavigationBar: const BottomToolbar(), 
+      bottomNavigationBar: const BottomToolbar(),
     );
   }
 
@@ -1736,8 +1733,9 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
             .toList(), // Convert loaded items to a list of maps.
       };
 
-      // Create delivery route
-      await deliveryService.createDeliveryRoute(
+      // Create delivery route and get the created route object
+      final DeliveryRoute createdRoute =
+          await deliveryService.createDeliveryRoute(
         eventId: _selectedEventId!, // Add event ID.
         vehicleId: _selectedVehicleId!, // Add vehicle ID.
         driverId: _selectedDriverId!, // Add driver ID.
@@ -1746,17 +1744,29 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
         waypoints: waypoints, // Add waypoints.
         metadata: metadata, // Add metadata.
       );
-      await deliveryService.initializeRouteMetrics(metadata['routeId']);
+
+      await deliveryService.initializeRouteMetrics(createdRoute.id);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-                'Delivery route created successfully'), // Show success message.
+            content: Text('Delivery route created successfully'),
             behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
           ),
         );
-        context.pop(); // Navigate back.
+
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            final router = GoRouter.of(context);
+
+            if (router.canPop()) {
+              router.pop();
+            }
+
+            router.go('/deliveries');
+          }
+        });
       }
     } catch (e) {
       setState(() {
