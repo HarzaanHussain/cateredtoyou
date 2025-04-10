@@ -14,7 +14,6 @@ import 'package:cateredtoyou/models/delivery_route_model.dart';
 import 'package:cateredtoyou/views/delivery/widgets/delivery_map.dart';
 import 'package:cateredtoyou/views/delivery/widgets/delivery_info_card.dart';
 import 'package:cateredtoyou/views/delivery/widgets/driver_contact_sheet.dart';
-import 'package:cateredtoyou/views/delivery/widgets/loaded_items_section.dart';
 import 'package:cateredtoyou/views/delivery/widgets/reassign_driver_dialog.dart';
 import 'package:cateredtoyou/utils/permission_helpers.dart';
 import 'package:cateredtoyou/services/delivery_route_service.dart';
@@ -76,8 +75,6 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen>
   bool _isInfoExpanded = false; // Track if info panel is expanded
   bool _isManagementUser = false;
   bool _isActiveDriver = false;
-
-  // Drag controller instance
 
   // Action feedback states
   bool _isProcessingAction = false;
@@ -470,8 +467,6 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen>
         _locationUpdatedRecently = true;
         _lastUpdateTime =
             DateFormat('h:mm:ss a').format(_lastLocationUpdateTime!);
-
-        // Update speed and heading for better prediction
 
         // Save previous position for animation
         if (_currentRoute?.currentLocation != null) {
@@ -966,58 +961,6 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen>
     }
   }
 
-  // Management Actions
-  Future<void> _takeOverDelivery() async {
-    if (_isProcessingAction) return;
-
-    setState(() {
-      _isProcessingAction = true;
-      _actionFeedback = 'Taking over delivery...';
-      _isActionSuccess = false;
-    });
-
-    try {
-      final deliveryService =
-          Provider.of<DeliveryRouteService>(context, listen: false);
-      final locationService =
-          Provider.of<LocationService>(context, listen: false);
-
-      // Take over the delivery
-      await deliveryService.takeOverDelivery(_currentRoute!.id);
-
-      // If delivery is in progress, start tracking
-      if (_currentRoute!.status == 'in_progress') {
-        await locationService.startTrackingDelivery(_currentRoute!.id);
-      }
-
-      if (mounted) {
-        setState(() {
-          _isProcessingAction = false;
-          _actionFeedback = 'Successfully taken over delivery';
-          _isActionSuccess = true;
-        });
-
-        _showSnackBar('You have taken over this delivery', isError: false);
-
-        // Refresh user permissions
-        await _checkUserPermissions();
-
-        // Force refresh data
-        await _refreshData();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isProcessingAction = false;
-          _actionFeedback = 'Error: ${e.toString()}';
-          _isActionSuccess = false;
-        });
-
-        _showSnackBar('Error: ${e.toString()}', isError: true);
-      }
-    }
-  }
-
   Future<void> _showReassignDialog() async {
     final result = await showDialog(
       context: context,
@@ -1098,149 +1041,6 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen>
                   .pop(true); // Return true to indicate changes
             }
           });
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() {
-            _isProcessingAction = false;
-            _actionFeedback = 'Error: ${e.toString()}';
-            _isActionSuccess = false;
-          });
-
-          _showSnackBar('Error: ${e.toString()}', isError: true);
-        }
-      }
-    }
-  }
-
-  Future<void> _showEditDialog() async {
-    final startTimeController =
-        TimeOfDay.fromDateTime(_currentRoute!.startTime);
-    final endTimeController =
-        TimeOfDay.fromDateTime(_currentRoute!.estimatedEndTime);
-
-    var selectedStartTime = startTimeController;
-    var selectedEndTime = endTimeController;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Edit Delivery Times'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('Start Time'),
-                subtitle: Text(DateFormat('h:mm a').format(
-                  DateTime(
-                    DateTime.now().year,
-                    DateTime.now().month,
-                    DateTime.now().day,
-                    selectedStartTime.hour,
-                    selectedStartTime.minute,
-                  ),
-                )),
-                trailing: const Icon(Icons.access_time),
-                onTap: () async {
-                  final pickedTime = await showTimePicker(
-                    context: context,
-                    initialTime: selectedStartTime,
-                  );
-                  if (pickedTime != null) {
-                    setState(() {
-                      selectedStartTime = pickedTime;
-                    });
-                  }
-                },
-              ),
-              ListTile(
-                title: const Text('Estimated End Time'),
-                subtitle: Text(DateFormat('h:mm a').format(
-                  DateTime(
-                    DateTime.now().year,
-                    DateTime.now().month,
-                    DateTime.now().day,
-                    selectedEndTime.hour,
-                    selectedEndTime.minute,
-                  ),
-                )),
-                trailing: const Icon(Icons.access_time),
-                onTap: () async {
-                  final pickedTime = await showTimePicker(
-                    context: context,
-                    initialTime: selectedEndTime,
-                  );
-                  if (pickedTime != null) {
-                    setState(() {
-                      selectedEndTime = pickedTime;
-                    });
-                  }
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Update'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      setState(() {
-        _isProcessingAction = true;
-        _actionFeedback = 'Updating delivery times...';
-      });
-
-      try {
-        final now = DateTime.now();
-
-        // Create new DateTime objects with the selected times
-        final newStartDateTime = DateTime(
-          _currentRoute!.startTime.year,
-          _currentRoute!.startTime.month,
-          _currentRoute!.startTime.day,
-          selectedStartTime.hour,
-          selectedStartTime.minute,
-        );
-
-        final newEndDateTime = DateTime(
-          _currentRoute!.estimatedEndTime.year,
-          _currentRoute!.estimatedEndTime.month,
-          _currentRoute!.estimatedEndTime.day,
-          selectedEndTime.hour,
-          selectedEndTime.minute,
-        );
-
-        // Update in Firestore
-        await FirebaseFirestore.instance
-            .collection('delivery_routes')
-            .doc(_currentRoute!.id)
-            .update({
-          'startTime': Timestamp.fromDate(newStartDateTime),
-          'estimatedEndTime': Timestamp.fromDate(newEndDateTime),
-          'updatedAt': Timestamp.fromDate(now),
-        });
-
-        if (mounted) {
-          setState(() {
-            _isProcessingAction = false;
-            _actionFeedback = 'Delivery times updated successfully';
-            _isActionSuccess = true;
-          });
-
-          _showSnackBar('Delivery times updated', isError: false);
-
-          // Force refresh
-          await _refreshData();
         }
       } catch (e) {
         if (mounted) {
@@ -1696,31 +1496,10 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen>
                             _currentRoute!.waypoints.first.longitude,
                           ),
                     isLoading: _isLoading,
+                    // Make map options more visible by ensuring proper width
+                    showMapTypeButton: true,
+                    showZoomButtons: true,
                   ),
-
-                  // Loaded items section at the top (if needed)
-                  if (_currentRoute != null &&
-                      _currentRoute!.metadata != null &&
-                      _currentRoute!.metadata!['loadedItems'] != null)
-                    Positioned(
-                      top: 16,
-                      left: 16,
-                      right: 16,
-                      child: SafeArea(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 100),
-                          child: SingleChildScrollView(
-                            child: LoadedItemsSection(
-                              items: List<Map<String, dynamic>>.from(
-                                  _currentRoute!.metadata!['loadedItems']),
-                              allItemsLoaded: _currentRoute!
-                                      .metadata!['vehicleHasAllItems'] ??
-                                  false,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
 
                   // Live tracking indicator - always visible and minimal
                   if (_currentRoute?.currentLocation != null &&
@@ -2149,19 +1928,6 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen>
                                                           // Management-specific actions
                                                           if (_isManagementUser) ...[
                                                             _buildGridActionButton(
-                                                              icon: Icons.edit,
-                                                              label:
-                                                                  'Edit Times',
-                                                              color: Theme.of(
-                                                                      context)
-                                                                  .colorScheme
-                                                                  .primary,
-                                                              onPressed:
-                                                                  !_isProcessingAction
-                                                                      ? _showEditDialog
-                                                                      : null,
-                                                            ),
-                                                            _buildGridActionButton(
                                                               icon: Icons
                                                                   .swap_horiz,
                                                               label: 'Reassign',
@@ -2186,27 +1952,6 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen>
                                                                       : null,
                                                             ),
                                                           ],
-
-                                                          // Actions for non-active drivers
-                                                          if (!_isActiveDriver &&
-                                                              _currentRoute!
-                                                                      .status !=
-                                                                  'completed' &&
-                                                              _currentRoute!
-                                                                      .status !=
-                                                                  'cancelled')
-                                                            _buildGridActionButton(
-                                                              icon: Icons
-                                                                  .person_add,
-                                                              label:
-                                                                  'Take Over',
-                                                              color:
-                                                                  Colors.blue,
-                                                              onPressed:
-                                                                  !_isProcessingAction
-                                                                      ? _takeOverDelivery
-                                                                      : null,
-                                                            ),
 
                                                           // Contact driver action
                                                           _buildGridActionButton(

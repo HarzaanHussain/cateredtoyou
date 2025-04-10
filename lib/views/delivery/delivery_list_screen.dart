@@ -9,6 +9,7 @@ import 'package:cateredtoyou/services/delivery_route_service.dart';
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:cateredtoyou/utils/permission_helpers.dart';
 import 'package:cateredtoyou/views/delivery/widgets/reassign_driver_dialog.dart';
+import 'package:cateredtoyou/views/delivery/widgets/status_chip.dart';
 
 /// A stateless widget that displays a list of delivery routes with management features.
 class DeliveryListScreen extends StatelessWidget {
@@ -61,24 +62,25 @@ class DeliveryListScreen extends StatelessWidget {
                 return _buildEmptyState(context);
               }
 
-              // Sort deliveries: in_progress, pending, completed, cancelled
-              routes.sort((a, b) {
-                final statusOrder = {
-                  'in_progress': 0,
-                  'pending': 1,
-                  'completed': 2,
-                  'cancelled': 3,
-                };
-                
-                final aOrder = statusOrder[a.status.toLowerCase()] ?? 4;
-                final bOrder = statusOrder[b.status.toLowerCase()] ?? 4;
-                
-                final statusCompare = aOrder.compareTo(bOrder);
-                if (statusCompare != 0) return statusCompare;
-                
-                // Then sort by time (start time for pending, estimated end for in_progress)
-                return a.estimatedEndTime.compareTo(b.estimatedEndTime);
-              });
+              // Group deliveries by status
+              final inProgressRoutes = routes.where((r) => r.status == 'in_progress').toList();
+              final pendingRoutes = routes.where((r) => r.status == 'pending').toList();
+              final completedRoutes = routes.where((r) => r.status == 'completed').toList();
+              final cancelledRoutes = routes.where((r) => r.status == 'cancelled').toList();
+              
+              // Sort each group by time
+              inProgressRoutes.sort((a, b) => a.estimatedEndTime.compareTo(b.estimatedEndTime));
+              pendingRoutes.sort((a, b) => a.startTime.compareTo(b.startTime));
+              completedRoutes.sort((a, b) => b.actualEndTime?.compareTo(a.actualEndTime ?? b.estimatedEndTime) ?? -1);
+              cancelledRoutes.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+              
+              // Combine groups in order
+              final orderedRoutes = [
+                ...inProgressRoutes,
+                ...pendingRoutes,
+                ...completedRoutes,
+                ...cancelledRoutes,
+              ];
 
               return FutureBuilder<bool>(
                 future: isManagementUser(context),
@@ -87,9 +89,27 @@ class DeliveryListScreen extends StatelessWidget {
                   
                   return ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: routes.length,
+                    itemCount: orderedRoutes.length,
                     itemBuilder: (context, index) {
-                      final route = routes[index];
+                      final route = orderedRoutes[index];
+                      
+                      // Add section headers
+                      if (index == 0 || route.status != orderedRoutes[index-1].status) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (index > 0) const SizedBox(height: 16),
+                            _buildSectionHeader(context, route.status),
+                            const SizedBox(height: 8),
+                            DeliveryRouteCard(
+                              route: route,
+                              isManager: isManager,
+                              onTap: () => context.push('/track-delivery', extra: route),
+                            ),
+                          ],
+                        );
+                      }
+                      
                       return DeliveryRouteCard(
                         route: route,
                         isManager: isManager,
@@ -102,6 +122,58 @@ class DeliveryListScreen extends StatelessWidget {
             },
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(BuildContext context, String status) {
+    final theme = Theme.of(context);
+    
+    String title;
+    IconData icon;
+    Color color;
+    
+    switch (status.toLowerCase()) {
+      case 'in_progress':
+        title = 'In Progress';
+        icon = Icons.local_shipping;
+        color = theme.colorScheme.primary;
+        break;
+      case 'pending':
+        title = 'Scheduled';
+        icon = Icons.schedule;
+        color = Colors.orange;
+        break;
+      case 'completed':
+        title = 'Completed';
+        icon = Icons.check_circle;
+        color = Colors.green;
+        break;
+      case 'cancelled':
+        title = 'Cancelled';
+        icon = Icons.cancel;
+        color = Colors.red;
+        break;
+      default:
+        title = 'Other';
+        icon = Icons.more_horiz;
+        color = Colors.grey;
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.only(left: 8.0, bottom: 4.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -171,11 +243,31 @@ class DeliveryRouteCard extends StatelessWidget {
     final theme = Theme.of(context);
     final userId = FirebaseAuth.instance.currentUser?.uid;
     final isUserDriver = userId == route.driverId || userId == route.currentDriver;
+    
+    // Get card styling based on status
+    final cardStyle = _getCardStyle(context, route.status);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: cardStyle.borderColor,
+          width: 1,
+        ),
+      ),
       child: Column(
         children: [
+          // Optional colored status bar
+          Container(
+            height: 6,
+            width: double.infinity,
+            color: cardStyle.headerColor,
+          ),
+          
+          // Main content
           InkWell(
             onTap: onTap,
             child: Padding(
@@ -183,79 +275,94 @@ class DeliveryRouteCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Top row with title and status
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Event name and date
                       Expanded(
-                        child: Text(
-                          route.metadata?['eventName'] ?? 'Delivery #${route.id.substring(0, 8)}',
-                          style: theme.textTheme.titleMedium,
-                          overflow: TextOverflow.ellipsis,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              route.metadata?['eventName'] ?? 'Delivery #${route.id.substring(0, 8)}',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              DateFormat('MMM d, yyyy').format(route.startTime),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      _buildStatusChip(context, route.status),
+                      
+                      // Status chip using the provided widget
+                      StatusChip(status: route.status),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  _buildTimeRow(context),
-                  if (route.isReassigned) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withAlpha((0.1 * 255).toInt()),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Colors.orange.withAlpha((0.5 * 255).toInt()),
-                        ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Driver and time information
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Driver info with avatar
+                      Expanded(
+                        flex: 3,
+                        child: _buildDriverInfo(context),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.swap_horiz,
-                            size: 14,
-                            color: Colors.orange,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Reassigned',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.orange,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                      
+                      // Vertical divider
+                      Container(
+                        height: 40,
+                        width: 1,
+                        color: theme.colorScheme.outlineVariant,
                       ),
-                    ),
-                  ],
-                  _buildDriverInfo(context),
-                  _buildLoadedItemsInfo(),
-                  if (route.metadata?['notes'] != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      route.metadata!['notes'],
-                      style: theme.textTheme.bodyMedium,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  if (route.metadata?['loadedItems'] != null) ...[
+                      
+                      // Time info
+                      Expanded(
+                        flex: 4,
+                        child: _buildTimeInfo(context),
+                      ),
+                    ],
+                  ),
+                  
+                  // Load info and address
+                  const SizedBox(height: 16),
+                  _buildAddressAndLoadInfo(context),
+                  
+                  // Notes if available
+                  if (route.metadata?['notes'] != null && 
+                     (route.metadata?['notes'] as String).isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
                     const SizedBox(height: 8),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
-                          Icons.inventory_2,
+                          Icons.notes,
                           size: 16,
-                          color: theme.colorScheme.primary,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${(route.metadata?['loadedItems'] as List?)?.length ?? 0} items for delivery',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.primary,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            route.metadata!['notes'],
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontStyle: FontStyle.italic,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -266,59 +373,59 @@ class DeliveryRouteCard extends StatelessWidget {
             ),
           ),
           
-          // Management actions section
-          if (showActions && (isManager || isUserDriver)) ...[
-            const Divider(),
+          // Action buttons
+          if (showActions && (isManager || isUserDriver) && 
+              (route.status == 'pending' || route.status == 'in_progress')) ...[
+            const Divider(height: 1),
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  if (isUserDriver && route.status == 'pending') // Driver can start their deliveries
-                    _buildActionButton(
-                      context, 
-                      Icons.play_arrow, 
-                      'Start', 
-                      () => _updateStatus(context, 'in_progress'),
-                      theme.colorScheme.primary,
-                    ),
-                    
-                  if (isUserDriver && route.status == 'in_progress') // Driver can complete their deliveries
-                    _buildActionButton(
-                      context, 
-                      Icons.check, 
-                      'Complete', 
-                      () => _updateStatus(context, 'completed'),
-                      Colors.green,
-                    ),
+                  // Driver actions
+                  if (isUserDriver) ...[
+                    if (route.status == 'pending')
+                      TextButton.icon(
+                        onPressed: () => _updateStatus(context, 'in_progress'),
+                        icon: const Icon(Icons.play_arrow, size: 18),
+                        label: const Text('Start'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.green,
+                        ),
+                      ),
+                      
+                    if (route.status == 'in_progress')
+                      TextButton.icon(
+                        onPressed: () => _updateStatus(context, 'completed'),
+                        icon: const Icon(Icons.check_circle, size: 18),
+                        label: const Text('Complete'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.green,
+                        ),
+                      ),
+                  ],
                   
+                  // Manager actions
                   if (isManager) ...[
-                    if (route.status != 'completed' && route.status != 'cancelled')
-                      _buildActionButton(
-                        context, 
-                        Icons.edit, 
-                        'Edit', 
-                        () => _showEditDialog(context),
-                        theme.colorScheme.primary,
+                    if (route.status != 'completed' && route.status != 'cancelled') ...[
+                      TextButton.icon(
+                        onPressed: () => _showReassignDialog(context),
+                        icon: const Icon(Icons.person_add, size: 18),
+                        label: const Text('Reassign'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.orange,
+                        ),
                       ),
                       
-                    if (route.status != 'completed' && route.status != 'cancelled')
-                      _buildActionButton(
-                        context, 
-                        Icons.person_add, 
-                        'Reassign', 
-                        () => _showReassignDialog(context),
-                        Colors.orange,
+                      TextButton.icon(
+                        onPressed: () => _showDeleteDialog(context),
+                        icon: const Icon(Icons.delete, size: 18),
+                        label: const Text('Delete'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: theme.colorScheme.error,
+                        ),
                       ),
-                      
-                    if (route.status != 'completed' && route.status != 'cancelled')
-                      _buildActionButton(
-                        context, 
-                        Icons.delete, 
-                        'Delete', 
-                        () => _showDeleteDialog(context),
-                        theme.colorScheme.error,
-                      ),
+                    ],
                   ],
                 ],
               ),
@@ -329,38 +436,151 @@ class DeliveryRouteCard extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButton(
-    BuildContext context, 
-    IconData icon, 
-    String label, 
-    VoidCallback onPressed,
-    Color color,
-  ) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+  // Helper class for card styling
+  CardStyle _getCardStyle(BuildContext context, String status) {
+    final theme = Theme.of(context);
+    
+    switch (status.toLowerCase()) {
+      case 'in_progress':
+        return CardStyle(
+          headerColor: theme.colorScheme.primary,
+          borderColor: theme.colorScheme.primary.withAlpha((0.3 * 255).toInt()),
+          backgroundColor: theme.colorScheme.surface,
+        );
+      case 'pending':
+        return CardStyle(
+          headerColor: Colors.orange,
+          borderColor: Colors.orange.withAlpha((0.3 * 255).toInt()),
+          backgroundColor: theme.colorScheme.surface,
+        );
+      case 'completed':
+        return CardStyle(
+          headerColor: Colors.green,
+          borderColor: Colors.green.withAlpha((0.3 * 255).toInt()),
+          backgroundColor: theme.colorScheme.surface,
+        );
+      case 'cancelled':
+        return CardStyle(
+          headerColor: Colors.grey,
+          borderColor: Colors.grey.withAlpha((0.3 * 255).toInt()),
+          backgroundColor: theme.colorScheme.surfaceContainerLowest,
+        );
+      default:
+        return CardStyle(
+          headerColor: Colors.grey,
+          borderColor: theme.colorScheme.outlineVariant,
+          backgroundColor: theme.colorScheme.surface,
+        );
+    }
+  }
+  
+  Widget _buildAddressAndLoadInfo(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    // Get pickup and delivery addresses
+    final pickupAddress = route.metadata?['pickupAddress'] ?? 'Restaurant Location';
+    final deliveryAddress = route.metadata?['deliveryAddress'] ?? 'Delivery Location';
+    
+    // Get loaded items info
+    final hasItemsInfo = route.metadata != null && 
+                         route.metadata!.containsKey('loadedItems') &&
+                         route.metadata!['loadedItems'] != null;
+    
+    final loadedItems = hasItemsInfo ? route.metadata!['loadedItems'] as List : [];
+    final hasAllItems = route.metadata?['vehicleHasAllItems'] ?? false;
+    final itemCount = loadedItems.length;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Addresses
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(color: color, fontSize: 12),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.store,
+                  size: 16,
+                  color: theme.colorScheme.primary,
+                ),
+                Container(
+                  width: 1,
+                  height: 16,
+                  color: theme.colorScheme.outlineVariant,
+                ),
+                Icon(
+                  Icons.location_on,
+                  size: 16, 
+                  color: theme.colorScheme.error,
+                ),
+              ],
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    pickupAddress,
+                    style: theme.textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    deliveryAddress,
+                    style: theme.textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
-      ),
+        
+        // Item info if available
+        if (hasItemsInfo) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(
+                Icons.inventory_2,
+                size: 16,
+                color: hasAllItems ? Colors.green : Colors.orange,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$itemCount item${itemCount != 1 ? 's' : ''} for delivery',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: hasAllItems ? Colors.green : Colors.orange,
+                ),
+              ),
+              if (hasAllItems)
+                const Padding(
+                  padding: EdgeInsets.only(left: 4.0),
+                  child: Icon(Icons.check_circle, size: 14, color: Colors.green),
+                ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 
   Widget _buildDriverInfo(BuildContext context) {
-    if (route.driverId.isEmpty) return const SizedBox();
+    if (route.driverId.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 12.0),
+        child: Text('No driver assigned'),
+      );
+    }
     
     return Padding(
-      padding: const EdgeInsets.only(top: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0),
       child: FutureBuilder<DocumentSnapshot>(
         future: FirebaseFirestore.instance
             .collection('users')
@@ -368,26 +588,53 @@ class DeliveryRouteCard extends StatelessWidget {
             .get(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Text('Loading driver info...');
+            return const Text('Loading...');
           }
           
           if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
-            return const Text('Driver info unavailable');
+            return const Text('Driver unavailable');
           }
           
-          final driverData = snapshot.data!.data() as Map<String, dynamic>;
-          final driverName = '${driverData['firstName'] ?? ''} ${driverData['lastName'] ?? ''}';
+          final data = snapshot.data!.data() as Map<String, dynamic>;
+          final firstName = data['firstName'] ?? '';
+          final lastName = data['lastName'] ?? '';
+          final initials = firstName.isNotEmpty ? firstName[0] : '';
+          final driverName = '$firstName $lastName';
           
           return Row(
             children: [
-              const Icon(Icons.person, size: 16, color: Colors.blue),
-              const SizedBox(width: 4),
-              Text(
-                'Driver: $driverName',
-                style: TextStyle(
-                  color: Colors.blue.shade700,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13,
+              // Driver avatar
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: Theme.of(context).colorScheme.primary.withAlpha((0.2 * 255).toInt()),
+                child: Text(
+                  initials.toUpperCase(),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Driver',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    Text(
+                      driverName,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -397,86 +644,123 @@ class DeliveryRouteCard extends StatelessWidget {
     );
   }
 
-  Widget _buildTimeRow(BuildContext context) {
+  Widget _buildTimeInfo(BuildContext context) {
     final theme = Theme.of(context);
     final now = DateTime.now();
-    final isDelayed = route.status != 'completed' &&
-        now.isAfter(route.estimatedEndTime);
-
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Start Time',
-                style: theme.textTheme.bodySmall,
-              ),
-              Text(
-                _formatTime(route.startTime),
-                style: theme.textTheme.titleSmall,
-              ),
-            ],
-          ),
-        ),
-        const Icon(Icons.arrow_forward, size: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                'Est. Arrival',
-                style: theme.textTheme.bodySmall,
-              ),
-              Text(
-                _formatTime(route.estimatedEndTime),
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: isDelayed ? theme.colorScheme.error : null,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLoadedItemsInfo() {
-    // Check if we have manifest data in the metadata
-    if (route.metadata == null ||
-        !route.metadata!.containsKey('loadedItems') ||
-        route.metadata!['loadedItems'] == null) {
-      return const SizedBox.shrink();
+    
+    // Variables to hold time-related display text
+    String timeLabel;
+    String timeValue;
+    Color timeColor = theme.colorScheme.onSurface;
+    IconData timeIcon;
+    String statusText;
+    
+    switch (route.status.toLowerCase()) {
+      case 'pending':
+        timeLabel = 'Scheduled for';
+        timeValue = _formatTime(route.startTime);
+        timeIcon = Icons.schedule;
+        
+        // Check if scheduled time is in the past
+        if (now.isAfter(route.startTime)) {
+          statusText = 'Overdue';
+          timeColor = theme.colorScheme.error;
+        } else {
+          // Show time until scheduled start
+          final difference = route.startTime.difference(now);
+          if (difference.inDays > 0) {
+            statusText = 'In ${difference.inDays} day${difference.inDays > 1 ? 's' : ''}';
+          } else if (difference.inHours > 0) {
+            statusText = 'In ${difference.inHours} hour${difference.inHours > 1 ? 's' : ''}';
+          } else {
+            statusText = 'In ${difference.inMinutes} min';
+          }
+        }
+        break;
+        
+      case 'in_progress':
+        timeLabel = 'Est. arrival';
+        timeValue = _formatTime(route.estimatedEndTime);
+        timeIcon = Icons.delivery_dining;
+        
+        // Calculate if delivery is on time or delayed
+        final difference = route.estimatedEndTime.difference(now);
+        if (difference.isNegative) {
+          statusText = 'Delayed';
+          timeColor = theme.colorScheme.error;
+        } else if (difference.inHours > 0) {
+          statusText = '${difference.inHours}h ${difference.inMinutes.remainder(60)}m left';
+        } else {
+          statusText = '${difference.inMinutes}m left';
+        }
+        break;
+        
+      case 'completed':
+        timeLabel = 'Delivered at';
+        timeValue = _formatTime(route.actualEndTime ?? route.estimatedEndTime);
+        timeIcon = Icons.check_circle;
+        
+        // How long ago it was completed
+        final difference = now.difference(route.actualEndTime ?? route.estimatedEndTime);
+        if (difference.inDays > 0) {
+          statusText = '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
+        } else if (difference.inHours > 0) {
+          statusText = '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
+        } else {
+          statusText = '${difference.inMinutes} min ago';
+        }
+        break;
+        
+      case 'cancelled':
+        timeLabel = 'Cancelled on';
+        timeValue = _formatDateTime(route.updatedAt);
+        timeIcon = Icons.cancel;
+        statusText = '';
+        break;
+        
+      default:
+        timeLabel = 'Time';
+        timeValue = _formatTime(route.startTime);
+        timeIcon = Icons.access_time;
+        statusText = '';
     }
-
-    final loadedItems = route.metadata!['loadedItems'] as List;
-    final hasAllItems = route.metadata!['vehicleHasAllItems'] ?? false;
-    final itemCount = loadedItems.length;
-
+    
     return Padding(
-      padding: const EdgeInsets.only(top: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0),
       child: Row(
         children: [
-          Icon(
-            Icons.inventory_2,
-            size: 16,
-            color: hasAllItems ? Colors.green : Colors.orange,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '$itemCount item${itemCount != 1 ? 's' : ''} loaded',
-            style: TextStyle(
-              color: hasAllItems ? Colors.green : Colors.orange,
-              fontWeight: FontWeight.w500,
-              fontSize: 13,
+          Icon(timeIcon, size: 18, color: timeColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  timeLabel,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  timeValue,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: timeColor,
+                  ),
+                ),
+                if (statusText.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    statusText,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: timeColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          if (hasAllItems)
-            const Padding(
-              padding: EdgeInsets.only(left: 4.0),
-              child: Icon(Icons.check_circle, size: 14, color: Colors.green),
-            ),
         ],
       ),
     );
@@ -485,52 +769,9 @@ class DeliveryRouteCard extends StatelessWidget {
   String _formatTime(DateTime time) {
     return DateFormat('h:mm a').format(time);
   }
-
-  Widget _buildStatusChip(BuildContext context, String status) {
-    final theme = Theme.of(context);
-
-    Color backgroundColor;
-    Color textColor;
-
-    switch (status.toLowerCase()) {
-      case 'pending':
-        backgroundColor = Colors.grey.shade200;
-        textColor = Colors.grey.shade700;
-        break;
-      case 'in_progress':
-        backgroundColor = theme.colorScheme.primary.withAlpha((0.1 * 255).toInt());
-        textColor = theme.colorScheme.primary;
-        break;
-      case 'completed':
-        backgroundColor = Colors.green.shade50;
-        textColor = Colors.green.shade700;
-        break;
-      case 'cancelled':
-        backgroundColor = Colors.red.shade50;
-        textColor = Colors.red.shade700;
-        break;
-      default:
-        backgroundColor = Colors.grey.shade100;
-        textColor = Colors.grey.shade700;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 8,
-        vertical: 4,
-      ),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        status.toUpperCase(),
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: textColor,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
+  
+  String _formatDateTime(DateTime dateTime) {
+    return DateFormat('MMM d, h:mm a').format(dateTime);
   }
 
   void _showReassignDialog(BuildContext context) {
@@ -583,83 +824,6 @@ class DeliveryRouteCard extends StatelessWidget {
     );
   }
 
-  void _showEditDialog(BuildContext context) {
-    final startTimeController = TimeOfDay.fromDateTime(route.startTime);
-    final endTimeController = TimeOfDay.fromDateTime(route.estimatedEndTime);
-    
-    var selectedStartTime = startTimeController;
-    var selectedEndTime = endTimeController;
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Delivery Times'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('Start Time'),
-              subtitle: Text(_formatTimeOfDay(startTimeController)),
-              trailing: const Icon(Icons.access_time),
-              onTap: () async {
-                final pickedTime = await showTimePicker(
-                  context: context,
-                  initialTime: startTimeController,
-                );
-                if (pickedTime != null) {
-                  selectedStartTime = pickedTime;
-                }
-              },
-            ),
-            ListTile(
-              title: const Text('Estimated End Time'),
-              subtitle: Text(_formatTimeOfDay(endTimeController)),
-              trailing: const Icon(Icons.access_time),
-              onTap: () async {
-                final pickedTime = await showTimePicker(
-                  context: context,
-                  initialTime: endTimeController,
-                );
-                if (pickedTime != null) {
-                  selectedEndTime = pickedTime;
-                }
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _updateDeliveryTimes(
-                context, 
-                selectedStartTime, 
-                selectedEndTime
-              );
-            },
-            child: const Text('Update'),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  String _formatTimeOfDay(TimeOfDay time) {
-    final now = DateTime.now();
-    final dt = DateTime(
-      now.year, 
-      now.month, 
-      now.day, 
-      time.hour, 
-      time.minute
-    );
-    return DateFormat('h:mm a').format(dt);
-  }
-
   Future<void> _updateStatus(BuildContext context, String newStatus) async {
     try {
       await Provider.of<DeliveryRouteService>(context, listen: false)
@@ -709,59 +873,17 @@ class DeliveryRouteCard extends StatelessWidget {
       }
     }
   }
+}
+
+/// Helper class for styling delivery cards
+class CardStyle {
+  final Color headerColor;
+  final Color borderColor;
+  final Color backgroundColor;
   
-  Future<void> _updateDeliveryTimes(
-    BuildContext context, 
-    TimeOfDay startTime, 
-    TimeOfDay endTime
-  ) async {
-    try {
-      final now = DateTime.now();
-      
-      // Create new DateTime objects with the selected times but same date
-      final newStartDateTime = DateTime(
-        route.startTime.year,
-        route.startTime.month,
-        route.startTime.day,
-        startTime.hour,
-        startTime.minute,
-      );
-      
-      final newEndDateTime = DateTime(
-        route.estimatedEndTime.year,
-        route.estimatedEndTime.month,
-        route.estimatedEndTime.day,
-        endTime.hour,
-        endTime.minute,
-      );
-      
-      // Update in Firestore
-      await FirebaseFirestore.instance
-          .collection('delivery_routes')
-          .doc(route.id)
-          .update({
-        'startTime': Timestamp.fromDate(newStartDateTime),
-        'estimatedEndTime': Timestamp.fromDate(newEndDateTime),
-        'updatedAt': Timestamp.fromDate(now),
-      });
-      
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Delivery times updated'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-    }
-  }
+  CardStyle({
+    required this.headerColor,
+    required this.borderColor,
+    required this.backgroundColor,
+  });
 }

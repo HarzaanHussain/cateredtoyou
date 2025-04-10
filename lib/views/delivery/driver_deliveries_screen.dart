@@ -13,7 +13,6 @@ import 'package:cateredtoyou/views/delivery/widgets/reassign_driver_dialog.dart'
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart'; 
 
-// Stateless widget for the Driver Deliveries Screen - works for any user
 class DriverDeliveriesScreen extends StatefulWidget {
   const DriverDeliveriesScreen({super.key});
 
@@ -41,7 +40,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // When the app resumes, refresh permission status & data
     if (state == AppLifecycleState.resumed) {
       _checkManagePermissions();
     }
@@ -79,25 +77,48 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
     final auth = FirebaseAuth.instance;
     final userId = auth.currentUser?.uid;
 
-    // If the user is not logged in, show a message prompting them to log in
     if (userId == null) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
-          child: Text('Please log in to view your deliveries'),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Theme.of(context).colorScheme.error.withAlpha((0.7 * 255).toInt()),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Authentication Required',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Please log in to view your deliveries',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () => context.go('/login'),
+                icon: const Icon(Icons.login),
+                label: const Text('Go to Login'),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    // Main UI structure with a TabController for different delivery statuses
     return DefaultTabController(
-      length: 3, // Number of tabs
+      length: 3, 
       initialIndex: _selectedTabIndex,
       child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         bottomNavigationBar: const BottomToolbar(),
         appBar: AppBar(
           title: const Text('My Deliveries'),
           actions: [
-            // Add action button for managers to create new deliveries
             if (_hasManagePermission)
               IconButton(
                 icon: const Icon(Icons.add),
@@ -112,9 +133,9 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
           ],
           bottom: TabBar(
             tabs: const [
-              Tab(text: 'Active'), // Tab for active deliveries
-              Tab(text: 'Upcoming'), // Tab for upcoming deliveries
-              Tab(text: 'Completed'), // Tab for completed deliveries
+              Tab(text: 'Active'),
+              Tab(text: 'Upcoming'),
+              Tab(text: 'Completed'),
             ],
             onTap: (index) {
               setState(() {
@@ -126,10 +147,9 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
         body: Consumer<DeliveryRouteService>(
           builder: (context, deliveryService, child) {
             return StreamBuilder<List<DeliveryRoute>>(
-              // Use the appropriate stream based on permissions
               stream: _hasManagePermission 
-                  ? deliveryService.getDeliveryRoutes() // Managers see all deliveries
-                  : deliveryService.getAccessibleDriverRoutes(), // Others see only their own
+                  ? deliveryService.getDeliveryRoutes()
+                  : deliveryService.getAccessibleDriverRoutes(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return _buildError(context, snapshot.error.toString());
@@ -141,21 +161,18 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
 
                 final routes = snapshot.data!;
                 
-                // Filter routes by status
                 final activeRoutes = routes.where((r) => r.status == 'in_progress').toList();
                 final upcomingRoutes = routes.where((r) => r.status == 'pending').toList();
                 final completedRoutes = routes.where((r) => 
                   r.status == 'completed' || r.status == 'cancelled'
                 ).toList();
 
-                // Sort routes by time
                 activeRoutes.sort((a, b) => a.estimatedEndTime.compareTo(b.estimatedEndTime));
                 upcomingRoutes.sort((a, b) => a.startTime.compareTo(b.startTime));
                 completedRoutes.sort((a, b) => 
                   (b.actualEndTime ?? b.updatedAt).compareTo(a.actualEndTime ?? a.updatedAt)
                 );
 
-                // Use Consumer for LocationService to ensure it's available in deeper widgets
                 return Consumer<LocationService>(
                   builder: (context, locationService, child) {
                     return TabBarView(
@@ -175,7 +192,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
     );
   }
 
-  // Helper method to build the delivery list for a specific type
   Widget _buildDeliveryList(
     BuildContext context, 
     List<DeliveryRoute> routes, 
@@ -220,25 +236,30 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
     LocationService locationService,
     {bool isActiveDriver = false}
   ) {
-    // Check if this is the currently tracked delivery
     final isTracking = locationService.isTracking && 
                       locationService.activeDeliveryId == route.id;
     
     return Card(
       elevation: 2,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
           color: route.status == 'completed' 
-              ? Colors.green.withAlpha(76) // Fixed: using direct value
+              ? Colors.green.withAlpha((0.3 * 255).toInt())
               : route.status == 'cancelled'
-                  ? Colors.red.withAlpha(76) // Fixed: using direct value
+                  ? Colors.red.withAlpha((0.3 * 255).toInt())
                   : Colors.transparent,
           width: 1.5,
         ),
       ),
       child: Column(
         children: [
+          // Colored top bar based on status
+          Container(
+            height: 8,
+            color: _getStatusColor(route.status),
+          ),
           Stack(
             children: [
               InkWell(
@@ -270,7 +291,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
                       Container(
                         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(76), // Fixed: using direct value
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha((0.3 * 255).toInt()),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
@@ -299,9 +320,18 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
                                   )
                                 : route.status == 'cancelled'
                                   ? const Text('Cancelled', style: TextStyle(fontWeight: FontWeight.bold))
-                                  : Text(
-                                      '${DateFormat('h:mm a').format(route.startTime)} → ${DateFormat('h:mm a').format(route.estimatedEndTime)}',
-                                      style: const TextStyle(fontWeight: FontWeight.w500),
+                                  : Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          route.status == 'in_progress' ? 'Delivery time:' : 'Scheduled time:',
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                        Text(
+                                          '${DateFormat('h:mm a').format(route.startTime)} → ${DateFormat('h:mm a').format(route.estimatedEndTime)}',
+                                          style: const TextStyle(fontWeight: FontWeight.w500),
+                                        ),
+                                      ],
                                     ),
                             ),
                           ],
@@ -311,6 +341,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
                       const SizedBox(height: 12),
                       _buildDriverInfoRow(context, route),
                       
+                      // Location information
                       if (route.metadata?['deliveryAddress'] != null) ...[
                         const SizedBox(height: 8),
                         Row(
@@ -354,8 +385,8 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
                                   color: route.metadata!['vehicleHasAllItems'] == true
-                                      ? Colors.green.withAlpha(25) // Fixed: using direct value
-                                      : Colors.orange.withAlpha(25), // Fixed: using direct value
+                                      ? Colors.green.withAlpha((0.1 * 255).toInt())
+                                      : Colors.orange.withAlpha((0.1 * 255).toInt()),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
@@ -390,7 +421,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withAlpha(51), // Fixed: using direct value
+                        color: Colors.orange.withAlpha((0.2 * 255).toInt()),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.orange),
                       ),
@@ -414,7 +445,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.green.withAlpha(51), // Fixed: using direct value
+                      color: Colors.green.withAlpha((0.2 * 255).toInt()),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.green),
                     ),
@@ -477,68 +508,67 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
                       ),
                     ),
                   
-                  // Action buttons row
-                  Wrap(
-                    spacing: 8.0,
-                    runSpacing: 8.0,
-                    alignment: WrapAlignment.center,
-                    children: [
-                      if (route.status == 'pending') ...[
-                        // Any user can take over a pending delivery
-                        _buildActionButton(
-                          context,
-                          icon: Icons.play_arrow,
-                          label: isActiveDriver ? 'Start Delivery' : 'Take & Start',
-                          color: Colors.green,
-                          onPressed: () => isActiveDriver
-                              ? _handleStartDelivery(route)
-                              : _handleTakeAndStartDelivery(route),
+                  // Action buttons row - Driver actions 
+                  if (isActiveDriver) ...[
+                    if (route.status == 'pending')
+                      // Start button for active drivers with pending deliveries
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          icon: const Icon(Icons.play_arrow),
+                          label: const Text('Start Delivery'),
+                          onPressed: () => _handleStartDelivery(route),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.green,
+                          ),
                         ),
-                      ] else if (route.status == 'in_progress') ...[
-                        // Show tracking status and button
-                        if (isActiveDriver) ...[
-                          _buildActionButton(
-                            context,
-                            icon: isTracking ? Icons.location_on : Icons.location_off,
-                            label: isTracking ? 'Tracking Active' : 'Resume Tracking',
-                            color: isTracking ? Colors.green : Colors.blueGrey,
-                            onPressed: isTracking
-                                ? null
-                                : () => _handleStartTracking(route),
+                      ),
+                    
+                    if (route.status == 'in_progress') ...[
+                      Row(
+                        children: [
+                          // Tracking status button
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: Icon(isTracking ? Icons.location_on : Icons.location_off),
+                              label: Text(isTracking ? 'Tracking Active' : 'Resume Tracking'),
+                              onPressed: isTracking
+                                  ? null
+                                  : () => _handleStartTracking(route),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: isTracking ? Colors.green : Colors.blueGrey,
+                              ),
+                            ),
                           ),
-                          _buildActionButton(
-                            context,
-                            icon: Icons.check,
-                            label: 'Complete',
-                            color: Colors.green,
-                            onPressed: () => _handleCompleteDelivery(route),
-                          ),
-                        ] else ...[
-                          // For non-active drivers, show Take Over button
-                          _buildActionButton(
-                            context,
-                            icon: Icons.person_add,
-                            label: 'Take Over',
-                            color: Colors.blue,
-                            onPressed: () => _handleTakeOverDelivery(route),
+                          const SizedBox(width: 12),
+                          // Complete button
+                          Expanded(
+                            child: FilledButton.icon(
+                              icon: const Icon(Icons.check),
+                              label: const Text('Complete'),
+                              onPressed: () => _handleCompleteDelivery(route),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.green,
+                              ),
+                            ),
                           ),
                         ],
-                      ],
-                      
-                      // View details button
-                      if ((route.status == 'pending' && !isActiveDriver) || 
-                          (route.status == 'in_progress' && !isActiveDriver)) 
-                        _buildActionButton(
-                          context,
-                          icon: Icons.visibility,
-                          label: 'View Details',
-                          color: Theme.of(context).colorScheme.primary,
-                          onPressed: () => _handleViewDetails(route),
-                        ),
+                      ),
                     ],
-                  ),
+                  ] else ...{
+                    // For non-active drivers, only show View Details button
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        icon: const Icon(Icons.visibility),
+                        label: const Text('View Details'),
+                        onPressed: () => _handleViewDetails(route),
+                      ),
+                    ),
+                  },
+  
                   
-                  // Management options for users with proper permissions
+                  // Management options - Only show Reassign and Delete
                   if (hasManagePermission && (type == 'active' || type == 'upcoming')) ...[
                     const SizedBox(height: 16),
                     const Divider(),
@@ -555,30 +585,31 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _buildManagementAction(
-                          context,
-                          Icons.person_add_alt,
-                          'Reassign',
-                          Colors.orange,
-                          () => _handleReassignDialog(route),
+                        // Reassign button
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.person_add_alt),
+                            label: const Text('Reassign Driver'),
+                            onPressed: () => _handleReassignDialog(route),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.orange,
+                            ),
+                          ),
                         ),
-                        _buildManagementAction(
-                          context,
-                          Icons.edit,
-                          'Edit',
-                          Theme.of(context).colorScheme.primary,
-                          () => _handleEditDialog(route),
-                        ),
-                        _buildManagementAction(
-                          context,
-                          Icons.delete,
-                          'Delete',
-                          Theme.of(context).colorScheme.error,
-                          () => _handleDeleteDialog(route),
+                        const SizedBox(width: 12),
+                        // Delete button
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.delete),
+                            label: const Text('Delete'),
+                            onPressed: () => _handleDeleteDialog(route),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -634,39 +665,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
             ),
           ],
         ],
-      ),
-    );
-  }
-
-  // Helper method to build a management action button
-  Widget _buildManagementAction(
-    BuildContext context, 
-    IconData icon, 
-    String label, 
-    Color color, 
-    VoidCallback onTap
-  ) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -727,7 +725,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
         iconData = Icons.schedule;
         break;
       case 'in_progress':
-        bgColor = Theme.of(context).colorScheme.primary.withAlpha(25); // Fixed
+        bgColor = Theme.of(context).colorScheme.primary.withAlpha((0.1 * 255).toInt());
         textColor = Theme.of(context).colorScheme.primary;
         displayText = 'IN PROGRESS';
         iconData = Icons.local_shipping;
@@ -756,7 +754,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: textColor.withAlpha(76)), // Fixed
+        border: Border.all(color: textColor.withAlpha((0.3 * 255).toInt())),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -776,6 +774,22 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
         ],
       ),
     );
+  }
+
+  // Get status color for the top bar
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.grey;
+      case 'in_progress':
+        return Colors.blue;
+      case 'completed':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 
   // Helper method to build the empty state UI for a specific type
@@ -811,40 +825,43 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
 
     // Display the empty state UI
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            size: 64,
-            color: theme.colorScheme.onSurfaceVariant.withAlpha(127), // Fixed
-          ),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.bold,
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 64,
+              color: theme.colorScheme.onSurfaceVariant.withAlpha((0.5 * 255).toInt()),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            description,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+            const SizedBox(height: 16),
+            Text(
+              message,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          // Only show this button for managers who can create deliveries
-          if (canManage) ...[
-            OutlinedButton.icon(
-              icon: const Icon(Icons.add),
-              label: const Text('Create Delivery'),
-             onPressed: () => context.go('/add-delivery'),
+            const SizedBox(height: 8),
+            Text(
+              description,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 24),
+            // Only show this button for managers who can create deliveries
+            if (canManage) ...[
+              OutlinedButton.icon(
+                icon: const Icon(Icons.add),
+                label: const Text('Create Delivery'),
+                onPressed: () => context.go('/add-delivery'),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -853,27 +870,34 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
   Widget _buildError(BuildContext context, String error) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               Icons.error_outline,
-              size: 48,
+              size: 64,
               color: Theme.of(context).colorScheme.error,
             ),
             const SizedBox(height: 16),
             Text(
               'Error loading deliveries',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 8),
-            Text(
-              error,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.error,
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(8),
               ),
-              textAlign: TextAlign.center,
+              child: Text(
+                error,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
@@ -906,29 +930,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
           ),
         ),
       ],
-    );
-  }
-  
-  // Action button for delivery operations
-  Widget _buildActionButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback? onPressed,
-  }) {
-    return ElevatedButton.icon(
-      icon: Icon(icon, color: color),
-      label: Text(label),
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        foregroundColor: color,
-        backgroundColor: color.withAlpha(25), // Fixed
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: color.withAlpha(76)), // Fixed
-        ),
-      ),
     );
   }
 
@@ -1093,103 +1094,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
     }
   }
   
-  // Handler for taking over and starting a delivery
-  void _handleTakeAndStartDelivery(DeliveryRoute route) async {
-    // Get services before async operation
-    if (!mounted) return;
-    final deliveryService = Provider.of<DeliveryRouteService>(context, listen: false);
-    final locationService = Provider.of<LocationService>(context, listen: false);
-    
-    // Show loading dialog for location check
-    if (!mounted) return;
-    _showLoadingDialog('Checking your location...');
-    
-    try {
-      // Check if user is within 1 mile of the pickup location
-      final pickupLocation = route.waypoints.first;
-      final isClose = await _isWithinRequiredDistance(pickupLocation);
-      
-      // Close the loading dialog
-      if (!mounted) return;
-      _closeDialog();
-      
-      if (!isClose) {
-        if (!mounted) return;
-        _showSnackBar('You must be within 1 mile of the pickup location to start this delivery.');
-        return;
-      }
-      
-      // Show loading dialog for taking over and starting delivery
-      if (!mounted) return;
-      _showLoadingDialog('Taking over and starting delivery...');
-      
-      // First, take over the delivery
-      await deliveryService.takeOverDelivery(route.id);
-      
-      // Then update status in Firestore
-      await deliveryService.updateRouteStatus(route.id, 'in_progress');
-      
-      // Start location tracking
-      await locationService.startTrackingDelivery(route.id);
-      
-      // Close the dialog
-      if (!mounted) return;
-      _closeDialog();
-      
-      // Show success message
-      if (!mounted) return;
-      _showSnackBar('Delivery taken over and started successfully');
-      
-      // Navigate to details
-      if (!mounted) return;
-      _handleViewDetails(route);
-    } catch (e) {
-      // Close any open dialog
-      if (mounted) {
-        _closeDialog();
-        _showSnackBar('Error taking over delivery: $e', isError: true);
-      }
-    }
-  }
-  
-  // Handler for taking over an active delivery
-  void _handleTakeOverDelivery(DeliveryRoute route) async {
-    // Get services before async operation
-    if (!mounted) return;
-    final deliveryService = Provider.of<DeliveryRouteService>(context, listen: false);
-    final locationService = Provider.of<LocationService>(context, listen: false);
-    
-    // Show loading dialog
-    if (!mounted) return;
-    _showLoadingDialog('Taking over delivery...');
-    
-    try {
-      // Take over the delivery
-      await deliveryService.takeOverDelivery(route.id);
-      
-      // Start location tracking
-      await locationService.startTrackingDelivery(route.id);
-      
-      // Close the dialog
-      if (!mounted) return;
-      _closeDialog();
-      
-      // Show success message
-      if (!mounted) return;
-      _showSnackBar('Delivery taken over successfully');
-      
-      // Navigate to details
-      if (!mounted) return;
-      _handleViewDetails(route);
-    } catch (e) {
-      // Close any open dialog
-      if (mounted) {
-        _closeDialog();
-        _showSnackBar('Error taking over delivery: $e', isError: true);
-      }
-    }
-  }
-  
   // Handler for starting tracking on an active delivery
   void _handleStartTracking(DeliveryRoute route) async {
     // Get service before async operation
@@ -1337,183 +1241,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
     }
   }
   
-  // Handler for showing edit dialog
-  void _handleEditDialog(DeliveryRoute route) async {
-    if (!mounted) return;
-    
-    final startTimeController = TimeOfDay.fromDateTime(route.startTime);
-    final endTimeController = TimeOfDay.fromDateTime(route.estimatedEndTime);
-    final pickupAddressController = TextEditingController(text: route.metadata?['pickupAddress'] ?? '');
-    final deliveryAddressController = TextEditingController(text: route.metadata?['deliveryAddress'] ?? '');
-    
-    var selectedStartTime = startTimeController;
-    var selectedEndTime = endTimeController;
-    
-    try {
-      // Show the edit dialog
-      final result = await _showSafeDialog<bool>(
-        contextBuilder: () => context,
-        dialogBuilder: (dialogContext) => StatefulBuilder(
-          builder: (builderContext, setState) {
-            return AlertDialog(
-              title: const Text('Edit Delivery Details'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Time section
-                    Text('Time Settings', 
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(builderContext).colorScheme.primary)),
-                    const SizedBox(height: 8),
-                    ListTile(
-                      title: const Text('Start Time'),
-                      subtitle: Text(_formatTimeOfDay(selectedStartTime)),
-                      trailing: const Icon(Icons.access_time),
-                      onTap: () async {
-                        final pickedTime = await showTimePicker(
-                          context: builderContext,
-                          initialTime: selectedStartTime,
-                        );
-                        if (pickedTime != null) {
-                          setState(() {
-                            selectedStartTime = pickedTime;
-                          });
-                        }
-                      },
-                    ),
-                    ListTile(
-                      title: const Text('Estimated End Time'),
-                      subtitle: Text(_formatTimeOfDay(selectedEndTime)),
-                      trailing: const Icon(Icons.access_time),
-                      onTap: () async {
-                        final pickedTime = await showTimePicker(
-                          context: builderContext,
-                          initialTime: selectedEndTime,
-                        );
-                        if (pickedTime != null) {
-                          setState(() {
-                            selectedEndTime = pickedTime;
-                          });
-                        }
-                      },
-                    ),
-                    
-                    const Divider(height: 24),
-                    
-                    // Address section
-                    Text('Address Settings', 
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(builderContext).colorScheme.primary)),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: pickupAddressController,
-                      decoration: const InputDecoration(
-                        labelText: 'Pickup Address',
-                        border: OutlineInputBorder(),
-                      ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: deliveryAddressController,
-                      decoration: const InputDecoration(
-                        labelText: 'Delivery Address',
-                        border: OutlineInputBorder(),
-                      ),
-                      maxLines: 2,
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(dialogContext, true),
-                  child: const Text('Update'),
-                ),
-              ],
-            );
-          },
-        ),
-      );
-      
-      if (result != true || !mounted) {
-        pickupAddressController.dispose();
-        deliveryAddressController.dispose();
-        return;
-      }
-      
-      // Show loading dialog
-      if (!mounted) return;
-      _showLoadingDialog('Updating delivery details...');
-      
-      final now = DateTime.now();
-      
-      // Create new DateTime objects with the selected times
-      final newStartDateTime = DateTime(
-        route.startTime.year,
-        route.startTime.month,
-        route.startTime.day,
-        selectedStartTime.hour,
-        selectedStartTime.minute,
-      );
-      
-      final newEndDateTime = DateTime(
-        route.estimatedEndTime.year,
-        route.estimatedEndTime.month,
-        route.estimatedEndTime.day,
-        selectedEndTime.hour,
-        selectedEndTime.minute,
-      );
-      
-      // Update in Firestore
-      await FirebaseFirestore.instance
-          .collection('delivery_routes')
-          .doc(route.id)
-          .update({
-        'startTime': Timestamp.fromDate(newStartDateTime),
-        'estimatedEndTime': Timestamp.fromDate(newEndDateTime),
-        'updatedAt': Timestamp.fromDate(now),
-        'metadata.pickupAddress': pickupAddressController.text,
-        'metadata.deliveryAddress': deliveryAddressController.text,
-      });
-      
-      // Close the dialog
-      if (!mounted) {
-        pickupAddressController.dispose();
-        deliveryAddressController.dispose();
-        return;
-      }
-      
-      _closeDialog();
-      
-      // Show success message and refresh UI
-      if (!mounted) {
-        pickupAddressController.dispose();
-        deliveryAddressController.dispose();
-        return;
-      }
-      
-      _showSnackBar('Delivery details updated');
-      
-      if (mounted) {
-        _refresh();
-      }
-    } catch (e) {
-      // Close any open dialog and show error
-      if (mounted) {
-        _closeDialog();
-        _showSnackBar('Error updating delivery details: $e', isError: true);
-      }
-    } finally {
-      // Always dispose controllers
-      pickupAddressController.dispose();
-      deliveryAddressController.dispose();
-    }
-  }
-  
   // Handler for showing delete dialog
   void _handleDeleteDialog(DeliveryRoute route) async {
     if (!mounted) return;
@@ -1630,13 +1357,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
       debugPrint('Error fetching driver name: $e');
       return 'Unknown Driver';
     }
-  }
-  
-  // Helper to format TimeOfDay to a readable string
-  String _formatTimeOfDay(TimeOfDay time) {
-    final now = DateTime.now();
-    final dt = DateTime(now.year, now.month, now.day, time.hour, time.minute);
-    return DateFormat('h:mm a').format(dt);
   }
   
   // Helper to show SnackBar messages
