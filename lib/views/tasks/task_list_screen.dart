@@ -339,7 +339,7 @@ class TaskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card( // Creates a card widget to display the task.
       elevation: 2, // Sets the elevation of the card to give it a shadow effect.
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8), // Sets the margin around the card.
+      margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 8), // Sets the margin around the card.
       child: InkWell( // Makes the card tappable.
         onTap: () {
           Navigator.push( // Navigates to the TaskDetailScreen when the card is tapped.
@@ -350,7 +350,7 @@ class TaskCard extends StatelessWidget {
           );
         },
         child: Padding( // Adds padding inside the card.
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Column( // Arranges the child widgets in a column.
             crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
             children: [
