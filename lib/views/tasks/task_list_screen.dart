@@ -19,7 +19,7 @@ class TaskListScreen extends StatelessWidget {
     return DefaultTabController(
       length: 4,
       child: Scaffold(
-        backgroundColor: const Color(0xFFFBC72B), // yellow background 
+        // backgroundColor: const Color(0xFFFBC72B), // yellow background
 
         bottomNavigationBar: const BottomToolbar(),
         appBar: AppBar(
@@ -111,13 +111,13 @@ class _TaskListState extends State<_TaskList> {
                           Icon(
                             Icons.task_alt,
                             size: 64,
-                            color: Colors.white,
+                            color: Colors.black,
                           ),
                           const SizedBox(height: 16),
                           Text(
                             'No tasks found',
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
+                              color: Colors.black,
                             ),
                           ),
                         ],
