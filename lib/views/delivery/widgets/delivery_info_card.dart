@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cateredtoyou/models/delivery_route_model.dart';
@@ -158,49 +159,131 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
     return _formatTotalDistance();
   }
 
-  // Fixed time calculation by using accurate timestamps
   String _formatTotalDuration() {
-    // Use the route's actual start and end times for accurate calculation
-    final startTime = widget.route.startTime; 
-    final endTime = widget.route.estimatedEndTime;
-    
-    // Ensure we're not calculating a negative duration
-    if (startTime.isAfter(endTime)) {
-      return 'Est. time: 0h 0m';
-    }
-    
-    final duration = endTime.difference(startTime);
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    
-    return 'Est. time: ${hours}h ${minutes}m';
+  // Use the route's actual start and end times for accurate calculation
+  final startTime = widget.route.startTime; 
+  final endTime = widget.route.estimatedEndTime;
+  
+  // Ensure we're not calculating a negative duration
+  if (startTime.isAfter(endTime)) {
+    return 'Est. time: 0h 0m';
   }
+  
+  // Calculate the duration between start and estimated end time
+  final duration = endTime.difference(startTime);
+  
+  // Format the duration - make sure we're getting proper values
+  final hours = duration.inHours;
+  final minutes = duration.inMinutes.remainder(60);
+  
+  // Debug the calculated values
+  debugPrint('Total duration - Hours: $hours, Minutes: $minutes');
+  debugPrint('StartTime: ${startTime.toString()}, EndTime: ${endTime.toString()}');
+  
+  // If both hours and minutes are 0, try getting the total minutes directly
+  if (hours == 0 && minutes == 0) {
+    final totalMinutes = duration.inMinutes;
+    if (totalMinutes > 0) {
+      return 'Est. time: ${totalMinutes}m';
+    }
+    
+    // If we still have zero, check for seconds
+    final totalSeconds = duration.inSeconds;
+    if (totalSeconds > 0) {
+      return 'Est. time: <1m';
+    }
+    
+    // Fall back to using the metadata if available
+    if (widget.route.metadata != null && 
+        widget.route.metadata!['routeDetails'] != null && 
+        widget.route.metadata!['routeDetails']['originalDuration'] != null) {
+      final seconds = widget.route.metadata!['routeDetails']['originalDuration'] as num;
+      final durationMinutes = (seconds / 60).round();
+      final durationHours = durationMinutes ~/ 60;
+      final remainingMinutes = durationMinutes % 60;
+      
+      if (durationHours > 0) {
+        return 'Est. time: ${durationHours}h ${remainingMinutes}m';
+      } else {
+        return 'Est. time: ${durationMinutes}m';
+      }
+    }
+  }
+  
+  // Normal formatting with hours and minutes
+  if (hours > 0) {
+    return 'Est. time: ${hours}h ${minutes}m';
+  } else {
+    return 'Est. time: ${minutes}m';
+  }
+}
 
-  // Fixed elapsed time calculation
-  String _formatElapsedTime() {
-    final now = DateTime.now();
-    final startTime = widget.route.startTime;
-    
-    // For pending deliveries or if now is before start time
-    if (widget.route.status == 'pending' || now.isBefore(startTime)) {
-      return 'Elapsed: 0h 0m';
-    }
-    
-    // For completed deliveries, use actual end time if available
-    if (widget.route.status == 'completed' && widget.route.actualEndTime != null) {
-      final elapsed = widget.route.actualEndTime!.difference(startTime);
-      final hours = elapsed.inHours;
-      final minutes = elapsed.inMinutes.remainder(60);
-      return 'Actual: ${hours}h ${minutes}m';
-    }
-    
-    // For in-progress, calculate elapsed time from now
-    final elapsed = now.difference(startTime);
+
+ String _formatElapsedTime() {
+  final now = DateTime.now();
+  final startTime = widget.route.startTime;
+  
+  // For pending deliveries or if now is before start time
+  if (widget.route.status == 'pending' || now.isBefore(startTime)) {
+    return 'Elapsed: 0h 0m';
+  }
+  
+  // For completed deliveries, use actual end time if available
+  if (widget.route.status == 'completed' && widget.route.actualEndTime != null) {
+    final elapsed = widget.route.actualEndTime!.difference(startTime);
     final hours = elapsed.inHours;
     final minutes = elapsed.inMinutes.remainder(60);
     
-    return 'Elapsed: ${hours}h ${minutes}m';
+    if (hours > 0) {
+      return 'Actual: ${hours}h ${minutes}m';
+    } else {
+      return 'Actual: ${elapsed.inMinutes}m';
+    }
   }
+  
+  // For in-progress, calculate elapsed time from now
+  final elapsed = now.difference(startTime);
+  final hours = elapsed.inHours;
+  final minutes = elapsed.inMinutes.remainder(60);
+  
+  // Debug the calculated values
+  debugPrint('Elapsed time - Hours: $hours, Minutes: $minutes');
+  debugPrint('Now: ${now.toString()}, StartTime: ${startTime.toString()}');
+  
+  // If in-progress but showing 0 time, check for timestamps in metadata
+  if (hours == 0 && minutes == 0 && widget.route.status == 'in_progress') {
+    // Check if there's an actualStartTime in the document
+    if (widget.route.metadata != null && 
+        widget.route.metadata!['actualStartTime'] != null) {
+      final actualStartTimestamp = widget.route.metadata!['actualStartTime'];
+      if (actualStartTimestamp is Timestamp) {
+        // Convert the Firestore Timestamp to a Dart DateTime object
+        final actualStartTime = actualStartTimestamp.toDate(); 
+        // This is necessary because Firestore stores timestamps in its own format,
+        // and we need a Dart DateTime object to perform time calculations.
+        final actualElapsed = now.difference(actualStartTime);
+        final actualHours = actualElapsed.inHours;
+        final actualMinutes = actualElapsed.inMinutes.remainder(60);
+        
+        if (actualHours > 0) {
+          return 'Elapsed: ${actualHours}h ${actualMinutes}m';
+        } else if (actualMinutes > 0) {
+          return 'Elapsed: ${actualMinutes}m';
+        }
+      }
+    }
+    
+    // If we still have no time, show a minimum value rather than 0
+    return 'Elapsed: <1m';
+  }
+  
+  // Normal formatting with hours and minutes
+  if (hours > 0) {
+    return 'Elapsed: ${hours}h ${minutes}m';
+  } else {
+    return 'Elapsed: ${minutes}m';
+  }
+}
 
   Widget _buildAddressSection(BuildContext context) {
     final theme = Theme.of(context);

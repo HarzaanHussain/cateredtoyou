@@ -27,7 +27,8 @@ class DeliveryRouteService extends ChangeNotifier {
   // Get all delivery routes for the organization
   Stream<List<DeliveryRoute>> getDeliveryRoutes() async* {
     try {
-      final organization = await _organizationService.getCurrentUserOrganization();
+      final organization =
+          await _organizationService.getCurrentUserOrganization();
       if (organization == null) {
         yield [];
         return;
@@ -49,7 +50,8 @@ class DeliveryRouteService extends ChangeNotifier {
   // Get active deliveries for a specific driver
   Stream<List<DeliveryRoute>> getDriverRoutes(String driverId) async* {
     try {
-      final organization = await _organizationService.getCurrentUserOrganization();
+      final organization =
+          await _organizationService.getCurrentUserOrganization();
       if (organization == null) {
         yield [];
         return;
@@ -82,14 +84,16 @@ class DeliveryRouteService extends ChangeNotifier {
         return;
       }
 
-      final organization = await _organizationService.getCurrentUserOrganization();
+      final organization =
+          await _organizationService.getCurrentUserOrganization();
       if (organization == null) {
         yield [];
         return;
       }
 
       // First, check if the user has the broader view_deliveries permission
-      final hasViewPermission = await _rolePermissions.hasPermission('view_deliveries');
+      final hasViewPermission =
+          await _rolePermissions.hasPermission('view_deliveries');
 
       if (hasViewPermission) {
         // If they have view_deliveries permission, they can see all pending deliveries
@@ -126,7 +130,8 @@ class DeliveryRouteService extends ChangeNotifier {
   // Initialize route metrics when creating a new route
   Future<void> initializeRouteMetrics(String routeId) async {
     try {
-      final routeDoc = await _firestore.collection('delivery_routes').doc(routeId).get();
+      final routeDoc =
+          await _firestore.collection('delivery_routes').doc(routeId).get();
       if (!routeDoc.exists) return;
 
       final route = DeliveryRoute.fromMap(routeDoc.data()!, routeId);
@@ -142,7 +147,8 @@ class DeliveryRouteService extends ChangeNotifier {
       if (route.waypoints.isEmpty || route.waypoints.length < 2) return;
 
       // Calculate total route distance
-      final totalDistance = DeliveryProgress.calculateTotalRouteDistance(route.waypoints);
+      final totalDistance =
+          DeliveryProgress.calculateTotalRouteDistance(route.waypoints);
 
       // Estimate duration using average speed of 13.4 m/s (30 mph)
       const averageSpeed = 13.4; // m/s
@@ -154,7 +160,8 @@ class DeliveryRouteService extends ChangeNotifier {
       await _firestore.collection('delivery_routes').doc(routeId).update({
         'metadata.routeDetails.totalDistance': totalDistance,
         'metadata.routeDetails.originalDuration': estimatedDuration,
-        'metadata.routeDetails.progress': route.status == 'pending' ? 0.0 : 0.05,
+        'metadata.routeDetails.progress':
+            route.status == 'pending' ? 0.0 : 0.05,
         'metadata.routeDetails.calculatedAt': FieldValue.serverTimestamp(),
         'estimatedEndTime': Timestamp.fromDate(eta),
       });
@@ -183,12 +190,14 @@ class DeliveryRouteService extends ChangeNotifier {
       }
 
       // Check if user has permission to manage deliveries
-      final hasPermission = await _rolePermissions.hasPermission('manage_deliveries');
+      final hasPermission =
+          await _rolePermissions.hasPermission('manage_deliveries');
       if (!hasPermission) {
         throw 'You do not have permission to create delivery routes';
       }
 
-      final organization = await _organizationService.getCurrentUserOrganization();
+      final organization =
+          await _organizationService.getCurrentUserOrganization();
       if (organization == null) {
         throw 'Organization not found';
       }
@@ -207,7 +216,8 @@ class DeliveryRouteService extends ChangeNotifier {
         'eventId': eventId,
         'vehicleId': vehicleId,
         'driverId': driverId,
-        'currentDriver': driverId, // Initially set current driver same as original driver
+        'currentDriver':
+            driverId, // Initially set current driver same as original driver
         'organizationId': organization.id,
         'startTime': Timestamp.fromDate(startTime),
         'estimatedEndTime': Timestamp.fromDate(estimatedEndTime),
@@ -252,7 +262,8 @@ class DeliveryRouteService extends ChangeNotifier {
         throw 'Not authenticated';
       }
 
-      final routeDoc = await _firestore.collection('delivery_routes').doc(routeId).get();
+      final routeDoc =
+          await _firestore.collection('delivery_routes').doc(routeId).get();
       if (!routeDoc.exists) {
         throw 'Route not found';
       }
@@ -260,8 +271,9 @@ class DeliveryRouteService extends ChangeNotifier {
       final route = DeliveryRoute.fromMap(routeDoc.data()!, routeId);
 
       // Check if user has permission to manage_deliveries or if they are the active driver
-      final hasManagePermission = await _rolePermissions.hasPermission('manage_deliveries');
-      
+      final hasManagePermission =
+          await _rolePermissions.hasPermission('manage_deliveries');
+
       // Allow update if user has manage_deliveries permission OR is the active driver
       if (!hasManagePermission && !route.isActiveDriver(currentUser.uid)) {
         throw 'Only the assigned driver or managers can update this route';
@@ -279,12 +291,15 @@ class DeliveryRouteService extends ChangeNotifier {
         // If the new status is 'completed'
         updateData['actualEndTime'] = FieldValue.serverTimestamp();
         updateData['metadata.completedAt'] = FieldValue.serverTimestamp();
-        
+
         // Store the completing driver's ID (might be different from original)
         updateData['metadata.completedBy'] = currentUser.uid;
       }
 
-      await _firestore.collection('delivery_routes').doc(routeId).update(updateData);
+      await _firestore
+          .collection('delivery_routes')
+          .doc(routeId)
+          .update(updateData);
 
       // If completed, update vehicle status
       if (newStatus == 'completed') {
@@ -311,26 +326,33 @@ class DeliveryRouteService extends ChangeNotifier {
       }
 
       // Check if user has permission to manage deliveries
-      final hasPermission = await _rolePermissions.hasPermission('manage_deliveries');
+      final hasPermission =
+          await _rolePermissions.hasPermission('manage_deliveries');
       if (!hasPermission) {
         throw 'You do not have permission to reassign deliveries';
       }
 
-      final routeDoc = await _firestore.collection('delivery_routes').doc(routeId).get();
+      final routeDoc =
+          await _firestore.collection('delivery_routes').doc(routeId).get();
       if (!routeDoc.exists) {
         throw 'Route not found';
       }
 
-      // Update the currentDriver field, preserving the original driverId for record-keeping
+      final now = Timestamp.now();
+
       await _firestore.collection('delivery_routes').doc(routeId).update({
         'currentDriver': newDriverId,
         'updatedAt': FieldValue.serverTimestamp(),
-        'metadata.driverReassignments': FieldValue.arrayUnion([{
-          'timestamp': FieldValue.serverTimestamp(),
-          'previousDriver': routeDoc.data()?['currentDriver'] ?? routeDoc.data()?['driverId'],
-          'newDriver': newDriverId,
-          'reassignedBy': currentUser.uid,
-        }]),
+        'metadata.driverReassignments': FieldValue.arrayUnion([
+          {
+            'timestamp':
+                now, // Use the local timestamp instead of serverTimestamp()
+            'previousDriver': routeDoc.data()?['currentDriver'] ??
+                routeDoc.data()?['driverId'],
+            'newDriver': newDriverId,
+            'reassignedBy': currentUser.uid,
+          }
+        ]),
       });
 
       notifyListeners();
@@ -340,99 +362,67 @@ class DeliveryRouteService extends ChangeNotifier {
     }
   }
 
-  // Take over a delivery as the current user (can be done by any user)
-  Future<void> takeOverDelivery(String routeId) async {
+  // Update route progress details based on current location
+  Future<void> updateDriverLocation(String routeId, GeoPoint location,
+      {double? heading, double? speed}) async {
     try {
       final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
+      if (currentUser == null) throw 'Not authenticated';
+
+      final routeDoc =
+          await _firestore.collection('delivery_routes').doc(routeId).get();
+      if (!routeDoc.exists) throw 'Route not found';
+
+      final route = DeliveryRoute.fromMap(routeDoc.data()!, routeId);
+
+      // Check if user is the active driver
+      if (!route.isActiveDriver(currentUser.uid)) {
+        throw 'You must be assigned to this delivery to update its location';
       }
 
-      final routeDoc = await _firestore.collection('delivery_routes').doc(routeId).get();
-      if (!routeDoc.exists) {
-        throw 'Route not found';
+      // Only update location if delivery is in progress
+      if (route.status != 'in_progress') {
+        throw 'Delivery must be in progress to update location';
       }
 
-      // Check if the delivery is in a state that can be taken over
-      final status = routeDoc.data()?['status'];
-      if (status != 'pending' && status != 'in_progress') {
-        throw 'This delivery cannot be taken over in its current state';
-      }
-
-      // Update the currentDriver field, preserving the original driverId for record-keeping
-      await _firestore.collection('delivery_routes').doc(routeId).update({
-        'currentDriver': currentUser.uid,
+      // ALWAYS UPDATE - No filtering of small changes
+      final updateData = {
+        'currentLocation': location,
         'updatedAt': FieldValue.serverTimestamp(),
-        'metadata.driverReassignments': FieldValue.arrayUnion([{
-          'timestamp': FieldValue.serverTimestamp(),
-          'previousDriver': routeDoc.data()?['currentDriver'] ?? routeDoc.data()?['driverId'],
-          'newDriver': currentUser.uid,
-          'reassignedBy': currentUser.uid,
-          'isSelfAssigned': true,
-        }]),
-      });
+        'metadata.lastLocationUpdate': FieldValue.serverTimestamp(),
+      };
 
-      notifyListeners();
+      // Add optional parameters if provided
+      if (heading != null) {
+        updateData['currentHeading'] = heading;
+      }
+
+      if (speed != null) {
+        updateData['metadata.currentSpeed'] = speed;
+      }
+
+      await _firestore
+          .collection('delivery_routes')
+          .doc(routeId)
+          .update(updateData);
+
+      // Calculate and update route progress details in a separate operation
+      _updateProgressDetails(routeId, location);
+
+      debugPrint(
+          '🚚 DRIVER LOCATION UPDATED: ${location.latitude}, ${location.longitude}');
     } catch (e) {
-      debugPrint('Error taking over delivery: $e');
+      debugPrint('Error updating driver location: $e');
       rethrow;
     }
   }
 
-  // Update route progress details based on current location
-Future<void> updateDriverLocation(String routeId, GeoPoint location,
-    {double? heading, double? speed}) async {
-  try {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) throw 'Not authenticated';
-
-    final routeDoc = await _firestore.collection('delivery_routes').doc(routeId).get();
-    if (!routeDoc.exists) throw 'Route not found';
-
-    final route = DeliveryRoute.fromMap(routeDoc.data()!, routeId);
-
-    // Check if user is the active driver
-    if (!route.isActiveDriver(currentUser.uid)) {
-      throw 'You must be assigned to this delivery to update its location';
-    }
-
-    // Only update location if delivery is in progress
-    if (route.status != 'in_progress') {
-      throw 'Delivery must be in progress to update location';
-    }
-    
-    // ALWAYS UPDATE - No filtering of small changes
-    final updateData = {
-      'currentLocation': location,
-      'updatedAt': FieldValue.serverTimestamp(),
-      'metadata.lastLocationUpdate': FieldValue.serverTimestamp(),
-    };
-
-    // Add optional parameters if provided
-    if (heading != null) {
-      updateData['currentHeading'] = heading;
-    }
-
-    if (speed != null) {
-      updateData['metadata.currentSpeed'] = speed;
-    }
-
-    await _firestore.collection('delivery_routes').doc(routeId).update(updateData);
-
-    // Calculate and update route progress details in a separate operation
-    _updateProgressDetails(routeId, location);
-
-    debugPrint('🚚 DRIVER LOCATION UPDATED: ${location.latitude}, ${location.longitude}');
-  } catch (e) {
-    debugPrint('Error updating driver location: $e');
-    rethrow;
-  }
-}
-
   // Calculate and update progress metrics
-  Future<void> _updateProgressDetails(String routeId, GeoPoint currentLocation) async {
+  Future<void> _updateProgressDetails(
+      String routeId, GeoPoint currentLocation) async {
     try {
-      final routeDoc = await _firestore.collection('delivery_routes').doc(routeId).get();
+      final routeDoc =
+          await _firestore.collection('delivery_routes').doc(routeId).get();
       if (!routeDoc.exists) return;
 
       final route = DeliveryRoute.fromMap(routeDoc.data()!, routeId);
@@ -449,10 +439,13 @@ Future<void> updateDriverLocation(String routeId, GeoPoint location,
         if (route.metadata != null &&
             route.metadata!['routeDetails'] != null &&
             route.metadata!['routeDetails']['totalDistance'] != null) {
-          totalRouteDistance = (route.metadata!['routeDetails']['totalDistance'] as num).toDouble();
+          totalRouteDistance =
+              (route.metadata!['routeDetails']['totalDistance'] as num)
+                  .toDouble();
         } else {
           // Calculate from waypoints
-          totalRouteDistance = DeliveryProgress.calculateTotalRouteDistance(route.waypoints);
+          totalRouteDistance =
+              DeliveryProgress.calculateTotalRouteDistance(route.waypoints);
         }
 
         // Ensure we have a valid total distance
@@ -461,16 +454,19 @@ Future<void> updateDriverLocation(String routeId, GeoPoint location,
         }
 
         // Calculate remaining distance using Haversine formula
-        final remainingDistance = DeliveryProgress.calculateRemainingDistance(currentLocation, destination);
+        final remainingDistance = DeliveryProgress.calculateRemainingDistance(
+            currentLocation, destination);
 
         // Ensure we have a non-negative remaining distance
-        final safeRemainingDistance = remainingDistance < 0 ? 0 : remainingDistance;
+        final safeRemainingDistance =
+            remainingDistance < 0 ? 0 : remainingDistance;
 
         // Estimate remaining time based on current speed or average speed
-        final currentSpeed = (route.metadata?['currentSpeed'] as num? ?? 10.0).toDouble();
+        final currentSpeed =
+            (route.metadata?['currentSpeed'] as num? ?? 10.0).toDouble();
         // Ensure we have a reasonable speed value (at least 0.1 m/s)
         final safeSpeed = currentSpeed < 0.1 ? 10.0 : currentSpeed;
-        
+
         // Calculate estimated time safely
         double estimatedTimeInSeconds;
         if (safeRemainingDistance <= 0) {
@@ -481,7 +477,8 @@ Future<void> updateDriverLocation(String routeId, GeoPoint location,
           if (rawEstimatedTime.isFinite && !rawEstimatedTime.isNaN) {
             estimatedTimeInSeconds = rawEstimatedTime.clamp(0.0, 3600.0);
           } else {
-            estimatedTimeInSeconds = 600.0; // Default to 10 minutes if calculation failed
+            estimatedTimeInSeconds =
+                600.0; // Default to 10 minutes if calculation failed
           }
         }
 
@@ -490,7 +487,8 @@ Future<void> updateDriverLocation(String routeId, GeoPoint location,
         if (totalRouteDistance > 0) {
           // Safety check for division
           if (safeRemainingDistance <= totalRouteDistance) {
-            final rawProgress = 1.0 - (safeRemainingDistance / totalRouteDistance);
+            final rawProgress =
+                1.0 - (safeRemainingDistance / totalRouteDistance);
             // Verify the result is valid
             progress = rawProgress.isFinite && !rawProgress.isNaN
                 ? rawProgress.clamp(0.0, 1.0)
@@ -505,8 +503,9 @@ Future<void> updateDriverLocation(String routeId, GeoPoint location,
         if (route.metadata != null &&
             route.metadata!['routeDetails'] != null &&
             route.metadata!['routeDetails']['originalDuration'] != null) {
-          
-          final originalDuration = (route.metadata!['routeDetails']['originalDuration'] as num).toDouble();
+          final originalDuration =
+              (route.metadata!['routeDetails']['originalDuration'] as num)
+                  .toDouble();
 
           // Check for positive original duration to avoid division by zero
           if (originalDuration > 0) {
@@ -534,9 +533,11 @@ Future<void> updateDriverLocation(String routeId, GeoPoint location,
         await _firestore.collection('delivery_routes').doc(routeId).update({
           'metadata.routeDetails.remainingDistance': safeRemainingDistance,
           'metadata.routeDetails.totalDistance': totalRouteDistance,
-          'metadata.routeDetails.estimatedTimeRemaining': estimatedTimeInSeconds.round(),
+          'metadata.routeDetails.estimatedTimeRemaining':
+              estimatedTimeInSeconds.round(),
           'metadata.routeDetails.progress': progress,
-          'metadata.routeDetails.lastProgressUpdate': FieldValue.serverTimestamp(),
+          'metadata.routeDetails.lastProgressUpdate':
+              FieldValue.serverTimestamp(),
           'metadata.routeDetails.estimatedArrival': Timestamp.fromDate(eta),
           'metadata.routeDetails.traffic': trafficCondition,
           'estimatedEndTime': Timestamp.fromDate(eta),
@@ -555,7 +556,8 @@ Future<void> updateDriverLocation(String routeId, GeoPoint location,
   }
 
   // Update estimated arrival time (requires manage_deliveries permission)
-  Future<void> updateEstimatedTime(String routeId, DateTime newEstimatedTime) async {
+  Future<void> updateEstimatedTime(
+      String routeId, DateTime newEstimatedTime) async {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) {
@@ -563,12 +565,14 @@ Future<void> updateDriverLocation(String routeId, GeoPoint location,
       }
 
       // Check if user has permission to manage deliveries
-      final hasPermission = await _rolePermissions.hasPermission('manage_deliveries');
+      final hasPermission =
+          await _rolePermissions.hasPermission('manage_deliveries');
       if (!hasPermission) {
         throw 'You do not have permission to update delivery times';
       }
 
-      final routeDoc = await _firestore.collection('delivery_routes').doc(routeId).get();
+      final routeDoc =
+          await _firestore.collection('delivery_routes').doc(routeId).get();
       if (!routeDoc.exists) {
         throw 'Route not found';
       }
@@ -594,12 +598,14 @@ Future<void> updateDriverLocation(String routeId, GeoPoint location,
       }
 
       // Check if user has permission to manage deliveries
-      final hasPermission = await _rolePermissions.hasPermission('manage_deliveries');
+      final hasPermission =
+          await _rolePermissions.hasPermission('manage_deliveries');
       if (!hasPermission) {
         throw 'You do not have permission to cancel deliveries';
       }
 
-      final routeDoc = await _firestore.collection('delivery_routes').doc(routeId).get();
+      final routeDoc =
+          await _firestore.collection('delivery_routes').doc(routeId).get();
       if (!routeDoc.exists) {
         throw 'Route not found';
       }
