@@ -1,4 +1,5 @@
 import 'dart:async'; // Importing the async library for using Timer and Future.
+import 'package:cateredtoyou/models/delivery_route_model.dart';
 import 'package:cateredtoyou/models/user_model.dart'; // Importing the user model.
 import 'package:cateredtoyou/models/vehicle_model.dart'; // Importing the vehicle model.
 import 'package:cateredtoyou/services/staff_service.dart'; // Importing the staff service.
@@ -6,6 +7,7 @@ import 'package:cateredtoyou/services/vehicle_service.dart'; // Importing the ve
 import 'package:cateredtoyou/utils/auto_complete.dart';
 import 'package:cateredtoyou/views/delivery/widgets/delivery_map.dart'; // Importing the delivery map widget.
 import 'package:cateredtoyou/views/delivery/widgets/delivery_map_controller.dart'; // Importing the delivery map controller.
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
 import 'package:flutter_map/flutter_map.dart'; // Importing flutter_map for map functionalities.
 import 'package:latlong2/latlong.dart'; // Importing latlong2 for handling geographical coordinates.
@@ -44,6 +46,8 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
       _deliveryAddressController; // Controller for the delivery address input.
   late final TextEditingController
       _notesController; // Controller for the notes input.
+  final _pickupAddressKey = GlobalKey();
+  final _deliveryAddressKey = GlobalKey();
 
   // Form Fields
   String? _selectedEventId; // Selected event ID.
@@ -295,7 +299,244 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
         });
       }
     } catch (e) {
-      _handleError('Error getting address', e);
+      _handleError(
+          'Error getting address', e); // Handle error if getting address fails.
+    }
+  }
+
+  Future<void> _searchAddress(String query, bool isPickup) async {
+    if (query.length < 3) return; // Return if query is too short.
+
+    _debounceTimer?.cancel(); // Cancel previous debounce timer.
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
+      try {
+        setState(() => _isLoading = true); // Set loading state to true.
+
+        final response = await http.get(
+          Uri.parse(
+            'https://nominatim.openstreetmap.org/search?format=json&q=$query&limit=5&countrycodes=us', // URL for address search.
+          ),
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent':
+                'CateredToYou/1.0', // User-Agent header for the request.
+          },
+        );
+
+        if (!mounted) return;
+
+        if (response.statusCode == 200) {
+          final results =
+              json.decode(response.body) as List; // Decode JSON response.
+          if (results.isNotEmpty) {
+            await _showAddressSuggestions(
+                results, isPickup); // Show address suggestions.
+          }
+        }
+      } catch (e) {
+        _handleError('Error searching address',
+            e); // Handle error if searching address fails.
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false); // Set loading state to false.
+        }
+      }
+    });
+  }
+
+  Future<void> _showAddressSuggestions(List results, bool isPickup) async {
+    if (!mounted) return;
+
+    // Find the RenderObject of the text field to position the suggestions properly
+    final RenderBox? textFieldBox = isPickup
+        ? _pickupAddressKey.currentContext?.findRenderObject() as RenderBox?
+        : _deliveryAddressKey.currentContext?.findRenderObject() as RenderBox?;
+
+    if (textFieldBox == null) {
+      await _showAddressSuggestionsBottomSheet(results, isPickup);
+      return;
+    }
+
+    // Get the position and size of the text field
+    final textFieldPosition = textFieldBox.localToGlobal(Offset.zero);
+    final textFieldSize = textFieldBox.size;
+
+    // Calculate the position for the popup
+    final offset = Offset(0, textFieldSize.height + 5);
+    final position = textFieldPosition + offset;
+
+    // Show a dropdown menu at the calculated position
+    final selected = await showMenu<Map<String, dynamic>>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx + textFieldSize.width,
+        position.dy + 20.0,
+      ),
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      // Set a reasonable limit to the menu height
+      constraints: BoxConstraints(
+        maxWidth: textFieldSize.width,
+        maxHeight: MediaQuery.of(context).size.height *
+            0.4, // Limit to 40% of screen height
+      ),
+      items: results.map<PopupMenuItem<Map<String, dynamic>>>((result) {
+        return PopupMenuItem<Map<String, dynamic>>(
+          value: result,
+          padding: EdgeInsets.zero, // Remove default padding
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _formatAddressForDisplay(result['display_name']),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  result['display_name'],
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+
+    // Process the selected address
+    if (selected != null) {
+      _processSelectedAddress(selected, isPickup);
+    }
+  }
+
+// Helper method to format an address for display
+  String _formatAddressForDisplay(String fullAddress) {
+    // Extract just the main part of the address (typically the first comma-separated part)
+    final parts = fullAddress.split(',');
+    if (parts.isEmpty) return fullAddress;
+    return parts[0].trim();
+  }
+
+// Helper method to process the selected address
+  void _processSelectedAddress(Map<String, dynamic> selected, bool isPickup) {
+    final latLng = LatLng(
+      double.parse(selected['lat']),
+      double.parse(selected['lon']),
+    );
+
+    setState(() {
+      if (isPickup) {
+        _pickupLocation = latLng;
+        _pickupAddressController.text = selected['display_name'];
+      } else {
+        _deliveryLocation = latLng;
+        _deliveryAddressController.text = selected['display_name'];
+      }
+    });
+
+    _updateMapMarkersAndPolylines();
+
+    if (_pickupLocation != null && _deliveryLocation != null) {
+      _getRouteDetails();
+    }
+
+    _updateMapBounds();
+  }
+
+// Fallback method if we can't determine text field position
+  Future<void> _showAddressSuggestionsBottomSheet(
+      List results, bool isPickup) async {
+    final selected = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height *
+              0.6, // Limit to 60% of screen height
+        ),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurfaceVariant
+                    .withAlpha((0.4 * 255).toInt()),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                'Select Address',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const Divider(),
+            Flexible(
+              child: ListView.builder(
+                itemCount: results.length,
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemBuilder: (context, index) {
+                  final result = results[index];
+                  return ListTile(
+                    leading: const Icon(Icons.location_on),
+                    title: Text(
+                      _formatAddressForDisplay(result['display_name']),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      result['display_name'],
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: () => Navigator.pop(context, result),
+                  );
+                },
+              ),
+            ),
+            // Add a safe area at the bottom for notched devices
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
+        ),
+      ),
+    );
+
+    // Process the selected address
+    if (selected != null) {
+      _processSelectedAddress(selected, isPickup);
     }
   }
 
@@ -520,6 +761,7 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
           ],
         ),
       ),
+      bottomNavigationBar: const BottomToolbar(),
     );
   }
 
@@ -575,25 +817,45 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
     required String hint,
     required bool isPickup,
   }) {
-    return AddressAutoComplete(
-      controller: controller,
-      label: label,
-      hint: hint,
-      isPickup: isPickup,
-      onLocationSelected: (location) {
-        setState(() {
-          if (isPickup) {
-            _pickupLocation = location;
-          } else {
-            _deliveryLocation = location;
-          }
+    final key = isPickup ? _pickupAddressKey : _deliveryAddressKey;
 
-          _updateMapMarkersAndPolylines();
-          if (_pickupLocation != null && _deliveryLocation != null) {
-            _getRouteDetails();
-            _updateMapBounds();
-          }
-        });
+    return TextFormField(
+      key: key, // Add the key here
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: const Icon(Icons.location_on),
+        border: const OutlineInputBorder(),
+        suffixIcon: controller.text.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  controller.clear();
+                  setState(() {
+                    if (isPickup) {
+                      _pickupLocation = null;
+                    } else {
+                      _deliveryLocation = null;
+                    }
+                    _updateMapMarkersAndPolylines();
+                  });
+                },
+              )
+            : null,
+      ),
+      onChanged: (value) {
+        if (value.length > 3) {
+          _searchAddress(value, isPickup);
+        }
+      },
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return isPickup
+              ? 'Please enter pickup location'
+              : 'Please enter delivery location';
+        }
+        return null;
       },
     );
   }
@@ -1130,56 +1392,45 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
 
   Widget _buildDriverDropdown() {
     return Consumer<StaffService>(
-      // Use Consumer to access the StaffService.
       builder: (context, staffService, _) {
         return StreamBuilder<List<UserModel>>(
-          // Use StreamBuilder to listen to the stream of staff members.
-          stream: staffService
-              .getStaffMembers(), // Get the stream of staff members.
+          stream: staffService.getStaffMembers(),
           builder: (context, snapshot) {
             if (snapshot.hasError) {
-              return Text(
-                  'Error: ${snapshot.error}'); // Show error message if there's an error.
+              return Text('Error: ${snapshot.error}');
             }
 
             if (!snapshot.hasData) {
-              return const Center(
-                  child:
-                      CircularProgressIndicator()); // Show loading indicator while data is loading.
+              return const Center(child: CircularProgressIndicator());
             }
 
+            // Modified: Allow any active staff to be a driver (removed role filter)
             final drivers = snapshot.data!
-                .where((staff) =>
-                    staff.role == 'driver' &&
-                    staff.employmentStatus ==
-                        'active') // Filter active drivers.
+                .where((staff) => staff.employmentStatus == 'active')
                 .toList();
 
             if (drivers.isEmpty) {
-              return const Text(
-                  'No available drivers'); // Show message if no drivers are available.
+              return const Text('No available staff members');
             }
 
             return DropdownButtonFormField<String>(
-              // Create a dropdown form field for selecting a driver.
-              value: _selectedDriverId, // Set the selected driver ID.
+              value: _selectedDriverId,
               decoration: const InputDecoration(
-                labelText: 'Select Driver', // Set the label text.
-                hintText: 'Choose a driver', // Set the hint text.
-                prefixIcon: Icon(Icons.person), // Set the prefix icon.
+                labelText: 'Select Driver',
+                hintText: 'Choose a driver',
+                prefixIcon: Icon(Icons.person),
               ),
               items: drivers.map((driver) {
                 return DropdownMenuItem(
-                  value: driver.uid, // Set the driver ID.
+                  value: driver.uid,
                   child: Text(
-                      '${driver.firstName} ${driver.lastName}'), // Set the driver name.
+                      '${driver.firstName} ${driver.lastName}${driver.role == 'driver' ? ' (Driver)' : ''}'),
                 );
               }).toList(),
-              onChanged: (value) => setState(() =>
-                  _selectedDriverId = value), // Update the selected driver ID.
+              onChanged: (value) => setState(() => _selectedDriverId = value),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please select a driver'; // Validate the input.
+                  return 'Please select a driver';
                 }
                 return null;
               },
@@ -1525,8 +1776,9 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
             .toList(), // Convert loaded items to a list of maps.
       };
 
-      // Create delivery route
-      await deliveryService.createDeliveryRoute(
+      // Create delivery route and get the created route object
+      final DeliveryRoute createdRoute =
+          await deliveryService.createDeliveryRoute(
         eventId: _selectedEventId!, // Add event ID.
         vehicleId: _selectedVehicleId!, // Add vehicle ID.
         driverId: _selectedDriverId!, // Add driver ID.
@@ -1536,15 +1788,28 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
         metadata: metadata, // Add metadata.
       );
 
+      await deliveryService.initializeRouteMetrics(createdRoute.id);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-                'Delivery route created successfully'), // Show success message.
+            content: Text('Delivery route created successfully'),
             behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
           ),
         );
-        context.pop(); // Navigate back.
+
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            final router = GoRouter.of(context);
+
+            if (router.canPop()) {
+              router.pop();
+            }
+
+            router.go('/deliveries');
+          }
+        });
       }
     } catch (e) {
       setState(() {

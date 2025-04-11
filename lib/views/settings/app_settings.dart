@@ -26,9 +26,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   final List<String> _languages = [
     'English',
     'Spanish',
-    'French',
-    'German',
-    'Chinese',
   ];
 
   @override

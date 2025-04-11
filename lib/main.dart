@@ -3,8 +3,9 @@ import 'dart:async';
 
 // import our custom services and packages
 import 'package:cateredtoyou/services/auth_service.dart';
-import 'package:cateredtoyou/services/delivery_route_service.dart'; // handles delivery route operations
-import 'package:cateredtoyou/services/event_service.dart'; // manages event operations
+import 'package:cateredtoyou/services/delivery_route_service.dart'; // Import DeliveryRouteService for delivery route-related operations
+import 'package:cateredtoyou/services/event_service.dart'; // Import EventService for event-related operations
+import 'package:cateredtoyou/services/location_service.dart';
 import 'package:cateredtoyou/services/manifest_service.dart';
 import 'package:cateredtoyou/services/menu_item_service.dart'; // manages menu item operations
 import 'package:cateredtoyou/services/notification_service.dart';
@@ -46,7 +47,15 @@ class FirebaseSecondary {
   }
 }
 
-// main function to initialize app and run it
+void setupRecurringNotificationsCheck() {
+  NotificationService().processRecurringNotifications();
+
+  // Set up periodic checking of recurring notifications
+  Timer.periodic(const Duration(hours: 1), (timer) {
+    NotificationService().processRecurringNotifications();
+  });
+}
+
 void main() async {
   // ensure flutter binding is initialized
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,7 +72,7 @@ void main() async {
 
 // main app widget
 class MyApp extends StatelessWidget {
-  const MyApp({super.key}); // constructor
+  const MyApp({super.key}); // Constructor for MyApp
 
   @override
   Widget build(BuildContext context) {
@@ -72,26 +81,43 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => OrganizationService()),
         Provider<AuthService>(create: (_) => AuthService()),
-        // staff service depends on organization service
+        // Role permissions service
+        ChangeNotifierProvider(create: (_) => RolePermissions()),
+        // Staff service depends on OrganizationService
         ChangeNotifierProvider(
-          create: (context) => StaffService(context.read<OrganizationService>()),
+          create: (context) =>
+              StaffService(context.read<OrganizationService>()),
         ),
         ChangeNotifierProvider(
-          create: (context) => ManifestService(context.read<OrganizationService>()),
+          create: (context) =>
+              ManifestService(context.read<OrganizationService>()),
         ),
         // inventory service depends on organization service
         ChangeNotifierProvider(
-          create: (context) => InventoryService(context.read<OrganizationService>()),
+          create: (context) =>
+              InventoryService(context.read<OrganizationService>()),
         ),
         // vehicle service depends on organization service
         ChangeNotifierProvider(
-          create: (context) => VehicleService(context.read<OrganizationService>()),
+          create: (context) =>
+              VehicleService(context.read<OrganizationService>()),
         ),
-        // delivery route service depends on organization service
+        // Delivery route service depends on OrganizationService
+         ChangeNotifierProvider(
+          create: (context) => DeliveryRouteService(
+            context.read<OrganizationService>(),
+            context.read<RolePermissions>(),
+          ),
+        ),
+        // LocationService depends on DeliveryRouteService, so it must come AFTER
         ChangeNotifierProvider(
-          create: (context) => DeliveryRouteService(context.read<OrganizationService>()),
+          create: (context) => LocationService(
+            context.read<DeliveryRouteService>(),
+          ),
         ),
-        ChangeNotifierProvider(create: (_) => RolePermissions()),
+
+        
+        // Auth model should be last as it might depend on other services
         ChangeNotifierProvider(create: (_) => AuthModel()),
         // task service depends on organization service
         ChangeNotifierProvider(
@@ -110,193 +136,108 @@ class MyApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider(
-          create: (context) => MenuItemService(context.read<OrganizationService>()),
+          create: (context) =>
+              MenuItemService(context.read<OrganizationService>()),
         ),
         ChangeNotifierProvider(
-          create: (context) => CustomerService(context.read<OrganizationService>()),
+          create: (context) =>
+              CustomerService(context.read<OrganizationService>()),
         ),
         // add theme manager so dark mode toggle works
         ChangeNotifierProvider(create: (_) => ThemeManager()),
       ],
-      child: Builder(builder: (context) {
-        // get auth model from provider
-        final authModel = context.watch<AuthModel>();
-        // get theme manager to control dark/light mode
-        final themeManager = context.watch<ThemeManager>();
-        // create app router for navigation
-        final appRouter = AppRouter(authModel);
+      child: Builder(
+        builder: (context) {
+          final authModel =
+              context.watch<AuthModel>(); // Watch AuthModel for changes
+          final appRouter =
+              AppRouter(authModel); // Create AppRouter instance with AuthModel
 
-        return MaterialApp.router(
-          title: 'cateredtouyou', // app title
-          debugShowCheckedModeBanner: false, // hide debug banner
-          
-          
-          
-          
-          // light theme
-          theme: ThemeData(
-            useMaterial3: true,
-            // custom color scheme for light theme
-            colorScheme: const ColorScheme(
-              brightness: Brightness.light,
-              primary: Color(0xFFFFC30B), // honey yellow
-              onPrimary: Colors.white,
-              secondary: Color(0xFFFFC30B),
-              onSecondary: Colors.black,
-              error: Colors.red,
-              onError: Colors.white,
-              surface: Color(0xFFFFFFFF), // pure white
-              onSurface: Colors.black87,
-            ),
-            scaffoldBackgroundColor: Colors.white, // background is white
-            appBarTheme: const AppBarTheme(
-              backgroundColor: const Color(0xFFFFC30B), // appbar uses honey yellow
-              elevation: 4,
-            ),
-            elevatedButtonTheme: ElevatedButtonThemeData(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFC30B), // button background is honey yellow
-                foregroundColor: Colors.black, // text color for button
-                minimumSize: const Size.fromHeight(48),
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
+          return MaterialApp.router(
+            title: 'CateredToYou',
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(
+              useMaterial3: true,
+              // Define a custom ColorScheme
+              colorScheme: const ColorScheme(
+                brightness: Brightness.light,
+                primary: Color(0xFF2C3E50), // Dark navy for sophistication
+                onPrimary: Colors.white,
+                secondary: Color(0xFFD4AF37), // Elegant gold accent
+                onSecondary: Colors.black,
+                error: Colors.red,
+                onError: Colors.white,
+                surface: Color(0xFFFCF8F2), // Warm cream background
+                onSurface: Colors.black87,
+              ),
+              scaffoldBackgroundColor: const Color(0xFFFCF8F2),
+              appBarTheme: const AppBarTheme(
+                backgroundColor: Color(0xFF2C3E50),
+                foregroundColor: Colors.white,
+                elevation: 4,
+              ),
+              elevatedButtonTheme: ElevatedButtonThemeData(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      const Color(0xFFD4AF37), // Gold button background
+                  foregroundColor: Colors.black, // Button text color
+                  minimumSize: const Size.fromHeight(48),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                  ),
                 ),
               ),
-            ),
-            inputDecorationTheme: InputDecorationTheme(
-              filled: true,
-              fillColor: Colors.white, // input field fill is white
-              border: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color(0xFFBDC3C7)),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color(0xFFFFC30B)),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            ),
-            cardTheme: CardTheme(
-              color: Colors.white,
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              margin: const EdgeInsets.all(8),
-            ),
-            textTheme: const TextTheme(
-              headlineSmall: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2C3E50),
-              ),
-              titleMedium: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF2C3E50),
-              ),
-              bodyLarge: TextStyle(fontSize: 16, color: Colors.black87),
-              bodyMedium: TextStyle(fontSize: 14, color: Colors.black54),
-            ),
-            switchTheme: SwitchThemeData(
-              thumbColor: WidgetStateProperty.resolveWith<Color>(
-                (states) => Colors.white,
-              ),
-              trackColor: WidgetStateProperty.all(const Color(0xFFD4AF37)),
-              overlayColor: WidgetStateProperty.all(const Color(0xFFD4AF37)),
-            ),
-            // tabbar theme to ensure tab text is visible on yellow background
-            tabBarTheme: const TabBarTheme(
-              labelColor: Color(0xFF2C3E50), // dark text for selected tabs
-              unselectedLabelColor: Color.fromARGB(255, 253, 253, 253), // light text for unselected tabs
-              indicator: UnderlineTabIndicator(
-                borderSide: BorderSide(color: Color(0xFF2C3E50), width: 2),
-              ),
-            ),
-          ),
-
-
-          
-          // dark theme configuration
-          darkTheme: ThemeData(
-            useMaterial3: true,
-            colorScheme: const ColorScheme(
-              brightness: Brightness.dark,
-              primary: Color(0xFF1A252F),
-              onPrimary: Colors.white,
-              secondary: Color(0xFFCBA135),
-              onSecondary: Colors.white,
-              error: Colors.red,
-              onError: Colors.black,
-              surface: Color(0xFF121212),
-              onSurface: Colors.white70,
-            ),
-            scaffoldBackgroundColor: const Color(0xFF121212),
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Color(0xFF1A252F),
-              foregroundColor: Colors.white,
-              elevation: 4,
-            ),
-            elevatedButtonTheme: ElevatedButtonThemeData(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFCBA135),
-                foregroundColor: Colors.black,
-                minimumSize: const Size.fromHeight(48),
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
+              inputDecorationTheme: InputDecorationTheme(
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFFBDC3C7)),
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFFD4AF37)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               ),
-            ),
-            inputDecorationTheme: InputDecorationTheme(
-              filled: true,
-              fillColor: const Color(0xFF1E1E1E),
-              border: OutlineInputBorder(
-                borderSide: const BorderSide(color: Colors.grey),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color(0xFFCBA135)),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            ),
-            cardTheme: CardTheme(
-              color: const Color(0xFF1E1E1E),
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              margin: const EdgeInsets.all(8),
-            ),
-            textTheme: const TextTheme(
-              headlineSmall: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+              cardTheme: CardTheme(
                 color: Colors.white,
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                margin: const EdgeInsets.all(8),
               ),
-              titleMedium: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
+              textTheme: TextTheme(
+                headlineSmall: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2C3E50),
+                ),
+                titleMedium: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF2C3E50),
+                ),
+                bodyLarge: const TextStyle(fontSize: 16, color: Colors.black87),
+                bodyMedium:
+                    const TextStyle(fontSize: 14, color: Colors.black54),
               ),
-              bodyLarge: TextStyle(fontSize: 16, color: Colors.white70),
-              bodyMedium: TextStyle(fontSize: 14, color: Color.fromARGB(153, 0, 0, 0)),
+              switchTheme: SwitchThemeData(
+                thumbColor: WidgetStateProperty.resolveWith<Color>(
+                  (states) => Colors.white,
+                ),
+                trackColor: WidgetStateProperty.all(const Color(0xFFD4AF37)),
+                overlayColor: WidgetStateProperty.all(const Color(0xFFD4AF37)),
+              ),
             ),
-            switchTheme: SwitchThemeData(
-              thumbColor: WidgetStateProperty.resolveWith<Color>(
-                (states) => Colors.white,
-              ),
-              trackColor: WidgetStateProperty.all(const Color(0xFFCBA135)),
-              overlayColor: WidgetStateProperty.all(const Color(0xFFCBA135)),
-            ),
-          ),
-          // use theme manager to switch themes based on toggle in settings
-          themeMode: themeManager.themeMode,
-          routerConfig: appRouter.router,
-        );
-      }),
+            routerConfig: appRouter.router,
+          );
+        },
+      ),
     );
   }
 }
