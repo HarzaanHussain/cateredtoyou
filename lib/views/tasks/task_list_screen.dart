@@ -19,7 +19,7 @@ class TaskListScreen extends StatelessWidget {
     return DefaultTabController(
       length: 4,
       child: Scaffold(
-        //backgroundColor: const Color(0xFFFBC72B), // Change this to your desired color
+        // backgroundColor: const Color(0xFFFBC72B), // yellow background
 
         bottomNavigationBar: const BottomToolbar(),
         appBar: AppBar(
@@ -111,13 +111,13 @@ class _TaskListState extends State<_TaskList> {
                           Icon(
                             Icons.task_alt,
                             size: 64,
-                            color: Colors.white,
+                            color: Colors.black,
                           ),
                           const SizedBox(height: 16),
                           Text(
                             'No tasks found',
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
+                              color: Colors.black,
                             ),
                           ),
                         ],
@@ -337,91 +337,79 @@ class TaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card( // Creates a card widget to display the task.
-      elevation: 2, // Sets the elevation of the card to give it a shadow effect.
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8), // Sets the margin around the card.
-      child: InkWell( // Makes the card tappable.
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 8),
+      child: InkWell(
         onTap: () {
-          Navigator.push( // Navigates to the TaskDetailScreen when the card is tapped.
+          Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => TaskDetailScreen(task: task), // Passes the task to the TaskDetailScreen.
+              builder: (context) => TaskDetailScreen(task: task),
             ),
           );
         },
-        child: Padding( // Adds padding inside the card.
-          padding: const EdgeInsets.all(16),
-          child: Column( // Arranges the child widgets in a column.
-            crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row( // Arranges the child widgets in a row.
-                crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the row.
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded( // Expands the child widget to fill the available space.
-                    child: Column( // Arranges the child widgets in a column.
-                      crossAxisAlignment: CrossAxisAlignment.start, // Aligns children to the start of the column.
-                      children: [
-                        Row( // Arranges the child widgets in a row.
-                          children: [
-                            Flexible( // Makes the child widget flexible to avoid overflow.
-                              child: Text(
-                                task.name, // Displays the task name.
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold, // Sets the text style to bold.
-                                ),
-                              ),
-                            ),
-                            if (task.eventId.isNotEmpty) ...[ // Checks if the task is associated with an event.
-                              const SizedBox(width: 8), // Adds space between the task name and event name.
-                              FutureBuilder<DocumentSnapshot>(
-                                future: FirebaseFirestore.instance
-                                    .collection('events')
-                                    .doc(task.eventId)
-                                    .get(), // Fetches the event details from Firestore.
-                                builder: (context, snapshot) {
-                                  if (snapshot.hasData && snapshot.data!.exists) {
-                                    final eventData = snapshot.data!.data() as Map<String, dynamic>;
-                                    return Text(
-                                      '[${eventData['name'] + '\'s Event'?? 'Unknown Event'}]', // Displays the event name.
-                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        color: Colors.blue[700], // Sets the text color to blue.
-                                        fontWeight: FontWeight.w700, // Sets the text style to bold.
-                                      ),
-                                    );
-                                  }
-                                  return const SizedBox.shrink(); // Returns an empty widget if the event does not exist.
-                                },
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 4), // Adds space between the task name and description.
-                        Text(
-                          task.description, // Displays the task description.
-                          maxLines: 2, // Limits the description to 2 lines.
-                          overflow: TextOverflow.ellipsis, // Adds ellipsis if the description overflows.
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600], // Sets the text color to grey.
-                          ),
-                        ),
-                      ],
+                  Flexible(
+                    child: Text(
+                      '${task.name}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 8), // Adds space between the description and priority indicator.
-                  _buildPriorityIndicator(), // Builds the priority indicator widget.
                 ],
               ),
-              const SizedBox(height: 12), // Adds space between the priority indicator and due date/status row.
+              if (task.eventId.isNotEmpty) ...[
+                const SizedBox(height: 4), // Adds space between task name and event
+                FutureBuilder<DocumentSnapshot>(
+                  future: FirebaseFirestore.instance
+                      .collection('events')
+                      .doc(task.eventId)
+                      .get(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data!.exists) {
+                      final eventData = snapshot.data!.data() as Map<String, dynamic>;
+                      // Display event name in a new row below the task name
+                      return Text(
+                        '[${eventData['name'] + '\'s Event' ?? 'Unknown Event'}]',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Colors.blue[700], // Event name color
+                          fontWeight: FontWeight.w700,
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink(); // Return an empty widget if event data doesn't exist
+                  },
+                ),
+              ],
+              const SizedBox(height: 4), // Space between event name and task description
+              Text(
+                task.description, // Displays the task description
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 12), // Space between description and other content
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween, // Spaces the due date and status chip evenly.
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildDueDate(), // Builds the due date widget.
-                  _buildStatusChip(), // Builds the status chip widget.
+                  _buildDueDate(), // Builds the due date widget
+                  _buildStatusChip(), // Builds the status chip widget
                 ],
               ),
-              if (task.checklist.isNotEmpty) ...[ // Checks if the task has a checklist.
-                const SizedBox(height: 12), // Adds space between the status chip and progress indicator.
-                _buildProgressIndicator(), // Builds the progress indicator widget.
+              if (task.checklist.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildProgressIndicator(), // Progress indicator widget
               ],
             ],
           ),
@@ -429,7 +417,8 @@ class TaskCard extends StatelessWidget {
       ),
     );
   }
-  
+
+
 
   /// Builds the priority indicator widget.
   Widget _buildPriorityIndicator() {

@@ -15,8 +15,6 @@ class AppSettingsScreen extends StatefulWidget {
 }
 
 class _AppSettingsScreenState extends State<AppSettingsScreen> {
-  // If you no longer need a separate dark mode state, you can remove this:
-  // bool _darkMode = false;
   bool _notificationsEnabled = true;
   bool _soundEnabled = true;
   String _selectedLanguage = 'English';
@@ -32,6 +30,9 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Access ThemeManager from the provider
+    final themeManager = Provider.of<ThemeManager>(context);
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
@@ -54,11 +55,10 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             'Switch between light and dark theme',
             Icons.dark_mode,
             // Use the ThemeManager's value for dark mode:
-            Provider.of<ThemeManager>(context).isDarkMode,
+            themeManager.isDarkMode,
             (value) {
               // Toggle the theme using the ThemeManager
-              Provider.of<ThemeManager>(context, listen: false)
-                  .toggleTheme(value);
+              themeManager.toggleTheme(value);
             },
           ),
           const Divider(),

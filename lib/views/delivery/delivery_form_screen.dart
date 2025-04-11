@@ -4,6 +4,7 @@ import 'package:cateredtoyou/models/user_model.dart'; // Importing the user mode
 import 'package:cateredtoyou/models/vehicle_model.dart'; // Importing the vehicle model.
 import 'package:cateredtoyou/services/staff_service.dart'; // Importing the staff service.
 import 'package:cateredtoyou/services/vehicle_service.dart'; // Importing the vehicle service.
+import 'package:cateredtoyou/utils/auto_complete.dart';
 import 'package:cateredtoyou/views/delivery/widgets/delivery_map.dart'; // Importing the delivery map widget.
 import 'package:cateredtoyou/views/delivery/widgets/delivery_map_controller.dart'; // Importing the delivery map controller.
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
@@ -278,23 +279,22 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          'https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}', // URL for reverse geocoding.
+          'https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}',
         ),
         headers: {
           'Accept': 'application/json',
-          'User-Agent':
-              'CateredToYou/1.0', // User-Agent header for the request.
+          'User-Agent': 'CateredToYou/1.0',
         },
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body); // Decode JSON response.
-        final address = data['display_name']; // Get address from response.
+        final data = json.decode(response.body);
+        final address = data['display_name'];
         setState(() {
           if (isPickup) {
-            _pickupAddressController.text = address; // Set pickup address.
+            _pickupAddressController.text = address;
           } else {
-            _deliveryAddressController.text = address; // Set delivery address.
+            _deliveryAddressController.text = address;
           }
         });
       }
@@ -1243,12 +1243,19 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
         final data = eventDoc.data()!;
         final startDate = (data['startDate'] as Timestamp).toDate();
         final endDate = (data['endDate'] as Timestamp).toDate();
+        final location = data['location'] as String?;
 
         setState(() {
           _selectedEventId = value;
           _selectedEventName = data['name'];
           _eventStartDate = startDate;
           _eventEndDate = endDate;
+
+          if (location != null && location.isNotEmpty) {
+            _deliveryAddressController.text = location;
+            // this triggers a search to get the coordinates of this address for the map
+            _searchLocationFromEventAddress(location);
+          }
 
           // Reset time selections when event changes
           _startTime = null;
@@ -1280,6 +1287,42 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _searchLocationFromEventAddress(String address) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(address)}&limit=1&countrycodes=us',
+        ),
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'CateredToYou/1.0',
+        },
+      );
+      if (response.statusCode == 200) {
+        final results = json.decode(response.body) as List;
+        if (results.isNotEmpty) {
+          final result = results.first;
+          final latlng = LatLng(
+            double.parse(result['lat']),
+            double.parse(result['lon']),
+          );
+
+          setState(() {
+            _deliveryLocation = latlng;
+          });
+
+          _updateMapMarkersAndPolylines();
+          if (_pickupLocation != null && _deliveryLocation != null) {
+            await _getRouteDetails();
+            _updateMapBounds();
+          }
+        }
+      }
+    } catch (e) {
+      _handleError("Error getting coordinates for event location", e);
     }
   }
 

@@ -1,113 +1,106 @@
-import 'package:cateredtoyou/models/customer_model.dart'; // Importing the customer model.
+import 'package:cateredtoyou/models/customer_model.dart';
+import 'package:cateredtoyou/utils/auto_complete.dart';
 import 'package:cateredtoyou/widgets/event_metadata_selection.dart';
-import 'package:cateredtoyou/widgets/staff_assignment.dart'; // Importing the staff assignment widget.
-import 'package:cloud_firestore/cloud_firestore.dart'; // Importing Firestore for database operations.
-import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
-import 'package:provider/provider.dart'; // Importing Provider for state management.
-import 'package:go_router/go_router.dart'; // Importing GoRouter for navigation.
-import 'package:intl/intl.dart'; // Importing intl for date formatting.
-import 'package:cateredtoyou/models/event_model.dart'; // Importing the event model.
-import 'package:cateredtoyou/services/event_service.dart'; // Importing the event service for CRUD operations.
-import 'package:cateredtoyou/widgets/custom_button.dart'; // Importing custom button widget.
-import 'package:cateredtoyou/widgets/custom_text_field.dart'; // Importing custom text field widget.
-import 'package:cateredtoyou/widgets/customer_selector.dart'; // Importing customer selector widget.
-import 'package:cateredtoyou/widgets/event_menu_selection.dart'; // Importing event menu selection widget.
-import 'package:cateredtoyou/widgets/event_supplies_selection.dart'; // Importing event supplies selection widget.
+import 'package:cateredtoyou/widgets/staff_assignment.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:cateredtoyou/models/event_model.dart';
+import 'package:cateredtoyou/services/event_service.dart';
+import 'package:cateredtoyou/widgets/custom_button.dart';
+import 'package:cateredtoyou/widgets/custom_text_field.dart';
+import 'package:cateredtoyou/widgets/customer_selector.dart';
+import 'package:cateredtoyou/widgets/event_menu_selection.dart';
+import 'package:cateredtoyou/widgets/event_supplies_selection.dart';
 import 'package:cateredtoyou/widgets/add_customer_dialog.dart';
 
 class EventEditScreen extends StatefulWidget {
-  final Event? event; // Event object to edit, if null, a new event is created.
+  final Event? event;
 
   const EventEditScreen({
-    super.key, // Key for the widget.
-    this.event, // Optional event parameter.
+    super.key,
+    this.event,
   });
 
   @override
-  State<EventEditScreen> createState() =>
-      _EventEditScreenState(); // Creating the state for the widget.
+  State<EventEditScreen> createState() => _EventEditScreenState();
 }
 
 class _EventEditScreenState extends State<EventEditScreen> {
-  final _formKey = GlobalKey<FormState>(); // Key for the form.
-  final _nameController =
-      TextEditingController(); // Controller for the event name.
-  final _descriptionController =
-      TextEditingController(); // Controller for the event description.
-  final _locationController =
-      TextEditingController(); // Controller for the event location.
-  final _guestCountController =
-      TextEditingController(); // Controller for the guest count.
-  final _minStaffController =
-      TextEditingController(); // Controller for the minimum staff required.
-  final _notesController =
-      TextEditingController(); // Controller for additional notes.
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _guestCountController = TextEditingController();
+  final _minStaffController = TextEditingController();
+  final _notesController = TextEditingController();
+  LatLng? _eventLocation;
 
-  String? _selectedCustomerId; // Selected customer ID.
-  List<EventMenuItem> _selectedMenuItems = []; // List of selected menu items.
-  List<EventSupply> _selectedSupplies = []; // List of selected supplies.
-  List<AssignedStaff> _assignedStaff = []; // List of assigned staff.
+  // Page controller for multi-step form
+  late PageController _pageController;
+  int _currentPage = 0;
 
-  late DateTime _startDate; // Start date of the event.
-  late DateTime _endDate; // End date of the event.
-  late TimeOfDay _startTime; // Start time of the event.
-  late TimeOfDay _endTime; // End time of the event.
-  bool _isLoading = false; // Loading state for the form submission.
-  String? _error; // Error message for form submission.
-  double _totalPrice = 0.0; // Total price of the event.
-  EventMetadata? _metadata; // Metadata for the event.
+  // Form data
+  String? _selectedCustomerId;
+  List<EventMenuItem> _selectedMenuItems = [];
+  List<EventSupply> _selectedSupplies = [];
+  List<AssignedStaff> _assignedStaff = [];
+  late DateTime _startDate;
+  late DateTime _endDate;
+  late TimeOfDay _startTime;
+  late TimeOfDay _endTime;
+  bool _isLoading = false;
+  String? _error;
+  double _totalPrice = 0.0;
+  EventMetadata? _metadata;
 
   @override
   void initState() {
     super.initState();
-    final event = widget.event; // Getting the event from the widget.
+    _pageController = PageController(initialPage: 0);
+
+    final event = widget.event;
     if (event != null) {
-      _nameController.text = event.name; // Setting the event name.
-      _descriptionController.text =
-          event.description; // Setting the event description.
-      _locationController.text = event.location; // Setting the event location.
-      _guestCountController.text =
-          event.guestCount.toString(); // Setting the guest count.
-      _minStaffController.text =
-          event.minStaff.toString(); // Setting the minimum staff required.
-      _notesController.text = event.notes; // Setting the additional notes.
-      _startDate = event.startDate; // Setting the start date.
-      _endDate = event.endDate; // Setting the end date.
-      _startTime =
-          TimeOfDay.fromDateTime(event.startTime); // Setting the start time.
-      _endTime = TimeOfDay.fromDateTime(event.endTime); // Setting the end time.
-      _selectedCustomerId =
-          event.customerId; // Setting the selected customer ID.
-      _selectedMenuItems =
-          List.from(event.menuItems); // Setting the selected menu items.
-      _selectedSupplies =
-          List.from(event.supplies); // Setting the selected supplies.
-      _totalPrice = event.totalPrice; // Setting the total price.
-      _assignedStaff =
-          List.from(event.assignedStaff); // Setting the assigned staff.
-      _metadata = event.metadata != null // Setting the metadata.
+      _nameController.text = event.name;
+      _descriptionController.text = event.description;
+      _locationController.text = event.location;
+      _guestCountController.text = event.guestCount.toString();
+      _minStaffController.text = event.minStaff.toString();
+      _notesController.text = event.notes;
+      _startDate = event.startDate;
+      _endDate = event.endDate;
+      _startTime = TimeOfDay.fromDateTime(event.startTime);
+      _endTime = TimeOfDay.fromDateTime(event.endTime);
+      _selectedCustomerId = event.customerId;
+      _selectedMenuItems = List.from(event.menuItems);
+      _selectedSupplies = List.from(event.supplies);
+      _totalPrice = event.totalPrice;
+      _assignedStaff = List.from(event.assignedStaff);
+      _metadata = event.metadata != null
           ? EventMetadata.fromMap(event.metadata!)
           : null;
     } else {
-      _startDate =
-          DateTime.now().add(const Duration(days: 1)); // Default start date.
-      _endDate =
-          DateTime.now().add(const Duration(days: 1)); // Default end date.
-      _startTime = const TimeOfDay(hour: 9, minute: 0); // Default start time.
-      _endTime = const TimeOfDay(hour: 17, minute: 0); // Default end time.
+      _startDate = DateTime.now().add(const Duration(days: 1));
+      _endDate = DateTime.now().add(const Duration(days: 1));
+      _startTime = const TimeOfDay(hour: 9, minute: 0);
+      _endTime = const TimeOfDay(hour: 17, minute: 0);
     }
 
-    _updateTotalPrice(); // Updating the total price.
+    _updateTotalPrice();
   }
 
   @override
   void dispose() {
-    _nameController.dispose(); // Disposing the name controller.
-    _descriptionController.dispose(); // Disposing the description controller.
-    _locationController.dispose(); // Disposing the location controller.
-    _guestCountController.dispose(); // Disposing the guest count controller.
-    _minStaffController.dispose(); // Disposing the minimum staff controller.
-    _notesController.dispose(); // Disposing the notes controller.
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _locationController.dispose();
+    _guestCountController.dispose();
+    _minStaffController.dispose();
+    _notesController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -115,25 +108,20 @@ class _EventEditScreenState extends State<EventEditScreen> {
     // Calculate menu items total
     final menuTotal = _selectedMenuItems.fold(
       0.0,
-      (total, item) =>
-          total +
-          (item.price *
-              item.quantity), // Calculating the total price of menu items.
+      (total, item) => total + (item.price * item.quantity),
     );
 
     // Calculate supplies total
     double suppliesTotal = 0.0;
     for (final supply in _selectedSupplies) {
-      final price = await _getInventoryItemPrice(
-          supply.inventoryId); // Getting the price of each supply item.
+      final price = await _getInventoryItemPrice(supply.inventoryId);
       if (price != null) {
-        suppliesTotal +=
-            price * supply.quantity; // Calculating the total price of supplies.
+        suppliesTotal += price * supply.quantity;
       }
     }
 
     setState(() {
-      _totalPrice = menuTotal + suppliesTotal; // Setting the total price.
+      _totalPrice = menuTotal + suppliesTotal;
     });
   }
 
@@ -142,14 +130,14 @@ class _EventEditScreenState extends State<EventEditScreen> {
       final doc = await FirebaseFirestore.instance
           .collection('inventory')
           .doc(inventoryId)
-          .get(); // Fetching the inventory item price from Firestore.
+          .get();
       if (doc.exists) {
         final data = doc.data();
-        return data?['costPerUnit'] as double?; // Returning the cost per unit.
+        return data?['costPerUnit'] as double?;
       }
       return null;
     } catch (e) {
-      debugPrint('Error fetching inventory price: $e'); // Logging the error.
+      debugPrint('Error fetching inventory price: $e');
       return null;
     }
   }
@@ -157,13 +145,12 @@ class _EventEditScreenState extends State<EventEditScreen> {
   Future<void> _showAddCustomerDialog() async {
     final customer = await showDialog<CustomerModel>(
       context: context,
-      builder: (context) =>
-          const AddCustomerDialog(), // Showing the add customer dialog.
+      builder: (context) => const AddCustomerDialog(),
     );
 
     if (customer != null) {
       setState(() {
-        _selectedCustomerId = customer.id; // Setting the selected customer ID.
+        _selectedCustomerId = customer.id;
       });
     }
   }
@@ -171,24 +158,20 @@ class _EventEditScreenState extends State<EventEditScreen> {
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: isStartDate
-          ? _startDate
-          : _endDate, // Initial date for the date picker.
-      firstDate: DateTime.now(), // First selectable date.
-      lastDate: DateTime.now()
-          .add(const Duration(days: 365)), // Last selectable date.
+      initialDate: isStartDate ? _startDate : _endDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
     );
 
     if (picked != null) {
       setState(() {
         if (isStartDate) {
-          _startDate = picked; // Setting the start date.
+          _startDate = picked;
           if (_endDate.isBefore(_startDate)) {
-            _endDate =
-                _startDate; // Ensuring the end date is not before the start date.
+            _endDate = _startDate;
           }
         } else {
-          _endDate = picked; // Setting the end date.
+          _endDate = picked;
         }
       });
     }
@@ -197,41 +180,37 @@ class _EventEditScreenState extends State<EventEditScreen> {
   Future<void> _selectTime(BuildContext context, bool isStartTime) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
-      initialTime: isStartTime
-          ? _startTime
-          : _endTime, // Initial time for the time picker.
+      initialTime: isStartTime ? _startTime : _endTime,
     );
 
     if (picked != null) {
       setState(() {
         if (isStartTime) {
-          _startTime = picked; // Setting the start time.
+          _startTime = picked;
         } else {
-          _endTime = picked; // Setting the end time.
+          _endTime = picked;
         }
       });
     }
   }
 
   Future<void> _handleSubmit() async {
-    if (!_formKey.currentState!.validate()) return; // Validating the form.
+    if (!_formKey.currentState!.validate()) return;
 
     if (_selectedCustomerId == null) {
       setState(() {
-        _error =
-            'Please select a customer'; // Setting the error message if no customer is selected.
+        _error = 'Please select a customer';
       });
       return;
     }
 
     setState(() {
-      _isLoading = true; // Setting the loading state.
-      _error = null; // Clearing the error message.
+      _isLoading = true;
+      _error = null;
     });
 
     try {
-      final eventService =
-          context.read<EventService>(); // Getting the event service.
+      final eventService = context.read<EventService>();
 
       final startDateTime = DateTime(
         _startDate.year,
@@ -239,7 +218,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
         _startDate.day,
         _startTime.hour,
         _startTime.minute,
-      ); // Combining the start date and time.
+      );
 
       final endDateTime = DateTime(
         _endDate.year,
@@ -247,7 +226,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
         _endDate.day,
         _endTime.hour,
         _endTime.minute,
-      ); // Combining the end date and time.
+      );
 
       // Create or update event
       String eventId;
@@ -269,10 +248,10 @@ class _EventEditScreenState extends State<EventEditScreen> {
           assignedStaff: _assignedStaff,
           metadata: _metadata,
         );
-        eventId = createdEvent.id; // Store the ID of the newly created event
+        eventId = createdEvent.id;
       } else {
         final updatedEvent = widget.event!.copyWith(
-          name: _nameController.text.trim(), // Updating the existing event.
+          name: _nameController.text.trim(),
           description: _descriptionController.text.trim(),
           startDate: _startDate,
           endDate: _endDate,
@@ -291,7 +270,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
         );
 
         await eventService.updateEvent(updatedEvent);
-        eventId = widget.event!.id; // Use the ID of the existing event
+        eventId = widget.event!.id;
       }
 
       if (mounted) {
@@ -299,457 +278,643 @@ class _EventEditScreenState extends State<EventEditScreen> {
           SnackBar(
             content: Text(
               widget.event == null
-                  ? 'Event created successfully' // Showing success message for event creation.
-                  : 'Event updated successfully', // Showing success message for event update.
+                  ? 'Event created successfully'
+                  : 'Event updated successfully',
             ),
           ),
         );
-        context.go('/events'); // Navigating to the events page.
+        context.go('/events');
       }
     } catch (e) {
       setState(() {
-        _error = e.toString(); // Setting the error message.
+        _error = e.toString();
       });
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false; // Clearing the loading state.
+          _isLoading = false;
         });
       }
     }
   }
 
+  bool _validateCurrentPage() {
+    // Different validation for each page
+    switch (_currentPage) {
+      case 0:
+        // Basic event details & customer selection validation
+        if (_nameController.text.isEmpty ||
+            _descriptionController.text.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please fill in all required fields')),
+          );
+          return false;
+        }
+        if (_selectedCustomerId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please select a customer')),
+          );
+          return false;
+        }
+        return true;
+
+      case 1:
+        // Date, time, and venue info validation
+        if (_locationController.text.isEmpty ||
+            _guestCountController.text.isEmpty ||
+            _minStaffController.text.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please fill in all required fields')),
+          );
+          return false;
+        }
+
+        // Check if guest count is valid
+        try {
+          final guestCount = int.parse(_guestCountController.text);
+          if (guestCount < 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Guest count must be a positive number')),
+            );
+            return false;
+          }
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Guest count must be a valid number')),
+          );
+          return false;
+        }
+
+        // Check if min staff is valid
+        try {
+          final minStaff = int.parse(_minStaffController.text);
+          if (minStaff < 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Minimum staff must be a positive number')),
+            );
+            return false;
+          }
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Minimum staff must be a valid number')),
+          );
+          return false;
+        }
+
+        return true;
+
+      case 2:
+        // No specific validation for the third page
+        return true;
+
+      default:
+        return true;
+    }
+  }
+
+  Widget _buildNavButtons() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Previous button with explicit sizing constraints
+          SizedBox(
+            width: 120, // Fixed width to prevent layout issues
+            child: _currentPage > 0
+                ? ElevatedButton(
+                    onPressed: () {
+                      _pageController.previousPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                    child: const Text('Previous'),
+                  )
+                : const SizedBox(), // Empty but sized container
+          ),
+
+          // Next/Submit button with explicit sizing constraints
+          SizedBox(
+            width: 120, // Fixed width to prevent layout issues
+            child: ElevatedButton(
+              onPressed: _isLoading
+                  ? null
+                  : () {
+                      if (_currentPage < 2) {
+                        if (_validateCurrentPage()) {
+                          _pageController.nextPage(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        }
+                      } else {
+                        _handleSubmit();
+                      }
+                    },
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.0),
+                    )
+                  : Text(
+                      _currentPage < 2
+                          ? 'Next'
+                          : (widget.event == null
+                              ? 'Create Event'
+                              : 'Update Event'),
+                      style: _currentPage == 2
+                          ? const TextStyle(
+                              fontSize: 13) // Smaller font size for longer text
+                          : null, // Default size for "Next"
+                      textAlign: TextAlign.center,
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // First page: Basic event details and customer
+  Widget _buildPage1() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Event Details',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: _nameController,
+                    label: 'Event Name',
+                    prefixIcon: Icons.event,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter an event name';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: _descriptionController,
+                    label: 'Description',
+                    prefixIcon: Icons.description,
+                    maxLines: 3,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a description';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Customer Information',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 16),
+                  CustomerSelector(
+                    selectedCustomerId: _selectedCustomerId,
+                    onCustomerSelected: (customerId) {
+                      setState(() {
+                        _selectedCustomerId = customerId;
+                      });
+                    },
+                    onAddNewCustomer: _showAddCustomerDialog,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Second page: Date, time, venue
+  Widget _buildPage2() {
+    final dateFormat = DateFormat('MMM d, y');
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Date & Time',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ListTile(
+                          title: const Text('Start Date'),
+                          subtitle: Text(dateFormat.format(_startDate)),
+                          leading: const Icon(Icons.calendar_today),
+                          onTap: () => _selectDate(context, true),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListTile(
+                          title: const Text('End Date'),
+                          subtitle: Text(dateFormat.format(_endDate)),
+                          leading: const Icon(Icons.calendar_today),
+                          onTap: () => _selectDate(context, false),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ListTile(
+                          title: const Text('Start Time'),
+                          subtitle: Text(_startTime.format(context)),
+                          leading: const Icon(Icons.access_time),
+                          onTap: () => _selectTime(context, true),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListTile(
+                          title: const Text('End Time'),
+                          subtitle: Text(_endTime.format(context)),
+                          leading: const Icon(Icons.access_time),
+                          onTap: () => _selectTime(context, false),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Venue & Attendance',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 16),
+                  AddressAutoComplete(
+                      controller: _locationController,
+                      label: 'Event Location',
+                      hint: 'Enter event venue address',
+                      isPickup: false,
+                      onLocationSelected: (location) {
+                        setState(() {
+                          _eventLocation = location;
+                        });
+                      }),
+                  // CustomTextField(
+                  //   controller: _locationController,
+                  //   label: 'Location',
+                  //   prefixIcon: Icons.location_on,
+                  //   validator: (value) {
+                  //     if (value == null || value.isEmpty) {
+                  //       return 'Please enter a location';
+                  //     }
+                  //     return null;
+                  //   },
+                  // ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CustomTextField(
+                          controller: _guestCountController,
+                          label: 'Guest Count',
+                          prefixIcon: Icons.people,
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Required';
+                            }
+                            final number = int.tryParse(value);
+                            if (number == null) {
+                              return 'Invalid number';
+                            }
+                            if (number < 0) {
+                              return 'Must be >= 0';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: CustomTextField(
+                          controller: _minStaffController,
+                          label: 'Min. Staff',
+                          prefixIcon: Icons.person_outline,
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Required';
+                            }
+                            final number = int.tryParse(value);
+                            if (number == null) {
+                              return 'Invalid number';
+                            }
+                            if (number < 0) {
+                              return 'Must be >= 0';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Third page: Menu, supplies, staff, additional details
+  Widget _buildPage3() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Menu & Supplies',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      Text(
+                        'Total: \$${_totalPrice.toStringAsFixed(2)}',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  EventMenuSelection(
+                    selectedItems: _selectedMenuItems,
+                    onItemsChanged: (items) {
+                      setState(() {
+                        _selectedMenuItems = items;
+                        _updateTotalPrice();
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  EventSuppliesSelection(
+                    selectedSupplies: _selectedSupplies,
+                    onSuppliesChanged: (supplies) {
+                      setState(() {
+                        _selectedSupplies = supplies;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: StaffAssignmentWidget(
+                assignedStaff: _assignedStaff,
+                minStaff: int.tryParse(_minStaffController.text) ?? 0,
+                onStaffAssigned: (List<AssignedStaff> newStaff) {
+                  setState(() {
+                    _assignedStaff = newStaff;
+                  });
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Additional Notes',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: _notesController,
+                    label: 'Notes (Optional)',
+                    prefixIcon: Icons.note,
+                    maxLines: 3,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: EventMetadataSection(
+                initialMetadata: _metadata,
+                onMetadataChanged: (metadata) {
+                  setState(() {
+                    _metadata = metadata;
+                  });
+                },
+              ),
+            ),
+          ),
+          if (_error != null)
+            Card(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final dateFormat =
-        DateFormat('MMM d, y'); // Date format for displaying dates.
-    final isEditing =
-        widget.event != null; // Checking if the screen is in edit mode.
+    final isEditing = widget.event != null;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditing
-            ? 'Edit Event'
-            : 'Create Event'), // Setting the app bar title.
+        title: Text(isEditing ? 'Edit Event' : 'Create Event'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0), // Padding for the form.
+      body: SafeArea(
         child: Form(
-          key: _formKey, // Key for the form.
+          key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0), // Padding for the card.
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Event Details',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge, // Styling the text.
-                      ),
-                      const SizedBox(height: 16), // Spacing between elements.
-                      CustomTextField(
-                        controller:
-                            _nameController, // Controller for the event name.
-                        label: 'Event Name',
-                        prefixIcon: Icons.event,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter an event name'; // Validation for the event name.
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16), // Spacing between elements.
-                      CustomTextField(
-                        controller:
-                            _descriptionController, // Controller for the event description.
-                        label: 'Description',
-                        prefixIcon: Icons.description,
-                        maxLines: 3,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter a description'; // Validation for the event description.
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
-                  ),
+              // Progress indicator
+              LinearProgressIndicator(
+                value: (_currentPage + 1) / 3,
+                backgroundColor: Colors.grey[300],
+                valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).primaryColor),
+              ),
+
+              // Step indicator
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildStepIndicator(0, 'Basics'),
+                    _buildStepConnector(_currentPage >= 1),
+                    _buildStepIndicator(1, 'Venue'),
+                    _buildStepConnector(_currentPage >= 2),
+                    _buildStepIndicator(2, 'Details'),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16), // Spacing between elements.
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0), // Padding for the card.
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Customer Information',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge, // Styling the text.
-                      ),
-                      const SizedBox(height: 16), // Spacing between elements.
-                      CustomerSelector(
-                        selectedCustomerId:
-                            _selectedCustomerId, // Selected customer ID.
-                        onCustomerSelected: (customerId) {
-                          setState(() {
-                            _selectedCustomerId =
-                                customerId; // Setting the selected customer ID.
-                          });
-                        },
-                        onAddNewCustomer:
-                            _showAddCustomerDialog, // Showing the add customer dialog.
-                      ),
-                    ],
-                  ),
+
+              // Form pages
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (int page) {
+                    setState(() {
+                      _currentPage = page;
+                    });
+                  },
+                  children: [
+                    _buildPage1(),
+                    _buildPage2(),
+                    _buildPage3(),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16), // Spacing between elements.
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0), // Padding for the card.
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Date & Time',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge, // Styling the text.
-                      ),
-                      const SizedBox(height: 16), // Spacing between elements.
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ListTile(
-                              title: const Text('Start Date'),
-                              subtitle: Text(dateFormat.format(
-                                  _startDate)), // Displaying the start date.
-                              leading: const Icon(Icons.calendar_today),
-                              onTap: () => _selectDate(
-                                  context, true), // Selecting the start date.
-                            ),
-                          ),
-                          Expanded(
-                            child: ListTile(
-                              title: const Text('End Date'),
-                              subtitle: Text(dateFormat.format(
-                                  _endDate)), // Displaying the end date.
-                              leading: const Icon(Icons.calendar_today),
-                              onTap: () => _selectDate(
-                                  context, false), // Selecting the end date.
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ListTile(
-                              title: const Text('Start Time'),
-                              subtitle: Text(_startTime.format(
-                                  context)), // Displaying the start time.
-                              leading: const Icon(Icons.access_time),
-                              onTap: () => _selectTime(
-                                  context, true), // Selecting the start time.
-                            ),
-                          ),
-                          Expanded(
-                            child: ListTile(
-                              title: const Text('End Time'),
-                              subtitle: Text(_endTime
-                                  .format(context)), // Displaying the end time.
-                              leading: const Icon(Icons.access_time),
-                              onTap: () => _selectTime(
-                                  context, false), // Selecting the end time.
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16), // Spacing between elements.
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0), // Padding for the card.
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Venue & Attendance',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge, // Styling the text.
-                      ),
-                      const SizedBox(height: 16), // Spacing between elements.
-                      CustomTextField(
-                        controller:
-                            _locationController, // Controller for the event location.
-                        label: 'Location',
-                        prefixIcon: Icons.location_on,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter a location'; // Validation for the event location.
-                          }
-                          return null;
-                        },
-                      ),
 
-                      /// A SizedBox widget to add vertical spacing of 16 pixels.
-                      const SizedBox(height: 16),
-
-                      /// A Row widget containing two Expanded widgets for input fields.
-                      Row(
-                        children: [
-                          /// An Expanded widget containing a CustomTextField for guest count input.
-                          Expanded(
-                            child: CustomTextField(
-                              controller: _guestCountController,
-                              label: 'Guest Count',
-                              prefixIcon: Icons.people,
-                              keyboardType: TextInputType.number,
-                              validator: (value) {
-                                /// Validator to check if the guest count input is valid.
-                                if (value == null || value.isEmpty) {
-                                  return 'Required';
-                                }
-                                final number = int.tryParse(value);
-                                if (number == null) {
-                                  return 'Invalid number';
-                                }
-                                if (number < 0) {
-                                  return 'Must be >= 0';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-
-                          /// A SizedBox widget to add horizontal spacing of 16 pixels.
-                          const SizedBox(width: 16),
-
-                          /// An Expanded widget containing a CustomTextField for minimum staff input.
-                          Expanded(
-                            child: CustomTextField(
-                              controller: _minStaffController,
-                              label: 'Min. Staff',
-                              prefixIcon: Icons.person_outline,
-                              keyboardType: TextInputType.number,
-                              validator: (value) {
-                                /// Validator to check if the minimum staff input is valid.
-                                if (value == null || value.isEmpty) {
-                                  return 'Required';
-                                }
-                                final number = int.tryParse(value);
-                                if (number == null) {
-                                  return 'Invalid number';
-                                }
-                                if (number < 0) {
-                                  return 'Must be >= 0';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      /// A SizedBox widget to add vertical spacing of 16 pixels.
-                      const SizedBox(height: 16),
-
-                      /// A Card widget to display menu and supplies information.
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              /// A Row widget to display the title and total price.
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Menu & Supplies',
-                                    style:
-                                        Theme.of(context).textTheme.titleLarge,
-                                  ),
-                                  Text(
-                                    'Total: \$${_totalPrice.toStringAsFixed(2)}',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                ],
-                              ),
-
-                              /// A SizedBox widget to add vertical spacing of 24 pixels.
-                              const SizedBox(height: 24),
-
-                              /// A widget for selecting menu items.
-                              EventMenuSelection(
-                                selectedItems: _selectedMenuItems,
-                                onItemsChanged: (items) {
-                                  setState(() {
-                                    _selectedMenuItems = items;
-                                    _updateTotalPrice();
-                                  });
-                                },
-                              ),
-
-                              /// A SizedBox widget to add vertical spacing of 24 pixels.
-                              const SizedBox(height: 24),
-
-                              /// A widget for selecting supplies.
-                              EventSuppliesSelection(
-                                selectedSupplies: _selectedSupplies,
-                                onSuppliesChanged: (supplies) {
-                                  setState(() {
-                                    _selectedSupplies = supplies;
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      /// A SizedBox widget to add vertical spacing of 16 pixels.
-                      const SizedBox(height: 16),
-
-                      /// A Card widget to display staff assignment information.
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: StaffAssignmentWidget(
-                            assignedStaff: _assignedStaff,
-                            minStaff:
-                                int.tryParse(_minStaffController.text) ?? 0,
-                            onStaffAssigned: (List<AssignedStaff> newStaff) {
-                              setState(() {
-                                _assignedStaff =
-                                    newStaff; // No need for cast since types match
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-
-                      /// A SizedBox widget to add vertical spacing of 16 pixels.
-                      const SizedBox(height: 16),
-
-                      /// A Card widget to display additional notes input field.
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Additional Notes',
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-
-                              /// A SizedBox widget to add vertical spacing of 16 pixels.
-                              const SizedBox(height: 16),
-
-                              /// A CustomTextField for additional notes input.
-                              CustomTextField(
-                                controller: _notesController,
-                                label: 'Notes (Optional)',
-                                prefixIcon: Icons.note,
-                                maxLines: 3,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      /// A SizedBox widget to add vertical spacing of 24 pixels.
-                      const SizedBox(height: 24),
-
-                      /// A conditional Card widget to display error messages if any.
-                      if (_error != null)
-                        Card(
-                          color: Theme.of(context).colorScheme.errorContainer,
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.error_outline,
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-
-                                /// A SizedBox widget to add horizontal spacing of 16 pixels.
-                                const SizedBox(width: 16),
-
-                                /// A Text widget to display the error message.
-                                Expanded(
-                                  child: Text(
-                                    _error!,
-                                    style: TextStyle(
-                                      color:
-                                          Theme.of(context).colorScheme.error,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                      /// A SizedBox widget to add vertical spacing of 24 pixels.
-                      const SizedBox(height: 24),
-
-                      EventMetadataSection(
-                        // EventMetadataSection widget to display event metadata.
-                        initialMetadata: _metadata, // Initial metadata.
-                        onMetadataChanged: (metadata) {
-                          // Callback to update the metadata.
-                          setState(() {
-                            // Updating the state.
-                            _metadata = metadata; // Setting the metadata.
-                          });
-                        },
-                      ),
-                      const SizedBox(
-                          height:
-                              24), // A SizedBox widget to add vertical spacing of 24 pixels.
-
-                      /// A CustomButton widget to submit the form.
-                      CustomButton(
-                        label: isEditing ? 'Update Event' : 'Create Event',
-                        onPressed: _isLoading ? null : _handleSubmit,
-                        isLoading: _isLoading,
-                      ),
-
-                      /// A SizedBox widget to add vertical spacing of 32 pixels.
-                      const SizedBox(height: 32),
-                    ],
-                  ),
-                ),
-              ),
+              // Navigation buttons
+              _buildNavButtons(),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildStepIndicator(int step, String label) {
+    final isActive = _currentPage >= step;
+    final isCurrentStep = _currentPage == step;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: isActive ? Theme.of(context).primaryColor : Colors.grey[300],
+            borderRadius: BorderRadius.circular(15),
+            border: isCurrentStep
+                ? Border.all(color: Theme.of(context).primaryColor, width: 3)
+                : null,
+          ),
+          child: Center(
+            child: Text(
+              '${step + 1}',
+              style: TextStyle(
+                color: isActive ? Colors.white : Colors.black54,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isCurrentStep ? FontWeight.bold : FontWeight.normal,
+            color:
+                isCurrentStep ? Theme.of(context).primaryColor : Colors.black54,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepConnector(bool isActive) {
+    return Container(
+      width: 30,
+      height: 2,
+      color: isActive ? Theme.of(context).primaryColor : Colors.grey[300],
+      margin: const EdgeInsets.symmetric(horizontal: 4),
     );
   }
 }
