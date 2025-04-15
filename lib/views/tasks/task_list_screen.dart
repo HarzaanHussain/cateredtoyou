@@ -25,6 +25,7 @@ class TaskListScreen extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Tasks'),
           bottom: const TabBar(
+            labelColor: Colors.black,
             isScrollable: true,
             tabs: [
               Tab(text: 'My Tasks'),
