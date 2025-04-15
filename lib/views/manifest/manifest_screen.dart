@@ -56,6 +56,7 @@ class _ManifestScreenState extends State<ManifestScreen> with SingleTickerProvid
           title: const Text('Catering Management'),
           elevation: 2,
           bottom: const TabBar(
+            labelColor: Colors.black,        // <- selected tab text color
             tabs: [
               Tab(text: 'Manifests'),
               Tab(text: 'Vehicles'),
