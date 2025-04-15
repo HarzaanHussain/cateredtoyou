@@ -660,8 +660,10 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen>
           ],
         ),
         bottom: TabBar(
+          labelColor: Colors.black,        // <- selected tab text color
           controller: _tabController,
-          tabs: [
+          tabs:
+          [
             Tab(
               text: isSmallScreen ? 'Items' : 'Items to Load',
               icon: isSmallScreen ? const Icon(Icons.inventory_2) : null,
