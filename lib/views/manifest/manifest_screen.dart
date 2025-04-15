@@ -7,6 +7,8 @@ import 'package:cateredtoyou/views/manifest/manifest_detail_screen.dart';
 import 'package:cateredtoyou/views/manifest/split_view_manifest_screen.dart';
 import 'package:cateredtoyou/views/manifest/widgets/manifest_list_item.dart';
 import 'package:cateredtoyou/views/manifest/widgets/vehicle_overview_tab.dart';
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart'; // Imports bottom toolbar class
+
 
 /// Main screen that displays a list of all manifests
 ///
@@ -52,6 +54,7 @@ class _ManifestScreenState extends State<ManifestScreen> with SingleTickerProvid
     return DefaultTabController(
       length: 3,
       child: Scaffold(
+        bottomNavigationBar: const BottomToolbar(),
         appBar: AppBar(
           title: const Text('Catering Management'),
           elevation: 2,
