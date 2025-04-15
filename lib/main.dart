@@ -103,7 +103,7 @@ class MyApp extends StatelessWidget {
               VehicleService(context.read<OrganizationService>()),
         ),
         // Delivery route service depends on OrganizationService
-         ChangeNotifierProvider(
+        ChangeNotifierProvider(
           create: (context) => DeliveryRouteService(
             context.read<OrganizationService>(),
             context.read<RolePermissions>(),
@@ -116,7 +116,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
 
-        
+
         // Auth model should be last as it might depend on other services
         ChangeNotifierProvider(create: (_) => AuthModel()),
         // task service depends on organization service
@@ -149,9 +149,9 @@ class MyApp extends StatelessWidget {
       child: Builder(
         builder: (context) {
           final authModel =
-              context.watch<AuthModel>(); // Watch AuthModel for changes
+          context.watch<AuthModel>(); // Watch AuthModel for changes
           final appRouter =
-              AppRouter(authModel); // Create AppRouter instance with AuthModel
+          AppRouter(authModel); // Create AppRouter instance with AuthModel
 
           return MaterialApp.router(
             title: 'CateredToYou',
@@ -161,29 +161,29 @@ class MyApp extends StatelessWidget {
               // Define a custom ColorScheme
               colorScheme: const ColorScheme(
                 brightness: Brightness.light,
-                primary: Color(0xFF2C3E50), // Dark navy for sophistication
+                primary: Color(0xFFFFC30B), // honey yellow
                 onPrimary: Colors.white,
-                secondary: Color(0xFFD4AF37), // Elegant gold accent
+                secondary: Color(0xFFFFC30B),
                 onSecondary: Colors.black,
                 error: Colors.red,
                 onError: Colors.white,
-                surface: Color(0xFFFCF8F2), // Warm cream background
+                surface: Color(0xFFFFFFFF), // pure white
                 onSurface: Colors.black87,
               ),
-              scaffoldBackgroundColor: const Color(0xFFFCF8F2),
+              scaffoldBackgroundColor: Colors.white,
               appBarTheme: const AppBarTheme(
-                backgroundColor: Color(0xFF2C3E50),
+                backgroundColor: Color(0xFFFFC30B), // appbar uses honey yellow
                 foregroundColor: Colors.white,
                 elevation: 4,
               ),
               elevatedButtonTheme: ElevatedButtonThemeData(
                 style: ElevatedButton.styleFrom(
                   backgroundColor:
-                      const Color(0xFFD4AF37), // Gold button background
+                  const Color(0xFFFFC30B), // honey yellow button background
                   foregroundColor: Colors.black, // Button text color
                   minimumSize: const Size.fromHeight(48),
                   padding:
-                      const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                  const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.all(Radius.circular(12)),
                   ),
@@ -197,11 +197,11 @@ class MyApp extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: Color(0xFFD4AF37)),
+                  borderSide: const BorderSide(color: Color(0xFFFFC30B)),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               ),
               cardTheme: CardTheme(
                 color: Colors.white,
@@ -224,11 +224,11 @@ class MyApp extends StatelessWidget {
                 ),
                 bodyLarge: const TextStyle(fontSize: 16, color: Colors.black87),
                 bodyMedium:
-                    const TextStyle(fontSize: 14, color: Colors.black54),
+                const TextStyle(fontSize: 14, color: Colors.black54),
               ),
               switchTheme: SwitchThemeData(
                 thumbColor: WidgetStateProperty.resolveWith<Color>(
-                  (states) => Colors.white,
+                      (states) => Colors.white,
                 ),
                 trackColor: WidgetStateProperty.all(const Color(0xFFD4AF37)),
                 overlayColor: WidgetStateProperty.all(const Color(0xFFD4AF37)),
