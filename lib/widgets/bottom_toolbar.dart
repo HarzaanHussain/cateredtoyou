@@ -170,7 +170,16 @@ class _BottomToolbarState extends State<BottomToolbar> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => context.go('/home'),
+          onTap: () {
+            // First pop back to root if there are any routes in stack
+            while (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+            // Then use go_router to navigate to home
+            context.go('/home');
+          },
+          splashColor: Colors.white.withOpacity(0.3),
+          highlightColor: Colors.white.withOpacity(0.1),
           customBorder: const CircleBorder(),
           child: Column(
             mainAxisSize: MainAxisSize.min,
