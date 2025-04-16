@@ -14,10 +14,10 @@ class BottomToolbar extends StatefulWidget {
 class _BottomToolbarState extends State<BottomToolbar> {
   // This can be updated when notification status changes
   bool hasUnreadNotifications = false;
-  
+
   // You might want to add this when you implement the notification feature
   // late final NotificationService _notificationService;
-  
+
   @override
   void initState() {
     super.initState();
@@ -30,7 +30,7 @@ class _BottomToolbarState extends State<BottomToolbar> {
     //   });
     // });
   }
-  
+
   @override
   void dispose() {
     // Clean up any listeners when disposed
@@ -38,7 +38,7 @@ class _BottomToolbarState extends State<BottomToolbar> {
     // _notificationService.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return BottomAppBar(
@@ -57,7 +57,7 @@ class _BottomToolbarState extends State<BottomToolbar> {
               onPressed: () => context.push('/events'),
             ),
           ),
-          
+
           // Calendar button
           _buildNavItem(
             context: context,
@@ -65,10 +65,10 @@ class _BottomToolbarState extends State<BottomToolbar> {
             label: 'Calendar',
             onPressed: () => context.push('/calendar'),
           ),
-          
+
           // Home button (center, elevated)
           _buildHomeButton(context),
-          
+
           // Deliveries button
           PermissionWidget(
             permissionId: 'view_deliveries',
@@ -79,7 +79,7 @@ class _BottomToolbarState extends State<BottomToolbar> {
               onPressed: () => context.push('/driver-deliveries'),
             ),
           ),
-          
+
           // Notifications button
           PermissionWidget(
             permissionId: 'manage_menu',
@@ -87,7 +87,8 @@ class _BottomToolbarState extends State<BottomToolbar> {
               context: context,
               icon: Icons.notifications,
               label: 'Notifications',
-              hasNotification: hasUnreadNotifications, // Using the state variable
+              hasNotification:
+                  hasUnreadNotifications, // Using the state variable
               onPressed: () => context.push('/notifications'),
             ),
           ),
@@ -95,7 +96,7 @@ class _BottomToolbarState extends State<BottomToolbar> {
       ),
     );
   }
-  
+
   // Helper method to build navigation items with icon and text
   Widget _buildNavItem({
     required BuildContext context,
@@ -108,7 +109,8 @@ class _BottomToolbarState extends State<BottomToolbar> {
       onTap: onPressed,
       child: Container(
         width: 60, // Further reduced from 65
-        padding: const EdgeInsets.symmetric(vertical: 4), // Further reduced padding
+        padding:
+            const EdgeInsets.symmetric(vertical: 4), // Further reduced padding
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -147,47 +149,50 @@ class _BottomToolbarState extends State<BottomToolbar> {
       ),
     );
   }
-  
+
   // Special home button with different styling
   Widget _buildHomeButton(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.go('/home'),
-      child: Container(
-        width: 54, // Further reduced from 58
-        height: 54, // Further reduced from 58
-        decoration: BoxDecoration(
-          // color: Theme.of(context).primaryColor,
-          color: Color(0xFFFFC30B),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              spreadRadius: 1,
-              blurRadius: 3,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.home,
-              color: Colors.white,
-              size: 20, // Further reduced from 22
-            ),
-            const SizedBox(height: 1), // Further reduced spacing
-            Text(
-              'Home',
-              style: TextStyle(
+    return Container(
+      width: 54,
+      height: 54,
+      decoration: BoxDecoration(
+        color: Color(0xFFFFC30B),
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.go('/home'),
+          customBorder: const CircleBorder(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.home,
                 color: Colors.white,
-                fontSize: 8, // Further reduced from 9
-                fontWeight: FontWeight.w500,
+                size: 20,
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 1),
+              Text(
+                'Home',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
