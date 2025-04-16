@@ -14,7 +14,7 @@ class UrgentTasksWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final taskService = Provider.of<TaskService>(context);
-    final userId = FirebaseAuth.instance.currentUser!.uid;
+    // We don't need the userId here anymore since we want all urgent tasks
 
     return Card(
       shape: RoundedRectangleBorder(
@@ -40,8 +40,8 @@ class UrgentTasksWidget extends StatelessWidget {
                     Text(
                       'Urgent Tasks',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                   ],
                 ),
@@ -49,7 +49,7 @@ class UrgentTasksWidget extends StatelessWidget {
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const TaskListScreen(), // This constructor exists according to your provided code
+                      builder: (context) => const TaskListScreen(),
                     ),
                   ),
                   child: const Text('View All'),
@@ -58,7 +58,8 @@ class UrgentTasksWidget extends StatelessWidget {
             ),
             const Divider(),
             StreamBuilder<List<Task>>(
-              stream: taskService.getAssignedTasks(userId),
+              // Change this to get all tasks instead of just assigned tasks
+              stream: taskService.getTasks(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
@@ -76,11 +77,11 @@ class UrgentTasksWidget extends StatelessWidget {
 
                 final allTasks = snapshot.data ?? [];
 
-                // Filter and sort urgent tasks
+                // Filter only for urgent tasks, regardless of assignment
                 final urgentTasks = allTasks
                     .where((task) =>
-                task.priority == TaskPriority.urgent &&
-                    task.status != TaskStatus.completed)
+                        task.priority == TaskPriority.urgent &&
+                        task.status != TaskStatus.completed)
                     .toList();
 
                 // Sort by due date (earliest first)
@@ -105,7 +106,8 @@ class UrgentTasksWidget extends StatelessWidget {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: topUrgentTasks.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  separatorBuilder: (context, index) =>
+                      const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final task = topUrgentTasks[index];
                     final isOverdue = task.dueDate.isBefore(DateTime.now());
@@ -151,14 +153,19 @@ class UrgentTasksWidget extends StatelessWidget {
                                       Icon(
                                         Icons.calendar_today,
                                         size: 12,
-                                        color: isOverdue ? Colors.red : Colors.grey,
+                                        color: isOverdue
+                                            ? Colors.red
+                                            : Colors.grey,
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        DateFormat('MMM dd').format(task.dueDate),
+                                        DateFormat('MMM dd')
+                                            .format(task.dueDate),
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: isOverdue ? Colors.red : Colors.grey[600],
+                                          color: isOverdue
+                                              ? Colors.red
+                                              : Colors.grey[600],
                                         ),
                                       ),
                                       const SizedBox(width: 12),
