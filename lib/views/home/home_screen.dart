@@ -88,26 +88,6 @@ class HomeScreen extends StatelessWidget {
                         child: Column(
                           children: [
                             PermissionWidget(
-                              permissionId: 'manage_vehicles',
-                              child: ListTile(
-                                leading: const Icon(Icons.local_shipping),
-                                title: const Text('Fleet Management'),
-                                subtitle: const Text('Manage vehicles and assignments'),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.add),
-                                      onPressed: () => context.push('/add-vehicle'),
-                                    ),
-                                    const Icon(Icons.arrow_forward_ios),
-                                  ],
-                                ),
-                                onTap: () => context.push('/vehicles'),
-                              ),
-                            ),
-                            const Divider(),
-                            PermissionWidget(
                               permissionId: 'manage_deliveries',
                               child: ListTile(
                                 leading: const Icon(Icons.map),
