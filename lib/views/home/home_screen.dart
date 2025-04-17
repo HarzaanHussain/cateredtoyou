@@ -55,7 +55,7 @@ class HomeScreen extends StatelessWidget {
               // Urgent Events Widget
               const UrgentEventsWidget(),
 
-              const SizedBox(height: 24),
+              // const SizedBox(height: 24),
 
               // Urgent Tasks Widget - Added here
               const UrgentTasksWidget(),
