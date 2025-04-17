@@ -90,7 +90,10 @@ class _ManifestListItemState extends State<ManifestListItem> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+
+               // 1) Header: icon + title/date only
+
+                Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Event icon/avatar
@@ -141,26 +144,26 @@ class _ManifestListItemState extends State<ManifestListItem> {
                     ),
                   ),
 
-                  // Loading status chip
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(loadingProgress)
-                          .withAlpha((0.2 * 255).toInt()),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _getStatusText(loadingProgress),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                        color: _getStatusColor(loadingProgress),
-                      ),
+                   ],
+             ), // end header row
+
+                 const SizedBox(height: 8),
+
+                // 2) Status chip relocated under title/date
+                Container(
+                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(loadingProgress).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    _getStatusText(loadingProgress),
+                    style: TextStyle(
+                      color: _getStatusColor(loadingProgress),
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ],
-              ),
+                ),
 
               const SizedBox(height: 12),
 
