@@ -93,6 +93,28 @@ class CustomDrawer extends StatelessWidget {
                   ),
 
                   PermissionWidget(
+                    permissionId: 'manage_vehicles',
+                    child: ListTile(
+                      leading: const Icon(Icons.local_shipping),
+                      title: const Text('Fleet Management'),
+                      subtitle: const Text('Manage vehicles and assignments'),
+                      trailing: const Icon(Icons.arrow_forward_ios),
+                      onTap: () => context.push('/vehicles'),
+                    ),
+                  ),
+
+                  PermissionWidget(
+                    permissionId: 'manage_deliveries',
+                    child: ListTile(
+                      leading: const Icon(Icons.map),
+                      title: const Text('Delivery Routes'),
+                      subtitle: const Text('Manage and track delivery routes'),
+                      trailing: const Icon(Icons.arrow_forward_ios),
+                      onTap: () => context.push('/deliveries'),
+                    ),
+                  ),
+
+                  PermissionWidget(
                     permissionId: 'manage_menu',
                     child: ListTile(
                       leading: const Icon(Icons.restaurant_menu),

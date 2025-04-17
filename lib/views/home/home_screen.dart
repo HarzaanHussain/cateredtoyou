@@ -50,89 +50,11 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
-
-
               // Urgent Events Widget
               const UrgentEventsWidget(),
 
-              // const SizedBox(height: 24),
-
               // Urgent Tasks Widget - Added here
               const UrgentTasksWidget(),
-
-              const SizedBox(height: 24),
-
-              // Vehicle and Delivery Section
-              FutureBuilder<bool>(
-                future: Future.wait([
-                  rolePermissions.hasPermission('manage_vehicles'),
-                  rolePermissions.hasPermission('manage_deliveries')
-                ]).then((permissions) => permissions.any((p) => p)),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData || !snapshot.data!) {
-                    return const SizedBox.shrink();
-                  }
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 24),
-                      Text(
-                        'Vehicles & Deliveries',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Card(
-                        child: Column(
-                          children: [
-                            PermissionWidget(
-                              permissionId: 'manage_vehicles',
-                              child: ListTile(
-                                leading: const Icon(Icons.local_shipping),
-                                title: const Text('Fleet Management'),
-                                subtitle: const Text('Manage vehicles and assignments'),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.add),
-                                      onPressed: () => context.push('/add-vehicle'),
-                                    ),
-                                    const Icon(Icons.arrow_forward_ios),
-                                  ],
-                                ),
-                                onTap: () => context.push('/vehicles'),
-                              ),
-                            ),
-                            const Divider(),
-                            PermissionWidget(
-                              permissionId: 'manage_deliveries',
-                              child: ListTile(
-                                leading: const Icon(Icons.map),
-                                title: const Text('Delivery Routes'),
-                                subtitle: const Text('Manage and track delivery routes'),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.add),
-                                      onPressed: () => context.push('/add-delivery'),
-                                    ),
-                                    const Icon(Icons.arrow_forward_ios),
-                                  ],
-                                ),
-                                onTap: () => context.push('/deliveries'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
             ],
           ),
         ),
