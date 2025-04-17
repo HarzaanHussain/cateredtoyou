@@ -132,6 +132,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
             ),
           ],
           bottom: TabBar(
+            labelColor: Colors.black,
             tabs: const [
               Tab(text: 'Active'),
               Tab(text: 'Upcoming'),
