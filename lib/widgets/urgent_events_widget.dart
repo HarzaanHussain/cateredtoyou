@@ -46,11 +46,7 @@ class UrgentEventsWidget extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            Column(
-              children: urgentEvents
-                  .map((event) => _buildUrgentEventCard(context, event))
-                  .toList(),
-            ),
+            _buildUrgentEventCard(context, urgentEvents.first),
           ],
         );
       },
@@ -72,7 +68,7 @@ class UrgentEventsWidget extends StatelessWidget {
 
     urgent.sort((a, b) => a.startDate.compareTo(b.startDate));
 
-    return urgent.take(3).toList();
+    return urgent.take(1).toList();
   }
 
   Widget _buildUrgentEventCard(BuildContext context, Event event) {
