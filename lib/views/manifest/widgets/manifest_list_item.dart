@@ -75,6 +75,8 @@ class _ManifestListItemState extends State<ManifestListItem> {
     final loadingProgress = widget.manifest.items.isNotEmpty
         ? (loadedItems / widget.manifest.items.length * 100).toInt()
         : 0;
+        // at the top of build(), after you calculate `loadingProgress`:
+    final bool isComplete = loadingProgress == 100;
 
     return Card(
       elevation: 2,
@@ -231,7 +233,8 @@ class _ManifestListItemState extends State<ManifestListItem> {
 
               // Last updated timestamp
                // Bottom centered Load Items button
-              Padding(
+           
+            Padding(
                 padding: const EdgeInsets.only(top: 8.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -239,10 +242,19 @@ class _ManifestListItemState extends State<ManifestListItem> {
                     SizedBox(
                       width: 180,
                       child: ElevatedButton.icon(
-                        icon: const Icon(Icons.local_shipping_outlined, size: 18),
-                        label: const Text('Load Items'),
+                        icon: Icon(
+                          isComplete 
+                            ? Icons.info_outline 
+                            : Icons.local_shipping_outlined,
+                          size: 18,
+                        ),
+                        label: Text(
+                          isComplete ? 'Details' : 'Load Items',
+                        ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
+                          backgroundColor: isComplete 
+                            ? Colors.green 
+                            : const Color(0xFFFFC30B),
                         ),
                         onPressed: widget.onTap,
                       ),
