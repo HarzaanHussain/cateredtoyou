@@ -168,19 +168,11 @@ class _ManifestListItemState extends State<ManifestListItem> {
               const SizedBox(height: 12),
 
               // Loading progress bar
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+             
+               if (loadingProgress > 0 && loadingProgress < 100) ...[
+                  // 1) Progress percentage text + bar
                   Row(
                     children: [
-                      Text(
-                        '$loadedItems of ${widget.manifest.items.length} items loaded',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
                       const Spacer(),
                       Text(
                         '$loadingProgress%',
@@ -199,15 +191,13 @@ class _ManifestListItemState extends State<ManifestListItem> {
                       value: loadingProgress / 100,
                       backgroundColor: Colors.grey[200],
                       valueColor: AlwaysStoppedAnimation<Color>(
-                          _getStatusColor(loadingProgress)),
+                        _getStatusColor(loadingProgress),
+                      ),
                       minHeight: 8,
                     ),
                   ),
+                  const SizedBox(height: 16),
                 ],
-              ),
-
-              const SizedBox(height: 16),
-
 
               // Commented out in case we ever want to bring it back 
               // Item stats in a row
@@ -251,7 +241,7 @@ class _ManifestListItemState extends State<ManifestListItem> {
                       child: ElevatedButton.icon(
                         icon:
                             const Icon(Icons.local_shipping_outlined, size: 18),
-                        label: const Text('Manage Loading'),
+                        label: const Text('Load Items'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                         ),
