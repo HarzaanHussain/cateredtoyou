@@ -208,7 +208,10 @@ class _ManifestListItemState extends State<ManifestListItem> {
 
               const SizedBox(height: 16),
 
+
+              // Commented out in case we ever want to bring it back 
               // Item stats in a row
+              /*
               Row(
                 children: [
                   _buildStatIndicator(
@@ -233,7 +236,8 @@ class _ManifestListItemState extends State<ManifestListItem> {
                     unassignedItems > 0 ? Colors.orange : Colors.grey,
                   ),
                 ],
-              ),
+              ), 
+              */
 
               // Last updated timestamp
               Padding(
