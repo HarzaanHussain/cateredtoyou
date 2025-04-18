@@ -45,7 +45,7 @@ class TaskAutomationService {
       }
     }
 
-    await manageManifest(event.id, event.menuItems);
+    await upsertManifest(event.id, event.menuItems);
     await createManifestTasks(event.id, event.startDate);
   } catch (e) {
     debugPrint('Error generating tasks: $e');
@@ -86,7 +86,7 @@ Future<void> _handleEventUpdate(Event newEvent, Event oldEvent, Map<String, Stri
       await _processBatchUpdates(newEvent, oldEvent, staffByRole);
     }
 
-    await manageManifest(newEvent.id, newEvent.menuItems);
+    await upsertManifest(newEvent.id, newEvent.menuItems);
     await createManifestTasks(newEvent.id, newEvent.startDate);
 
     debugPrint('Event update handler completed successfully');
@@ -194,20 +194,19 @@ Future<void> _processBatchUpdates(Event newEvent, Event oldEvent, Map<String, St
   }
 }
 
-  Future<void> manageManifest(String eventId, List<EventMenuItem> selectedMenuItems) async {
+  Future<void> upsertManifest(String eventId, List<EventMenuItem> selectedMenuItems) async {
   try {
     if (eventId.isEmpty) {
-      debugPrint('Error: Empty event ID provided to manageManifest');
+      debugPrint('Error: Empty event ID provided to upsertManifest');
       return;
     }
 
     if (selectedMenuItems.isEmpty) {
-      debugPrint('No menu items provided to manageManifest for event: $eventId');
+      debugPrint('No menu items provided to upsertManifest for event: $eventId');
       // We'll continue anyway to create an empty manifest if needed
     }
 
     final manifestService = ManifestService(_organizationService);
-    debugPrint('Starting manifest management for event: $eventId');
 
     // Check if a manifest already exists for this event
     final exists = await manifestService.doesManifestExist(eventId);
@@ -232,7 +231,7 @@ Future<void> _processBatchUpdates(Event newEvent, Event oldEvent, Map<String, St
       }).toList();
 
       debugPrint('Created ${manifestItems.length} manifest items');
-      
+
       try {
         await manifestService.createManifest(
           eventId: eventId,
@@ -245,10 +244,10 @@ Future<void> _processBatchUpdates(Event newEvent, Event oldEvent, Map<String, St
       }
     } else {
       debugPrint('Existing manifest found. Updating it for event: $eventId');
-      
+
       try {
         final existingManifest = await manifestService.getManifestByEventId(eventId).first;
-        
+
         if (existingManifest == null) {
           debugPrint('Strange - manifest exists but could not be retrieved. Creating new one.');
           // Try to create a new manifest instead
@@ -263,7 +262,7 @@ Future<void> _processBatchUpdates(Event newEvent, Event oldEvent, Map<String, St
               loadingStatus: LoadingStatus.unassigned,
             );
           }).toList();
-          
+
           await manifestService.createManifest(
             eventId: eventId,
             items: newManifestItems,
@@ -271,14 +270,14 @@ Future<void> _processBatchUpdates(Event newEvent, Event oldEvent, Map<String, St
           debugPrint('Created new manifest for event: $eventId');
           return;
         }
-        
+
         // Get current menu item IDs
         final currentMenuItemIds = selectedMenuItems.map((item) => item.menuItemId).toSet();
         debugPrint('Current menu item IDs: $currentMenuItemIds');
 
         // Keep existing items that still exist in the menu
         final updatedItems = <ManifestItem>[];
-        
+
         // Keep existing items that are still in the menu
         for (final item in existingManifest.items) {
           if (currentMenuItemIds.contains(item.menuItemId)) {
