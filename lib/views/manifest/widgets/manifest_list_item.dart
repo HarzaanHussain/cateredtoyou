@@ -230,17 +230,16 @@ class _ManifestListItemState extends State<ManifestListItem> {
               */
 
               // Last updated timestamp
+               // Bottom centered Load Items button
               Padding(
                 padding: const EdgeInsets.only(top: 8.0),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Just one button for managing
                     SizedBox(
-                      width: 180, // Fixed width to prevent constraint issues
+                      width: 180,
                       child: ElevatedButton.icon(
-                        icon:
-                            const Icon(Icons.local_shipping_outlined, size: 18),
+                        icon: const Icon(Icons.local_shipping_outlined, size: 18),
                         label: const Text('Load Items'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
