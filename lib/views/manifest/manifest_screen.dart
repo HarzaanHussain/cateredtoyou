@@ -117,7 +117,7 @@ class _ManifestScreenState extends State<ManifestScreen> with SingleTickerProvid
               },
               icon: const Icon(Icons.add),
               label: const Text('New Manifest'),
-              backgroundColor: Colors.green,
+              backgroundColor: Color(0xFFFFC30B), // button same color as theme
             );
           }
         ),
