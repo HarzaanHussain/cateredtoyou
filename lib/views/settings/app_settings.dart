@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cateredtoyou/services/auth_service.dart';
-import 'package:cateredtoyou/services/theme_manager.dart';
 
 /// App Settings Screen
 /// This screen allows users to configure app-wide preferences
-/// and settings like appearance, notifications, and account details.
+/// and settings like language, notifications, and account details.
 class AppSettingsScreen extends StatefulWidget {
   const AppSettingsScreen({super.key});
 
@@ -18,21 +17,34 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   bool _notificationsEnabled = true;
   bool _soundEnabled = true;
   String _selectedLanguage = 'English';
-  bool _useMetric = true;
   bool _autoCheckUpdates = true;
   bool _dataSync = true;
   
-  // List of available languages
+  // List of available languages (limited to English and Spanish)
   final List<String> _languages = [
     'English',
     'Spanish',
   ];
 
+  // Password change related state
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _currentPasswordController = TextEditingController();
+  final _passwordFormKey = GlobalKey<FormState>();
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  bool _obscureCurrentPassword = true;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _currentPasswordController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Access ThemeManager from the provider
-    final themeManager = Provider.of<ThemeManager>(context);
-    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
@@ -48,17 +60,27 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Appearance section
-          _buildSectionHeader('Appearance'),
-          _buildSwitchTile(
-            'Dark Mode',
-            'Switch between light and dark theme',
-            Icons.dark_mode,
-            // Use the ThemeManager's value for dark mode:
-            themeManager.isDarkMode,
+          // Language section
+          _buildSectionHeader('Language'),
+          _buildDropdownTile(
+            'Language',
+            'Select your preferred language',
+            Icons.language,
+            _selectedLanguage,
+            _languages,
             (value) {
-              // Toggle the theme using the ThemeManager
-              themeManager.toggleTheme(value);
+              if (value != null) {
+                setState(() {
+                  _selectedLanguage = value;
+                });
+                // Here you would implement the actual language change
+                // For example: LocalizationService.changeLocale(value);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Language changed to $value'),
+                  ),
+                );
+              }
             },
           ),
           const Divider(),
@@ -87,35 +109,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
               });
             },
             enabled: _notificationsEnabled,
-          ),
-          const Divider(),
-          
-          // Display & Regional section
-          _buildSectionHeader('Display & Regional'),
-          _buildDropdownTile(
-            'Language',
-            'Select your preferred language',
-            Icons.language,
-            _selectedLanguage,
-            _languages,
-            (value) {
-              if (value != null) {
-                setState(() {
-                  _selectedLanguage = value;
-                });
-              }
-            },
-          ),
-          _buildSwitchTile(
-            'Use Metric System',
-            'Switch between metric and imperial units',
-            Icons.straighten,
-            _useMetric,
-            (value) {
-              setState(() {
-                _useMetric = value;
-              });
-            },
           ),
           const Divider(),
           
@@ -166,56 +159,28 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
               );
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.download, color: Colors.blue),
-            title: const Text('Export Data'),
-            subtitle: const Text('Export your data to a CSV file'),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Data export started'),
-                ),
-              );
-            },
-          ),
           const Divider(),
           
           // Account section
           _buildSectionHeader('Account'),
           Consumer<AuthService>(
             builder: (context, authService, _) {
-              // This would get the actual current user from your auth service
-              const currentUser = "johndoe@comp490.com";
+              // Get the current user from the auth service
+              final currentUser = authService.currentUser;
+              final userEmail = currentUser?.email ?? "Not logged in";
               
               return Column(
                 children: [
                   ListTile(
                     leading: const Icon(Icons.account_circle),
                     title: const Text('Current User'),
-                    subtitle: Text(currentUser),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.edit),
-                    title: const Text('Edit Profile'),
-                    onTap: () {
-                      // Would navigate to profile edit screen
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Profile editing would open here'),
-                        ),
-                      );
-                    },
+                    subtitle: Text(userEmail),
                   ),
                   ListTile(
                     leading: const Icon(Icons.password),
                     title: const Text('Change Password'),
                     onTap: () {
-                      // Would navigate to change password screen
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Password change would open here'),
-                        ),
-                      );
+                      _showChangePasswordDialog(context, authService);
                     },
                   ),
                   ListTile(
@@ -225,13 +190,19 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       _showConfirmDialog(
                         'Logout',
                         'Are you sure you want to logout?',
-                        () {
-                          // Would log out here
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Logging out...'),
-                            ),
-                          );
+                        () async {
+                          try {
+                            await authService.signOut();
+                            // Navigate to login screen after successful logout
+                            Navigator.of(context).pushReplacementNamed('/login');
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error logging out: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
                         },
                       );
                     },
@@ -254,6 +225,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             title: const Text('Terms of Service'),
             onTap: () {
               // Would open terms of service
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Terms of Service would open here'),
+                ),
+              );
             },
           ),
           ListTile(
@@ -261,6 +237,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             title: const Text('Privacy Policy'),
             onTap: () {
               // Would open privacy policy
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Privacy Policy would open here'),
+                ),
+              );
             },
           ),
           const SizedBox(height: 32),
@@ -274,6 +255,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   'Are you sure you want to delete your account? This action cannot be undone.',
                   () {
                     // Would delete account here
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Account deletion would happen here'),
+                      ),
+                    );
                   },
                 );
               },
@@ -282,6 +268,165 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
               ),
               child: const Text('Delete Account'),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Show password change dialog
+  void _showChangePasswordDialog(BuildContext context, AuthService authService) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change Password'),
+        content: Form(
+          key: _passwordFormKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _currentPasswordController,
+                  decoration: InputDecoration(
+                    labelText: 'Current Password',
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureCurrentPassword ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureCurrentPassword = !_obscureCurrentPassword;
+                        });
+                      },
+                    ),
+                  ),
+                  obscureText: _obscureCurrentPassword,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your current password';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _passwordController,
+                  decoration: InputDecoration(
+                    labelText: 'New Password',
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
+                  ),
+                  obscureText: _obscurePassword,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a password';
+                    }
+                    if (value.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _confirmPasswordController,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm New Password',
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureConfirmPassword = !_obscureConfirmPassword;
+                        });
+                      },
+                    ),
+                  ),
+                  obscureText: _obscureConfirmPassword,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please confirm your password';
+                    }
+                    if (value != _passwordController.text) {
+                      return 'Passwords do not match';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Clear the fields
+              _currentPasswordController.clear();
+              _passwordController.clear();
+              _confirmPasswordController.clear();
+            },
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (_passwordFormKey.currentState!.validate()) {
+                try {
+                  // Reauthenticate user with current password first
+                  final user = authService.currentUser;
+                  if (user != null && user.email != null) {
+                    // First sign in with current credentials to verify current password
+                    final result = await authService.signIn(
+                      user.email!,
+                      _currentPasswordController.text,
+                    );
+                    
+                    if (result.success) {
+                      // Now change the password
+                      await user.updatePassword(_passwordController.text);
+                      
+                      Navigator.of(context).pop();
+                      // Clear the fields
+                      _currentPasswordController.clear();
+                      _passwordController.clear();
+                      _confirmPasswordController.clear();
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Password updated successfully'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Current password is incorrect: ${result.error}'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error changing password: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Update Password'),
           ),
         ],
       ),
@@ -387,10 +532,10 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'App Appearance',
+                'Language',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              Text('Change how the app looks including theme settings.'),
+              Text('Change the language of the app.'),
               SizedBox(height: 8),
               Text(
                 'Notifications',
@@ -399,13 +544,25 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
               Text('Control how and when you receive notifications.'),
               SizedBox(height: 8),
               Text(
+                'Data & Sync',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text('Configure data synchronization and update settings.'),
+              SizedBox(height: 8),
+              Text(
                 'Account',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              Text('Manage your account settings, profile, and logout.'),
+              Text('Manage your account settings, password, and logout.'),
             ],
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }
