@@ -1,6 +1,8 @@
+import 'package:cateredtoyou/services/role_permissions.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cateredtoyou/widgets/permission_widget.dart';
+import 'package:provider/provider.dart';
 // You'll likely want to import your notification service
 // import 'package:cateredtoyou/services/notification_service.dart';
 
@@ -14,6 +16,10 @@ class BottomToolbar extends StatefulWidget {
 class _BottomToolbarState extends State<BottomToolbar> {
   // This can be updated when notification status changes
   bool hasUnreadNotifications = false;
+  bool _hasEventPermission = true;
+  bool _hasDeliveryPermission = true;
+  bool _hasNotificationPermission = true;
+  bool _isInitialized = false;
 
   // You might want to add this when you implement the notification feature
   // late final NotificationService _notificationService;
@@ -21,6 +27,7 @@ class _BottomToolbarState extends State<BottomToolbar> {
   @override
   void initState() {
     super.initState();
+    _loadPermissions();
     // Setup notification listeners here later
     // Example:
     // _notificationService = NotificationService();
@@ -39,6 +46,24 @@ class _BottomToolbarState extends State<BottomToolbar> {
     super.dispose();
   }
 
+  Future<void> _loadPermissions() async {
+    if(!mounted) return;
+    final rolePermissions = Provider.of<RolePermissions>(context, listen: false);
+
+    final eventPermission = await rolePermissions.hasPermission("manage_events");
+    final deliveryPermission = await rolePermissions.hasPermission("view_deliveries");
+    final notificationPermission = await rolePermissions.hasPermission("manage_events");
+
+    if(mounted){
+      setState(() {
+        _hasEventPermission = eventPermission;
+        _hasDeliveryPermission = deliveryPermission;
+        _hasNotificationPermission = notificationPermission;
+        _isInitialized = true;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return BottomAppBar(
@@ -48,15 +73,22 @@ class _BottomToolbarState extends State<BottomToolbar> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           // Events button
-          PermissionWidget(
-            permissionId: 'manage_events',
-            child: _buildNavItem(
-              context: context,
-              icon: Icons.event_available,
-              label: 'Events',
+          _hasEventPermission
+            ? _buildNavItem(
+              context: context, 
+              icon: Icons.event_available, 
+              label: 'Events', 
               onPressed: () => context.push('/events'),
+            )
+            : Opacity(
+                opacity: 0.3,
+                child: _buildNavItem(
+                  context: context, 
+                  icon: Icons.event_available, 
+                  label: 'Events', 
+                  onPressed: (){}
+                ),
             ),
-          ),
 
           // Calendar button
           _buildNavItem(
@@ -70,28 +102,40 @@ class _BottomToolbarState extends State<BottomToolbar> {
           _buildHomeButton(context),
 
           // Deliveries button
-          PermissionWidget(
-            permissionId: 'view_deliveries',
-            child: _buildNavItem(
-              context: context,
-              icon: Icons.route,
-              label: 'Deliveries',
+          _hasDeliveryPermission
+            ? _buildNavItem(
+              context: context, 
+              icon: Icons.route, 
+              label: 'Deliveries', 
               onPressed: () => context.push('/driver-deliveries'),
+            )
+            : Opacity(
+                opacity: 0.3,
+                child: _buildNavItem(
+                  context: context, 
+                  icon: Icons.route,
+                  label: 'Deliveries', 
+                  onPressed: (){}
+                ),
             ),
-          ),
 
           // Notifications button
-          PermissionWidget(
-            permissionId: 'manage_menu',
-            child: _buildNavItem(
-              context: context,
-              icon: Icons.notifications,
-              label: 'Notifications',
-              hasNotification:
-                  hasUnreadNotifications, // Using the state variable
+          _hasNotificationPermission
+            ? _buildNavItem(
+              context: context, 
+              icon: Icons.notifications, 
+              label: 'Notifications', 
               onPressed: () => context.push('/notifications'),
+            )
+            : Opacity(
+                opacity: 0.3,
+                child: _buildNavItem(
+                  context: context, 
+                  icon: Icons.notifications, 
+                  label: 'Notifications', 
+                  onPressed: (){}
+                ),
             ),
-          ),
         ],
       ),
     );
