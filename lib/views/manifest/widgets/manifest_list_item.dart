@@ -94,84 +94,84 @@ class _ManifestListItemState extends State<ManifestListItem> {
             children: [
 
                // 1) Header: icon + title/date only
-
-                Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Event icon/avatar
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.green.withAlpha((0.1 * 255).toInt()),
-                      borderRadius: BorderRadius.circular(8),
+                        Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Event icon/avatar
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.green.withAlpha((0.1 * 255).toInt()),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.event, color: Colors.green, size: 28),
                     ),
-                    child: const Icon(
-                      Icons.event,
-                      color: Colors.green,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
+                    const SizedBox(width: 16),
 
-                  // Event details
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _eventName,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        if (_isLoading)
-                          Container(
-                            width: 100,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          )
-                        else
+                    // Event details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            _eventDate,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey[600],
+                            _eventName,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                      ],
+                          const SizedBox(height: 4),
+                          _isLoading
+                              ? Container(
+                                  width: 100,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                )
+                              : Text(
+                                  _eventDate,
+                                  style: theme.textTheme.bodyMedium
+                                      ?.copyWith(color: Colors.grey[600]),
+                                ),
+                        ],
+                      ),
                     ),
-                  ),
 
-                   ],
-             ), // end header row
-
-                 const SizedBox(height: 8),
-
-                // 2) Status chip relocated under title/date
-                Container(
-                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(loadingProgress).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    _getStatusText(loadingProgress),
-                    style: TextStyle(
-                      color: _getStatusColor(loadingProgress),
-                      fontWeight: FontWeight.bold,
+                    // Status Chip back to top-right
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(loadingProgress).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        _getStatusText(loadingProgress),
+                        style: TextStyle(
+                          color: _getStatusColor(loadingProgress),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
 
-              const SizedBox(height: 12),
+
+             const SizedBox(height: 12),
+
+                Text(
+                  '$loadedItems of ${widget.manifest.items.length} items loaded',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                   fontWeight: FontWeight.w600,
+                   color: Colors.grey[800],
+                ),
+               ),
+               const SizedBox(height: 4),
 
               // Loading progress bar
              
-               if (loadingProgress > 0 && loadingProgress < 100) ...[
+               if (loadingProgress <= 100) ...[
                   // 1) Progress percentage text + bar
                   Row(
                     children: [
@@ -200,10 +200,10 @@ class _ManifestListItemState extends State<ManifestListItem> {
                   ),
                   const SizedBox(height: 16),
                 ],
-
-              // Commented out in case we ever want to bring it back 
+        
+             
               // Item stats in a row
-              /*
+              
               Row(
                 children: [
                   _buildStatIndicator(
@@ -229,7 +229,7 @@ class _ManifestListItemState extends State<ManifestListItem> {
                   ),
                 ],
               ), 
-              */
+              
 
               // Last updated timestamp
                // Bottom centered Load Items button
