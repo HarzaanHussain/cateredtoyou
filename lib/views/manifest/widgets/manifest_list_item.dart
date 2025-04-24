@@ -75,8 +75,7 @@ class _ManifestListItemState extends State<ManifestListItem> {
     final loadingProgress = widget.manifest.items.isNotEmpty
         ? (loadedItems / widget.manifest.items.length * 100).toInt()
         : 0;
-        // at the top of build(), after you calculate `loadingProgress`:
-    final bool isComplete = loadingProgress == 100;
+      
 
     return Card(
       elevation: 2,
@@ -138,7 +137,7 @@ class _ManifestListItemState extends State<ManifestListItem> {
                         ],
                       ),
                     ),
-
+                   
                     // Status Chip back to top-right
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -157,24 +156,18 @@ class _ManifestListItemState extends State<ManifestListItem> {
                   ],
                 ),
 
+            const SizedBox(height: 16),
 
-             const SizedBox(height: 12),
-
-                Text(
-                  '$loadedItems of ${widget.manifest.items.length} items loaded',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                   fontWeight: FontWeight.w600,
-                   color: Colors.grey[800],
-                ),
-               ),
-               const SizedBox(height: 4),
-
-              // Loading progress bar
-             
-               if (loadingProgress <= 100) ...[
-                  // 1) Progress percentage text + bar
+                  // single row: items count on left, percentage on right, aligned with the bar below
                   Row(
                     children: [
+                      Text(
+                        '$loadedItems of ${widget.manifest.items.length} items loaded',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[800],
+                        ),
+                      ),
                       const Spacer(),
                       Text(
                         '$loadingProgress%',
@@ -187,6 +180,7 @@ class _ManifestListItemState extends State<ManifestListItem> {
                     ],
                   ),
                   const SizedBox(height: 4),
+
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
@@ -199,12 +193,15 @@ class _ManifestListItemState extends State<ManifestListItem> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                ],
+
+                
+
         
              
               // Item stats in a row
-              
+              const SizedBox(height: 4),
               Row(
+                
                 children: [
                   _buildStatIndicator(
                     context,
@@ -228,40 +225,45 @@ class _ManifestListItemState extends State<ManifestListItem> {
                     unassignedItems > 0 ? Colors.orange : Colors.grey,
                   ),
                 ],
-              ), 
-              
+              ),
 
-              // Last updated timestamp
-               // Bottom centered Load Items button
-           
-            Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 180,
-                      child: ElevatedButton.icon(
-                        icon: Icon(
-                          isComplete 
-                            ? Icons.info_outline 
-                            : Icons.local_shipping_outlined,
-                          size: 18,
+
+
+              // Manage loading box --centered
+              Padding(
+                  padding: const EdgeInsets.only(top: 20.0),
+                    child: Center(
+                      child: ConstrainedBox(
+
+                        // To avoid pixel overflow error
+                        // only allow up to 180px wide
+                        constraints: const BoxConstraints(maxWidth: 180),
+                        child: ElevatedButton.icon(
+                          onPressed: widget.onTap,
+                          icon: const Icon(Icons.local_shipping_outlined, size: 18),
+                          label: const Text(
+                            'Manage Loading',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFFC30B),
+                            // remove any full-width defaults:
+                            minimumSize: Size.zero,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                            alignment: Alignment.center,
+                          ),
                         ),
-                        label: Text(
-                          isComplete ? 'Details' : 'Load Items',
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isComplete 
-                            ? Colors.green 
-                            : const Color(0xFFFFC30B),
-                        ),
-                        onPressed: widget.onTap,
                       ),
                     ),
-                  ],
-                ),
-              ),
+                  ),
+ 
+              
+
+                    
+                  
+                
+              
             ],
           ),
         ),
@@ -278,6 +280,7 @@ class _ManifestListItemState extends State<ManifestListItem> {
   ) {
     return Expanded(
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             icon,
