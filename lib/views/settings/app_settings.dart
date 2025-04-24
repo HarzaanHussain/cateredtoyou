@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cateredtoyou/services/auth_service.dart';
+import 'package:cateredtoyou/services/theme_manager.dart';
+
 
 /// App Settings Screen
 ///
@@ -62,6 +64,15 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 _darkMode = value;
               });
               // Would actually change theme here
+                  _buildSwitchTile(
+                  'Dark Mode',
+                  'Switch between light and dark theme',
+                  Icons.dark_mode,
+                  Provider.of<ThemeManager>(context).isDarkMode, // Read current theme state from the provider
+                  (value) {
+                    Provider.of<ThemeManager>(context, listen: false).toggleTheme(value);
+                  },
+                  );
             },
           ),
           
