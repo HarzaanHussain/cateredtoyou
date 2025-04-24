@@ -42,7 +42,6 @@ class CustomDrawer extends StatelessWidget {
                     child: ListTile(
                       leading: const Icon(Icons.handshake),
                       title: const Text('Customer Management'),
-                      subtitle: const Text('View and edit customer information'),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () => context.push('/customers'),
                     ),
@@ -53,7 +52,6 @@ class CustomDrawer extends StatelessWidget {
                     child: ListTile(
                       leading: const Icon(Icons.inventory),
                       title: const Text('Inventory'),
-                      subtitle: const Text('Manage kitchen inventory'),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () => context.push('/inventory'),
                     ),
@@ -64,7 +62,6 @@ class CustomDrawer extends StatelessWidget {
                     child: ListTile(
                       leading: const Icon(Icons.people),
                       title: const Text('Staff'),
-                      subtitle: const Text('Manage staff and roles'),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () => context.push('/staff'),
                     ),
@@ -75,7 +72,6 @@ class CustomDrawer extends StatelessWidget {
                     child: ListTile(
                       leading: const Icon(Icons.task),
                       title: const Text('Tasks'),
-                      subtitle: const Text('View and assign tasks'),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () => context.push('/tasks'),
                     ),
@@ -86,7 +82,6 @@ class CustomDrawer extends StatelessWidget {
                     child: ListTile(
                       leading: const Icon(Icons.local_shipping),
                       title: const Text('Vehicle Loading'),
-                      subtitle: const Text('Manage vehicle loading manifests'),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () => context.push('/manifest'),
                     ),
@@ -97,7 +92,6 @@ class CustomDrawer extends StatelessWidget {
                     child: ListTile(
                       leading: const Icon(Icons.local_shipping),
                       title: const Text('Fleet Management'),
-                      subtitle: const Text('Manage vehicles and assignments'),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () => context.push('/vehicles'),
                     ),
@@ -108,7 +102,6 @@ class CustomDrawer extends StatelessWidget {
                     child: ListTile(
                       leading: const Icon(Icons.map),
                       title: const Text('Delivery Routes'),
-                      subtitle: const Text('Manage and track delivery routes'),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () => context.push('/deliveries'),
                     ),
@@ -119,7 +112,6 @@ class CustomDrawer extends StatelessWidget {
                     child: ListTile(
                       leading: const Icon(Icons.restaurant_menu),
                       title: const Text('Menu Management'),
-                      subtitle: const Text('Manage menu items and recipes'),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () => context.push('/menu-items'),
                     ),
@@ -134,7 +126,6 @@ class CustomDrawer extends StatelessWidget {
               child: ListTile(
                 leading: const Icon(Icons.settings),
                 title: const Text('Settings'),
-                subtitle: const Text('Configure app preferences'),
                 trailing: const Icon(Icons.arrow_forward_ios),
                 onTap: () => context.push('/settings'),
               ),
