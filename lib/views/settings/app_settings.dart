@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cateredtoyou/services/auth_service.dart';
 
@@ -16,24 +16,15 @@ class AppSettingsScreen extends StatefulWidget {
 class _AppSettingsScreenState extends State<AppSettingsScreen> {
   bool _notificationsEnabled = true;
   bool _soundEnabled = true;
-  String _selectedLanguage = 'English';
   bool _autoCheckUpdates = true;
-  bool _dataSync = true;
   
-  // List of available languages (limited to English and Spanish)
-  final List<String> _languages = [
-    'English',
-    'Spanish',
-  ];
-
+  
   // Password change related state
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _currentPasswordController = TextEditingController();
   final _passwordFormKey = GlobalKey<FormState>();
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
-  bool _obscureCurrentPassword = true;
+  
 
   @override
   void dispose() {
@@ -60,31 +51,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Language section
-          _buildSectionHeader('Language'),
-          _buildDropdownTile(
-            'Language',
-            'Select your preferred language',
-            Icons.language,
-            _selectedLanguage,
-            _languages,
-            (value) {
-              if (value != null) {
-                setState(() {
-                  _selectedLanguage = value;
-                });
-                // Here you would implement the actual language change
-                // For example: LocalizationService.changeLocale(value);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Language changed to $value'),
-                  ),
-                );
-              }
-            },
-          ),
-          const Divider(),
-          
           // Notifications section
           _buildSectionHeader('Notifications'),
           _buildSwitchTile(
@@ -112,8 +78,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
           ),
           const Divider(),
           
-          // Data & Sync section
-          _buildSectionHeader('Data & Sync'),
+          // App Updates section
+          _buildSectionHeader('App Updates'),
           _buildSwitchTile(
             'Auto-check for Updates',
             'Automatically check for app updates',
@@ -122,17 +88,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             (value) {
               setState(() {
                 _autoCheckUpdates = value;
-              });
-            },
-          ),
-          _buildSwitchTile(
-            'Background Data Sync',
-            'Sync data in the background',
-            Icons.sync,
-            _dataSync,
-            (value) {
-              setState(() {
-                _dataSync = value;
               });
             },
           ),
@@ -191,17 +146,25 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                         'Logout',
                         'Are you sure you want to logout?',
                         () async {
+                          final goRouter = GoRouter.of(context); // Capture GoRouter instance
                           try {
                             await authService.signOut();
-                            // Navigate to login screen after successful logout
-                            Navigator.of(context).pushReplacementNamed('/login');
+                            // Check if widget is still mounted before navigating
+                            if (mounted) {
+                              // Navigate to login screen using captured GoRouter
+                              goRouter.go('/login');
+                            }
                           } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error logging out: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
+                            if (!mounted) return;
+                            
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error logging out: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
                           }
                         },
                       );
@@ -221,13 +184,34 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             subtitle: const Text('1.0.0 (Build 1234)'),
           ),
           ListTile(
+            leading: const Icon(Icons.business),
+            title: const Text('Catered To You'),
+            subtitle: const Text('We make catering easy'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.code),
+            title: const Text('Development Team'),
+            subtitle: const Text('CSUN COMP490/491'),
+          ),
+          ListTile(
             leading: const Icon(Icons.description_outlined),
             title: const Text('Terms of Service'),
             onTap: () {
-              // Would open terms of service
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Terms of Service would open here'),
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Terms of Service'),
+                  content: const SingleChildScrollView(
+                    child: Text(
+                      'By using Catered To You, you agree to these terms. The application is provided as-is without warranties. Users are responsible for maintaining the confidentiality of their account and password. Catered To You reserves the right to modify or terminate services for any reason, without notice.',
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Close'),
+                    ),
+                  ],
                 ),
               );
             },
@@ -236,39 +220,26 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             leading: const Icon(Icons.privacy_tip_outlined),
             title: const Text('Privacy Policy'),
             onTap: () {
-              // Would open privacy policy
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Privacy Policy would open here'),
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Privacy Policy'),
+                  content: const SingleChildScrollView(
+                    child: Text(
+                      'We collect information to provide better services to users. This includes account information, usage data, and device information. We use this data to improve our services, develop new features, and enhance security. We do not sell your personal information to third parties.',
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Close'),
+                    ),
+                  ],
                 ),
               );
             },
           ),
           const SizedBox(height: 32),
-          
-          Center(
-            child: TextButton(
-              onPressed: () {
-                HapticFeedback.mediumImpact();
-                _showConfirmDialog(
-                  'Delete Account',
-                  'Are you sure you want to delete your account? This action cannot be undone.',
-                  () {
-                    // Would delete account here
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Account deletion would happen here'),
-                      ),
-                    );
-                  },
-                );
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
-              child: const Text('Delete Account'),
-            ),
-          ),
         ],
       ),
     );
@@ -276,97 +247,103 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 
   // Show password change dialog
   void _showChangePasswordDialog(BuildContext context, AuthService authService) {
+    // Create stateful flag variables that will be used in the dialog
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Change Password'),
-        content: Form(
-          key: _passwordFormKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _currentPasswordController,
-                  decoration: InputDecoration(
-                    labelText: 'Current Password',
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureCurrentPassword ? Icons.visibility_off : Icons.visibility,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (stfContext, setDialogState) => AlertDialog(
+          title: const Text('Change Password'),
+          content: Form(
+            key: _passwordFormKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: _currentPasswordController,
+                    decoration: InputDecoration(
+                      labelText: 'Current Password',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscureCurrent ? Icons.visibility_off : Icons.visibility,
+                        ),
+                        onPressed: () {
+                          setDialogState(() {
+                            obscureCurrent = !obscureCurrent;
+                          });
+                        },
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _obscureCurrentPassword = !_obscureCurrentPassword;
-                        });
-                      },
                     ),
+                    obscureText: obscureCurrent,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your current password';
+                      }
+                      return null;
+                    },
                   ),
-                  obscureText: _obscureCurrentPassword,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your current password';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: InputDecoration(
-                    labelText: 'New Password',
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _passwordController,
+                    decoration: InputDecoration(
+                      labelText: 'New Password',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscureNew ? Icons.visibility_off : Icons.visibility,
+                        ),
+                        onPressed: () {
+                          setDialogState(() {
+                            obscureNew = !obscureNew;
+                          });
+                        },
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
                     ),
+                    obscureText: obscureNew,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a password';
+                      }
+                      if (value.length < 6) {
+                        return 'Password must be at least 6 characters';
+                      }
+                      return null;
+                    },
                   ),
-                  obscureText: _obscurePassword,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a password';
-                    }
-                    if (value.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _confirmPasswordController,
-                  decoration: InputDecoration(
-                    labelText: 'Confirm New Password',
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm New Password',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscureConfirm ? Icons.visibility_off : Icons.visibility,
+                        ),
+                        onPressed: () {
+                          setDialogState(() {
+                            obscureConfirm = !obscureConfirm;
+                          });
+                        },
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _obscureConfirmPassword = !_obscureConfirmPassword;
-                        });
-                      },
                     ),
+                    obscureText: obscureConfirm,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please confirm your password';
+                      }
+                      if (value != _passwordController.text) {
+                        return 'Passwords do not match';
+                      }
+                      return null;
+                    },
                   ),
-                  obscureText: _obscureConfirmPassword,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please confirm your password';
-                    }
-                    if (value != _passwordController.text) {
-                      return 'Passwords do not match';
-                    }
-                    return null;
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
         actions: [
           TextButton(
             onPressed: () {
@@ -430,6 +407,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -467,47 +445,22 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   }
 
   // Helper widget to build dropdown tiles
-  Widget _buildDropdownTile(
-    String title,
-    String subtitle,
-    IconData icon,
-    String value,
-    List<String> items,
-    Function(String?) onChanged,
-  ) {
-    return ListTile(
-      title: Text(title),
-      subtitle: Text(subtitle),
-      leading: Icon(icon),
-      trailing: DropdownButton<String>(
-        value: value,
-        onChanged: onChanged,
-        items: items.map<DropdownMenuItem<String>>((String item) {
-          return DropdownMenuItem<String>(
-            value: item,
-            child: Text(item),
-          );
-        }).toList(),
-        underline: Container(),
-      ),
-    );
-  }
 
   // Helper method to show a confirmation dialog
   void _showConfirmDialog(String title, String message, Function() onConfirm) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(title),
         content: Text(message),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               onConfirm();
             },
             style: ElevatedButton.styleFrom(
@@ -532,28 +485,34 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Language',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text('Change the language of the app.'),
-              SizedBox(height: 8),
-              Text(
                 'Notifications',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              Text('Control how and when you receive notifications.'),
+              Text('Control how and when you receive notifications about events, tasks, and updates.'),
               SizedBox(height: 8),
               Text(
-                'Data & Sync',
+                'App Updates',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              Text('Configure data synchronization and update settings.'),
+              Text('Configure automatic checking for application updates.'),
+              SizedBox(height: 8),
+              Text(
+                'Data Management',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text('Clear cache to free up device storage. This doesn\'t delete your important data.'),
               SizedBox(height: 8),
               Text(
                 'Account',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              Text('Manage your account settings, password, and logout.'),
+              Text('View your account information, change password, and logout from the application.'),
+              SizedBox(height: 8),
+              Text(
+                'About',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text('View information about the app, development team, terms of service, and privacy policy.'),
             ],
           ),
         ),
