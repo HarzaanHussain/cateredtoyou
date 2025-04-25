@@ -6,6 +6,7 @@ import 'package:flutter/material.dart'; // Import Flutter material design compon
 import 'package:go_router/go_router.dart'; // Import GoRouter for navigation.
 import 'package:intl/intl.dart'; // Import intl for date formatting.
 import 'package:url_launcher/url_launcher.dart'; // Import url_launcher for launching URLs.
+import 'package:cateredtoyou/widgets/main_scaffold.dart';
 
 /// A stateless widget that displays detailed information about a vehicle.
 class VehicleDetailsScreen extends StatelessWidget {
@@ -17,177 +18,168 @@ class VehicleDetailsScreen extends StatelessWidget {
     super.key, // Pass the key to the superclass constructor.
     required this.vehicle, // Initialize the vehicle property.
   });
+ //class VehicleDetailsScreen extends StatelessWidget {
+ // final VehicleModel vehicle;
+  //const VehicleDetailsScreen({super.key, required this.vehicle});
+
+  Widget _buildInfoRow(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon, {
+    Color? color,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(icon, color: color ?? cs.onSurface),
+        const SizedBox(width: 8),
+        Text('$label: ', style: Theme.of(context).textTheme.bodyLarge),
+        Text(value, style: TextStyle(color: color ?? cs.onSurface)),
+      ],
+    );
+  }
+
+  Widget _buildTelematicsInfo(BuildContext context, Map<String, dynamic> data) {
+    // your existing telematics widget…
+    return Text(data.toString());
+  }
 
   @override
   Widget build(BuildContext context) {
-    /// Retrieve the current theme and color scheme for styling.
-    final theme = Theme.of(context); // Get the current theme.
-    final colorScheme = theme.colorScheme; // Get the current color scheme.
+    final cs = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      bottomNavigationBar: const BottomToolbar(),
-      /// App bar with the vehicle's make and model as the title.
-      appBar: AppBar(
-        title: Text('${vehicle.make} ${vehicle.model}'), // Display vehicle's make and model in the app bar.
-        actions: [
-          /// Edit button that navigates to the edit vehicle screen.
-          IconButton(
-            icon: const Icon(Icons.edit), // Edit icon.
-            onPressed: () => context.push('/edit-vehicle', extra: vehicle), // Navigate to edit vehicle screen with the vehicle object.
-          ),
-        ],
+    return MainScaffold(
+      title: '${vehicle.make} ${vehicle.model}',
+
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => context.pop(),
       ),
+
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.edit),
+          onPressed: () => context.push(
+            '/edit-vehicle',
+            extra: vehicle,
+          ),
+        ),
+      ],
+
       body: ListView(
-        padding: const EdgeInsets.all(16), // Add padding around the list view.
+        padding: const EdgeInsets.all(16),
         children: [
-          /// Card displaying general vehicle information.
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16), // Add padding inside the card.
+              padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Vehicle Information',
-                    style: theme.textTheme.titleLarge, // Use large title text style.
-                  ),
-                  const SizedBox(height: 16), // Add vertical spacing.
-                  /// Display vehicle's license plate.
+                  Text('Vehicle Information',
+                      style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 16),
+                  _buildInfoRow(context, 'License Plate',
+                      vehicle.licensePlate, Icons.confirmation_number),
+                  const SizedBox(height: 12),
+                  _buildInfoRow(context, 'Type',
+                      vehicle.type.toString().split('.').last, Icons.category),
+                  const SizedBox(height: 12),
                   _buildInfoRow(
-                    context,
-                    'License Plate',
-                    vehicle.licensePlate, // Display vehicle's license plate.
-                    Icons.confirmation_number, // Use confirmation number icon.
-                  ),
-                  const SizedBox(height: 12), // Add vertical spacing.
-                  /// Display vehicle's type.
-                  _buildInfoRow(
-                    context,
-                    'Type',
-                    vehicle.type.toString().split('.').last, // Display vehicle's type.
-                    Icons.category, // Use category icon.
-                  ),
-                  const SizedBox(height: 12), // Add vertical spacing.
-                  /// Display vehicle's year.
-                  _buildInfoRow(
-                    context,
-                    'Year',
-                    vehicle.year, // Display vehicle's year.
-                    Icons.calendar_today, // Use calendar icon.
-                  ),
-                  const SizedBox(height: 12), // Add vertical spacing.
-                  /// Display vehicle's status.
-                  _buildInfoRow(
-                    context,
-                    'Status',
-                    vehicle.status.toString().split('.').last, // Display vehicle's status.
-                    Icons.info, // Use info icon.
-                  ),
+                      context, 'Year', vehicle.year, Icons.calendar_today),
+                  const SizedBox(height: 12),
+                  _buildInfoRow(context, 'Status',
+                      vehicle.status.toString().split('.').last, Icons.info),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 16), // Add vertical spacing.
-          /// Card displaying vehicle's maintenance schedule.
+          const SizedBox(height: 16),
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16), // Add padding inside the card.
+              padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Maintenance Schedule',
-                    style: theme.textTheme.titleLarge, // Use large title text style.
-                  ),
-                  const SizedBox(height: 16), // Add vertical spacing.
-                  /// Display last maintenance date.
+                  Text('Maintenance Schedule',
+                      style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 16),
                   _buildInfoRow(
                     context,
                     'Last Maintenance',
-                    DateFormat('MM/dd/yyyy').format(vehicle.lastMaintenanceDate), // Format and display last maintenance date.
-                    Icons.build, // Use build icon.
+                    DateFormat('MM/dd/yyyy')
+                        .format(vehicle.lastMaintenanceDate),
+                    Icons.build,
                   ),
-                  const SizedBox(height: 12), // Add vertical spacing.
-                  /// Display next maintenance date with color indication if overdue.
+                  const SizedBox(height: 12),
                   _buildInfoRow(
                     context,
                     'Next Maintenance',
-                    DateFormat('MM/dd/yyyy').format(vehicle.nextMaintenanceDate), // Format and display next maintenance date.
-                    Icons.event, // Use event icon.
-                    color: DateTime.now().isAfter(vehicle.nextMaintenanceDate) // Check if the next maintenance date is overdue.
-                        ? colorScheme.error // Use error color if overdue.
-                        : null, // No color if not overdue.
+                    DateFormat('MM/dd/yyyy')
+                        .format(vehicle.nextMaintenanceDate),
+                    Icons.event,
+                    color: DateTime.now()
+                            .isAfter(vehicle.nextMaintenanceDate)
+                        ? cs.error
+                        : null,
                   ),
                 ],
               ),
             ),
           ),
           if (vehicle.telematicsData != null) ...[
-            const SizedBox(height: 16), // Add vertical spacing.
-            /// Card displaying vehicle's telematics data.
+            const SizedBox(height: 16),
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16), // Add padding inside the card.
+                padding: const EdgeInsets.all(16),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Telematics Data',
-                      style: theme.textTheme.titleLarge, // Use large title text style.
-                    ),
-                    const SizedBox(height: 16), // Add vertical spacing.
-                    _buildTelematicsInfo(context, vehicle.telematicsData!), // Display telematics data.
+                    Text('Telematics Data',
+                        style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 16),
+                    _buildTelematicsInfo(context, vehicle.telematicsData!),
                   ],
                 ),
               ),
             ),
           ],
-          const SizedBox(height: 16), // Add vertical spacing.
+          const SizedBox(height: 16),
           if (vehicle.assignedDriverId != null)
-            /// FutureBuilder to fetch and display assigned driver's information.
             FutureBuilder<DocumentSnapshot>(
               future: FirebaseFirestore.instance
                   .collection('users')
                   .doc(vehicle.assignedDriverId)
-                  .get(), // Fetch assigned driver's information from Firestore.
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const SizedBox.shrink(); // Return an empty widget if data is not available.
+                  .get(),
+              builder: (context, snap) {
+                if (!snap.hasData || !snap.data!.exists) {
+                  return const SizedBox.shrink();
                 }
-
-                final driverData = snapshot.data!.data() as Map<String, dynamic>?; // Get driver data from snapshot.
-                if (driverData == null) {
-                  return const SizedBox.shrink(); // Return an empty widget if driver data is null.
-                }
-
+                final driver = snap.data!.data()! as Map<String, dynamic>;
                 return Card(
                   child: Padding(
-                    padding: const EdgeInsets.all(16), // Add padding inside the card.
+                    padding: const EdgeInsets.all(16),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start.
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Assigned Driver',
-                          style: theme.textTheme.titleLarge, // Use large title text style.
-                        ),
-                        const SizedBox(height: 16), // Add vertical spacing.
-                        /// Display driver's information with a call button.
+                        Text('Assigned Driver',
+                            style: Theme.of(context).textTheme.titleLarge),
+                        const SizedBox(height: 16),
                         ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: colorScheme.primary, // Set background color of avatar.
+                            backgroundColor: cs.primary,
                             child: Text(
-                              '${driverData['firstName'][0]}${driverData['lastName'][0]}', // Display driver's initials.
-                              style: TextStyle(color: colorScheme.onPrimary), // Set text color.
+                              '${driver['firstName'][0]}${driver['lastName'][0]}',
+                              style: TextStyle(color: cs.onPrimary),
                             ),
                           ),
                           title: Text(
-                            '${driverData['firstName']} ${driverData['lastName']}', // Display driver's full name.
-                          ),
-                          subtitle: Text(driverData['phoneNumber']), // Display driver's phone number.
+                              '${driver['firstName']} ${driver['lastName']}'),
+                          subtitle: Text(driver['phoneNumber']),
                           trailing: IconButton(
-                            icon: const Icon(Icons.phone), // Phone icon.
+                            icon: const Icon(Icons.phone),
                             onPressed: () => launchUrl(
-                              Uri.parse('tel:${driverData['phoneNumber']}'), // Launch phone dialer with driver's phone number.
+                              Uri.parse('tel:${driver['phoneNumber']}'),
                             ),
                           ),
                         ),
@@ -201,7 +193,7 @@ class VehicleDetailsScreen extends StatelessWidget {
       ),
     );
   }
-
+}
   /// Helper method to build a row displaying a label, value, and icon.
   Widget _buildInfoRow(
     BuildContext context,
@@ -307,4 +299,3 @@ class VehicleDetailsScreen extends StatelessWidget {
       ],
     );
   }
-}

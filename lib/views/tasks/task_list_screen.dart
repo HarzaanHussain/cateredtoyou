@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:cateredtoyou/models/task_model.dart';
 import 'package:cateredtoyou/services/task_service.dart';
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart'; // Imports bottom toolbar class
-
+import 'package:cateredtoyou/widgets/main_scaffold.dart';
 /// The `TaskListScreen` class represents a screen that displays a list of tasks.
 /// It uses a `DefaultTabController` to manage four tabs: My Tasks, Department, All Tasks, and Completed.
 class TaskListScreen extends StatelessWidget {
@@ -18,23 +18,22 @@ class TaskListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 4,
-      child: Scaffold(
-        // backgroundColor: const Color(0xFFFBC72B), // yellow background
+      child: MainScaffold(
+        title: 'Tasks',
 
-        bottomNavigationBar: const BottomToolbar(),
-        appBar: AppBar(
-          title: const Text('Tasks'),
-          bottom: const TabBar(
-            labelColor: Colors.black,
-            isScrollable: true,
-            tabs: [
-              Tab(text: 'My Tasks'),
-              Tab(text: 'Department'),
-              Tab(text: 'All Tasks'),
-              Tab(text: 'Completed'),
-            ],
-          ),
+        // ── Your TabBar under the AppBar
+        bottom: const TabBar(
+          labelColor: Colors.black,
+          isScrollable: true,
+          tabs: [
+            Tab(text: 'My Tasks'),
+            Tab(text: 'Department'),
+            Tab(text: 'All Tasks'),
+            Tab(text: 'Completed'),
+          ],
         ),
+
+        // ── The TabBarView
         body: const TabBarView(
           children: [
             _TaskList(listType: TaskListType.assigned),
@@ -43,11 +42,13 @@ class TaskListScreen extends StatelessWidget {
             _TaskList(listType: TaskListType.completed),
           ],
         ),
-        floatingActionButton: FloatingActionButton(
+
+        // ── Floating action button
+        fab: FloatingActionButton(
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const ManageTasksScreen(),
+              builder: (_) => const ManageTasksScreen(),
             ),
           ),
           child: const Icon(Icons.add),
@@ -56,7 +57,6 @@ class TaskListScreen extends StatelessWidget {
     );
   }
 }
-
 
 /// Enum representing different types of task lists.
 enum TaskListType { assigned, department, all, completed }

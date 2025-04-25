@@ -5,7 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:cateredtoyou/models/manifest_model.dart';
 import 'package:cateredtoyou/services/manifest_service.dart';
 import 'package:cateredtoyou/services/event_service.dart';
-
+import 'package:cateredtoyou/widgets/main_scaffold.dart';
+import 'package:go_router/go_router.dart';
 class ManifestCreationScreen extends StatefulWidget {
   final String? eventId; // Optional event ID if coming from an event
 
@@ -150,133 +151,131 @@ class _ManifestCreationScreenState extends State<ManifestCreationScreen> {
       });
     }
   }
+@override
+Widget build(BuildContext context) {
+  final theme = Theme.of(context);
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  return MainScaffold(
+    title: 'Create Manifest',
 
-    return Scaffold(
-      bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
-        title: const Text('Create Manifest'),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Create a new manifest for an event',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 16),
-                        if (_errorMessage != null)
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withAlpha((0.1 * 255).toInt()),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.red),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.error_outline, color: Colors.red),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _errorMessage!,
-                                    style: const TextStyle(color: Colors.red),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          isExpanded: true, // Allow dropdown to use full width
-                          decoration: InputDecoration(
-                            labelText: 'Select Event',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          value: _selectedEventId,
-                          items: _events.map((event) {
-                            return DropdownMenuItem<String>(
-                              value: event['id'] as String,
-                              child: Text(
-                                '${event['name']} - ${event['date']}',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedEventId = value;
-                            });
-                          },
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please select an event';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        if (_events.isEmpty)
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.withAlpha((0.1 * 255).toInt()),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.amber),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.info_outline, color: Colors.amber),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'No events available without a manifest. Create an event first or check if all events already have manifests.',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            onPressed: _isCreating || _events.isEmpty ? null : _createManifest,
-                            child: _isCreating
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                    ),
-                                  )
-                                : const Text('Create Manifest'),
-                          ),
-                        ),
-                      ],
+    // optional back‐arrow; if you want the drawer instead, omit this:
+    leading: IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => context.pop(),
+    ),
+
+    body: _isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Create a new manifest for an event',
+                      style: theme.textTheme.titleMedium,
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    if (_errorMessage != null)
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withAlpha((0.1 * 255).toInt()),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _errorMessage!,
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: 'Select Event',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      value: _selectedEventId,
+                      items: _events.map((event) {
+                        return DropdownMenuItem<String>(
+                          value: event['id'] as String,
+                          child: Text(
+                            '${event['name']} - ${event['date']}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) => setState(() => _selectedEventId = value),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select an event';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    if (_events.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withAlpha((0.1 * 255).toInt()),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.amber),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.amber),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'No events available without a manifest. Create an event first or check if all events already have manifests.',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: _isCreating || _events.isEmpty ? null : _createManifest,
+                        child: _isCreating
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Text('Create Manifest'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-    );
-  }
+          ),
+  );
 }
+
+  }

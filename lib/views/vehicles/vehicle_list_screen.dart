@@ -6,40 +6,41 @@ import 'package:go_router/go_router.dart'; // Package for navigation.
 import 'package:intl/intl.dart'; // Package for date formatting.
 import 'package:provider/provider.dart'; // Package for state management.
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart'; // Imports bottom toolbar class
+import 'package:cateredtoyou/widgets/main_scaffold.dart'; 
 
 /// A stateless widget that displays a list of vehicles.
 class VehicleListScreen extends StatelessWidget {
   const VehicleListScreen({super.key});
-
-  @override
+ @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
-        title: const Text('Fleet Management'), // Title of the screen.
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add), // Icon for adding a new vehicle.
-            onPressed: () => context.push('/add-vehicle'), // Navigates to the add vehicle screen.
-          ),
-        ],
-      ),
+    return MainScaffold(
+      title: 'Fleet Management',
+
+      // ➕ your “add vehicle” button lives here now
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.add),
+          onPressed: () => context.push('/add-vehicle'),
+        ),
+      ],
+
       body: Consumer<VehicleService>(
-        builder: (context, vehicleService, child) {
+        builder: (context, vehicleService, _) {
           return StreamBuilder<List<Vehicle>>(
-            stream: vehicleService.getVehicles(), // Stream of vehicle data.
+            stream: vehicleService.getVehicles(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
                 return Center(
                   child: Text(
-                    'Error: ${snapshot.error}', // Displays error message if there's an error.
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    'Error: ${snapshot.error}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 );
               }
-
               if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator()); // Shows a loading indicator while data is being fetched.
+                return const Center(child: CircularProgressIndicator());
               }
 
               final vehicles = snapshot.data!;
@@ -55,13 +56,13 @@ class VehicleListScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No vehicles found', // Message displayed when no vehicles are found.
+                        'No vehicles found',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 8),
                       ElevatedButton.icon(
                         icon: const Icon(Icons.add),
-                        label: const Text('Add Vehicle'), // Button to add a new vehicle.
+                        label: const Text('Add Vehicle'),
                         onPressed: () => context.push('/add-vehicle'),
                       ),
                     ],
@@ -71,10 +72,9 @@ class VehicleListScreen extends StatelessWidget {
 
               return ListView.builder(
                 padding: const EdgeInsets.all(16),
-                itemCount: vehicles.length, // Number of vehicles in the list.
+                itemCount: vehicles.length,
                 itemBuilder: (context, index) {
-                  final vehicle = vehicles[index];
-                  return VehicleCard(vehicle: vehicle); // Builds a card for each vehicle.
+                  return VehicleCard(vehicle: vehicles[index]);
                 },
               );
             },

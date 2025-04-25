@@ -9,11 +9,13 @@ class ThemedAppBar extends StatelessWidget implements PreferredSizeWidget {
     super.key,
     this.leading,          // ← NEW
     this.actions,
+    this.bottom,
   });
 
   final String title;
   final Widget? leading;   // ← NEW
   final List<Widget>? actions;
+    final PreferredSizeWidget? bottom; 
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -27,11 +29,13 @@ class ThemedAppBar extends StatelessWidget implements PreferredSizeWidget {
             title,
             leading: leading,         // ← NEW
             actions: actions,
+            bottom: bottom,
           )
         : AppBar(
             title: Text(title),
             leading: leading,         // ← NEW
             actions: actions,
+             bottom: bottom,
           );
   }
 }

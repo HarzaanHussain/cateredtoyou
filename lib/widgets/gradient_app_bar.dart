@@ -7,12 +7,14 @@ class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.title, {
     this.leading,          // ← NEW
     this.actions,
+    this.bottom,
     super.key,
   });
 
   final String title;
   final Widget? leading;   // ← NEW
   final List<Widget>? actions;
+   final PreferredSizeWidget? bottom; 
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -23,6 +25,7 @@ class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
       title: Text(title),
       leading: leading,    // ← NEW
       actions: actions,
+      bottom: bottom, 
       backgroundColor: Colors.transparent,
       elevation: 0,
       flexibleSpace: Container(

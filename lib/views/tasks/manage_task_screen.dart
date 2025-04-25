@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:cateredtoyou/models/task_model.dart';
 import 'package:cateredtoyou/services/task_service.dart';
 import 'package:cateredtoyou/widgets/main_scaffold.dart';
+import 'package:go_router/go_router.dart';
 class ManageTasksScreen extends StatefulWidget {
   const ManageTasksScreen({super.key});
 
@@ -170,34 +171,39 @@ class _ManageTasksScreenState extends State<ManageTasksScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Task'), // Title of the screen
-      ),
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _buildEventSelector(), // Widget to select an event
-              const SizedBox(height: 16),
-              _buildBasicDetails(), // Widget to input basic task details
-              const SizedBox(height: 16),
-              _buildAssignmentSection(), // Widget to assign the task
-              const SizedBox(height: 24),
-              _buildChecklistSection(), // Widget to manage checklist items
-              const SizedBox(height: 24),
-              _buildSubmitButton(), // Button to submit the form and create the task
-              const SizedBox(height: 32),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+          @override
+        Widget build(BuildContext context) {
+          return MainScaffold(
+            title: 'Create Task',
+
+            // optional back-arrow
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.pop(),
+            ),
+
+            body: SafeArea(
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _buildEventSelector(),    // your existing helper
+                    const SizedBox(height: 16),
+                    _buildBasicDetails(),
+                    const SizedBox(height: 16),
+                    _buildAssignmentSection(),
+                    const SizedBox(height: 24),
+                    _buildChecklistSection(),
+                    const SizedBox(height: 24),
+                    _buildSubmitButton(),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
 
   Widget _buildEventSelector() {
     return StreamBuilder<List<Event>>(

@@ -11,7 +11,8 @@ import 'package:cateredtoyou/services/vehicle_service.dart';
 import 'package:cateredtoyou/services/event_service.dart';
 import 'package:cateredtoyou/managers/drag_drop_manager.dart';
 import 'package:cateredtoyou/views/manifest/widgets/partial_quantity_selector.dart';
-
+import 'package:cateredtoyou/widgets/main_scaffold.dart';
+import 'package:go_router/go_router.dart';
 /// A screen that shows all items loaded in a specific vehicle across all events
 class VehicleLoadingScreen extends StatefulWidget {
   final String vehicleId;
@@ -459,70 +460,68 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // The main build method remains largely the same
-    // ...
-    
-    final theme = Theme.of(context);
+@override
+Widget build(BuildContext context) {
+  final theme = Theme.of(context);
 
-    if (_isLoading) {
-      return Scaffold(
-        bottomNavigationBar: const BottomToolbar(),
-        appBar: AppBar(
-          title: const Text('Vehicle Loading'),
-        ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    if (_vehicle == null) {
-      return Scaffold(
-        bottomNavigationBar: const BottomToolbar(),
-        appBar: AppBar(
-          title: const Text('Vehicle Loading'),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 64, color: Colors.red),
-              const SizedBox(height: 16),
-              Text(
-                'Vehicle not found',
-                style: theme.textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Go Back'),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Scaffold(
-      bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
-        title: Text('${_vehicle!.make} ${_vehicle!.model} Loading'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh data',
-            onPressed: () {
-              setState(() {
-                _eventDetails.clear();
-                _failedEventIds.clear();
-              });
-            },
-          ),
-        ],
+  // 1) Loading state
+  if (_isLoading) {
+    return MainScaffold(
+      title: 'Vehicle Loading',
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => context.pop(),
       ),
+      body: const Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  // 2) Vehicle not found
+  if (_vehicle == null) {
+    return MainScaffold(
+      title: 'Vehicle Loading',
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => context.pop(),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('Vehicle not found', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Go Back'),
+              onPressed: () => context.pop(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 3) Vehicle loaded
+  return MainScaffold(
+    title: '${_vehicle!.make} ${_vehicle!.model} Loading',
+    leading: IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => context.pop(),
+    ),
+    actions: [
+      IconButton(
+        icon: const Icon(Icons.refresh),
+        tooltip: 'Refresh data',
+        onPressed: () {
+          setState(() {
+            _eventDetails.clear();
+            _failedEventIds.clear();
+          });
+        },
+      ),
+    ],
       body: Column(
         children: [
           // Vehicle details card stays the same

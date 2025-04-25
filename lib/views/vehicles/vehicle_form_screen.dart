@@ -4,7 +4,7 @@ import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components
 import 'package:go_router/go_router.dart'; // Importing GoRouter for navigation
 import 'package:provider/provider.dart'; // Importing Provider for state management
-
+import 'package:cateredtoyou/widgets/main_scaffold.dart';
 
 class VehicleFormScreen extends StatefulWidget { // Defining a stateful widget for the vehicle form screen
   final Vehicle? vehicle; // Optional vehicle object to edit an existing vehicle
@@ -48,126 +48,131 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isEditing = widget.vehicle != null; // Checking if the form is in editing mode
-    
-    return Scaffold(
-      bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
-        title: Text(isEditing ? 'Edit Vehicle' : 'Add Vehicle'), // Setting the title based on editing mode
-      ),
-      body: Form(
-        key: _formKey, // Assigning the form key
-        child: ListView(
-          padding: const EdgeInsets.all(16), // Adding padding to the form
-          children: [
-            TextFormField(
-              controller: _makeController, // Assigning the make controller
-              decoration: const InputDecoration(
-                labelText: 'Make', // Label for the make input field
-                hintText: 'Enter vehicle make', // Hint text for the make input field
-              ),
-              textCapitalization: TextCapitalization.words, // Capitalizing each word
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter vehicle make'; // Validation for empty make field
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16), // Adding space between fields
-            TextFormField(
-              controller: _modelController, // Assigning the model controller
-              decoration: const InputDecoration(
-                labelText: 'Model', // Label for the model input field
-                hintText: 'Enter vehicle model', // Hint text for the model input field
-              ),
-              textCapitalization: TextCapitalization.words, // Capitalizing each word
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter vehicle model'; // Validation for empty model field
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16), // Adding space between fields
-            TextFormField(
-              controller: _yearController, // Assigning the year controller
-              decoration: const InputDecoration(
-                labelText: 'Year', // Label for the year input field
-                hintText: 'Enter vehicle year', // Hint text for the year input field
-              ),
-              keyboardType: TextInputType.number, // Setting keyboard type to number
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter vehicle year'; // Validation for empty year field
-                }
-                final year = int.tryParse(value);
-                if (year == null || year < 1900 || year > DateTime.now().year + 1) {
-                  return 'Please enter a valid year'; // Validation for invalid year
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16), // Adding space between fields
-            TextFormField(
-              controller: _licensePlateController, // Assigning the license plate controller
-              decoration: const InputDecoration(
-                labelText: 'License Plate', // Label for the license plate input field
-                hintText: 'Enter license plate number', // Hint text for the license plate input field
-              ),
-              textCapitalization: TextCapitalization.characters, // Capitalizing all characters
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter license plate number'; // Validation for empty license plate field
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16), // Adding space between fields
-            DropdownButtonFormField<VehicleType>(
-              value: _selectedType, // Assigning the selected type
-              decoration: const InputDecoration(
-                labelText: 'Vehicle Type', // Label for the vehicle type dropdown
-              ),
-              items: VehicleType.values.map((type) {
-                return DropdownMenuItem(
-                  value: type,
-                  child: Text(type.toString().split('.').last), // Displaying the vehicle type
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _selectedType = value); // Updating the selected type
-                }
-              },
-              validator: (value) {
-                if (value == null) {
-                  return 'Please select vehicle type'; // Validation for unselected vehicle type
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 32), // Adding space before the submit button
-            ElevatedButton(
-              onPressed: _isLoading ? null : _submitForm, // Disabling button if loading
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2, // Showing loading indicator if loading
-                      ),
-                    )
-                  : Text(isEditing ? 'Update Vehicle' : 'Add Vehicle'), // Button text based on editing mode
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+@override
+Widget build(BuildContext context) {
+  final isEditing = widget.vehicle != null; // true when editing
 
+  return MainScaffold(
+    title: isEditing ? 'Edit Vehicle' : 'Add Vehicle',
+
+    // ← automatically gives you the drawer & bottom toolbar
+    leading: IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => context.pop(), // or Navigator.of(context).pop()
+    ),
+
+    body: Form(
+      key: _formKey,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          TextFormField(
+            controller: _makeController,
+            decoration: const InputDecoration(
+              labelText: 'Make',
+              hintText: 'Enter vehicle make',
+            ),
+            textCapitalization: TextCapitalization.words,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter vehicle make';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _modelController,
+            decoration: const InputDecoration(
+              labelText: 'Model',
+              hintText: 'Enter vehicle model',
+            ),
+            textCapitalization: TextCapitalization.words,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter vehicle model';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _yearController,
+            decoration: const InputDecoration(
+              labelText: 'Year',
+              hintText: 'Enter vehicle year',
+            ),
+            keyboardType: TextInputType.number,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter vehicle year';
+              }
+              final year = int.tryParse(value);
+              if (year == null || year < 1900 || year > DateTime.now().year + 1) {
+                return 'Please enter a valid year';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _licensePlateController,
+            decoration: const InputDecoration(
+              labelText: 'License Plate',
+              hintText: 'Enter license plate number',
+            ),
+            textCapitalization: TextCapitalization.characters,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter license plate number';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<VehicleType>(
+            value: _selectedType,
+            decoration: const InputDecoration(
+              labelText: 'Vehicle Type',
+            ),
+            items: VehicleType.values.map((type) {
+              return DropdownMenuItem(
+                value: type,
+                child: Text(type.toString().split('.').last),
+              );
+            }).toList(),
+            onChanged: (value) {
+              if (value != null) setState(() => _selectedType = value);
+            },
+            validator: (value) {
+              if (value == null) {
+                return 'Please select vehicle type';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton(
+            onPressed: _isLoading ? null : _submitForm,
+            child: _isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(isEditing ? 'Update Vehicle' : 'Add Vehicle'),
+          ),
+        ],
+      ),
+    ),
+
+    // If you want a FAB instead of a bottom button, supply it here:
+    // fab: FloatingActionButton(
+    //   onPressed: _submitForm,
+    //   child: const Icon(Icons.check),
+    // ),
+  );
+}
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return; // Validating the form
 

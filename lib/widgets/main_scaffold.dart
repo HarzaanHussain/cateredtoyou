@@ -10,6 +10,7 @@ class MainScaffold extends StatelessWidget {
     required this.body,
     this.leading,          // ← NEW
     this.actions,
+    this.bottom,
     this.fab,
   });
 
@@ -17,6 +18,7 @@ class MainScaffold extends StatelessWidget {
   final Widget               body;
   final Widget?              leading;   // ← NEW
   final List<Widget>?        actions;
+  final PreferredSizeWidget? bottom; 
   final FloatingActionButton? fab;
 
   @override
