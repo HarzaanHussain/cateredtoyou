@@ -97,17 +97,21 @@ class EventService extends ChangeNotifier {
 
 
   Future<void> _verifyInventoryAvailability(List<EventSupply> supplies) async {
-  for (final supply in supplies) {
-    final doc = await _firestore.collection('inventory').doc(supply.inventoryId).get();
-    if (!doc.exists) {
-      throw 'Supply item ${supply.name} not found';
-    }
-    final item = InventoryItem.fromMap(doc.data()!, doc.id);
-    if (item.quantity < supply.quantity) {
-      throw 'Insufficient quantity available for ${supply.name}. Available: ${item.quantity} ${item.unit}';
+    for (final supply in supplies) {
+      final doc = await _firestore.collection('inventory').doc(supply.inventoryId).get();
+      if (!doc.exists) {
+        debugPrint('WARNING: Supply item ${supply.name} not found in inventory.');
+        continue; // Allow through
+      }
+      final item = InventoryItem.fromMap(doc.data()!, doc.id);
+      if (item.quantity < supply.quantity) {
+        debugPrint(
+          'Not enough ${supply.name} in stock. Needed: ${supply.quantity}, Available: ${item.quantity} ${item.unit}',
+        );
+        // TODO: add logic here to flag the item for ordering
+      }
     }
   }
-}
 
   Future<void> _verifyStaffAssignment(
       String organizationId, List<AssignedStaff> staff) async {
