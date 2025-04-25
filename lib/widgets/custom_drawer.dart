@@ -19,7 +19,7 @@ class CustomDrawer extends StatelessWidget {
             Container(
               height: 100,
               width: double.infinity,
-              color: Color(0xFFFBC72B),
+              color: const Color(0xFFFBC72B),
               padding: const EdgeInsets.all(16),
               alignment: Alignment.centerLeft,
               child: Text(
@@ -36,102 +36,106 @@ class CustomDrawer extends StatelessWidget {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  // New Customer Management option
-                  PermissionWidget(
+                  _buildDrawerItem(
+                    context,
                     permissionId: 'view_customers',
-                    child: ListTile(
-                      leading: const Icon(Icons.handshake),
-                      title: const Text('Customer Management'),
-                      trailing: const Icon(Icons.arrow_forward_ios),
-                      onTap: () => context.push('/customers'),
-                    ),
+                    icon: Icons.handshake,
+                    label: 'Customer Management',
+                    route: '/customers',
                   ),
-
-                  PermissionWidget(
+                  _buildDrawerItem(
+                    context,
                     permissionId: 'manage_inventory',
-                    child: ListTile(
-                      leading: const Icon(Icons.inventory),
-                      title: const Text('Inventory'),
-                      trailing: const Icon(Icons.arrow_forward_ios),
-                      onTap: () => context.push('/inventory'),
-                    ),
+                    icon: Icons.inventory,
+                    label: 'Inventory',
+                    route: '/inventory',
                   ),
-
-                  PermissionWidget(
+                  _buildDrawerItem(
+                    context,
                     permissionId: 'manage_staff',
-                    child: ListTile(
-                      leading: const Icon(Icons.people),
-                      title: const Text('Staff'),
-                      trailing: const Icon(Icons.arrow_forward_ios),
-                      onTap: () => context.push('/staff'),
-                    ),
+                    icon: Icons.people,
+                    label: 'Staff',
+                    route: '/staff',
                   ),
-
-                  PermissionWidget(
+                  _buildDrawerItem(
+                    context,
                     permissionId: 'view_tasks',
-                    child: ListTile(
-                      leading: const Icon(Icons.task),
-                      title: const Text('Tasks'),
-                      trailing: const Icon(Icons.arrow_forward_ios),
-                      onTap: () => context.push('/tasks'),
-                    ),
+                    icon: Icons.task,
+                    label: 'Tasks',
+                    route: '/tasks',
                   ),
-
-                  PermissionWidget(
+                  _buildDrawerItem(
+                    context,
                     permissionId: 'manage_manifest',
-                    child: ListTile(
-                      leading: const Icon(Icons.local_shipping),
-                      title: const Text('Vehicle Loading'),
-                      trailing: const Icon(Icons.arrow_forward_ios),
-                      onTap: () => context.push('/manifest'),
-                    ),
+                    icon: Icons.local_shipping,
+                    label: 'Vehicle Loading',
+                    route: '/manifest',
                   ),
-
-                  PermissionWidget(
+                  _buildDrawerItem(
+                    context,
                     permissionId: 'manage_vehicles',
-                    child: ListTile(
-                      leading: const Icon(Icons.local_shipping),
-                      title: const Text('Fleet Management'),
-                      trailing: const Icon(Icons.arrow_forward_ios),
-                      onTap: () => context.push('/vehicles'),
-                    ),
+                    icon: Icons.local_shipping,
+                    label: 'Fleet Management',
+                    route: '/vehicles',
                   ),
-
-                  PermissionWidget(
+                  _buildDrawerItem(
+                    context,
                     permissionId: 'manage_deliveries',
-                    child: ListTile(
-                      leading: const Icon(Icons.map),
-                      title: const Text('Delivery Routes'),
-                      trailing: const Icon(Icons.arrow_forward_ios),
-                      onTap: () => context.push('/deliveries'),
-                    ),
+                    icon: Icons.map,
+                    label: 'Delivery Routes',
+                    route: '/deliveries',
                   ),
-
-                  PermissionWidget(
+                  _buildDrawerItem(
+                    context,
                     permissionId: 'manage_menu',
-                    child: ListTile(
-                      leading: const Icon(Icons.restaurant_menu),
-                      title: const Text('Menu Management'),
-                      trailing: const Icon(Icons.arrow_forward_ios),
-                      onTap: () => context.push('/menu-items'),
-                    ),
+                    icon: Icons.restaurant_menu,
+                    label: 'Menu Management',
+                    route: '/menu-items',
                   ),
                 ],
               ),
             ),
 
             // Settings at the bottom
-            PermissionWidget(
-              permissionId: 'view_tasks', 
-              child: ListTile(
-                leading: const Icon(Icons.settings),
-                title: const Text('Settings'),
-                trailing: const Icon(Icons.arrow_forward_ios),
-                onTap: () => context.push('/settings'),
-              ),
+            _buildDrawerItem(
+              context,
+              permissionId: 'view_tasks',
+              icon: Icons.settings,
+              label: 'Settings',
+              route: '/settings',
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // Helper to build a drawer item with smaller trailing arrow and custom padding
+  Widget _buildDrawerItem(
+      BuildContext context, {
+        required String permissionId,
+        required IconData icon,
+        required String label,
+        required String route,
+      }) {
+    return PermissionWidget(
+      permissionId: permissionId,
+      child: ListTile(
+        contentPadding: const EdgeInsets.only(left: 16, right: 0),
+        leading: Icon(icon),
+        title: Text(label),
+        trailing: const Padding(
+          padding: EdgeInsets.only(right: 12.0), // Move arrow closer to edge
+          child: SizedBox(
+            height: 24,
+            width: 24,
+            child: Icon(
+              Icons.arrow_forward_ios,
+              size: 14, // Make it smaller
+            ),
+          ),
+        ),
+        onTap: () => context.push(route),
       ),
     );
   }
