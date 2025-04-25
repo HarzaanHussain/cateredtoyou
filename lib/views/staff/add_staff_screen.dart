@@ -6,6 +6,7 @@ import 'package:cateredtoyou/services/staff_service.dart';
 import 'package:cateredtoyou/widgets/custom_button.dart';
 import 'package:cateredtoyou/widgets/custom_text_field.dart';
 import 'package:cateredtoyou/utils/validators.dart';
+import 'package:cateredtoyou/widgets/main_scaffold.dart';
 
 class AddStaffScreen extends StatefulWidget {
   const AddStaffScreen({super.key}); // Constructor for the AddStaffScreen widget
@@ -124,15 +125,17 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
         });
       }
     }
-  }
+          }
+        @override
+        Widget build(BuildContext context) {
+          return MainScaffold(
+            title: 'Add Staff Member',
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
-        title: const Text('Add Staff Member'), // Title for the app bar
-      ),
+            // ← this gives you a back-arrow that pops to the previous route
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.pop(),  // or push to whatever route you need
+            ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0), // Add padding around the content
         child: Form(

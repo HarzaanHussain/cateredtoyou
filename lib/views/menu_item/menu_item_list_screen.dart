@@ -1,4 +1,4 @@
-
+import 'package:cateredtoyou/widgets/main_scaffold.dart';
 import 'package:flutter/material.dart'; // Import Flutter material design package.
 import 'package:provider/provider.dart'; // Import provider package for state management.
 import 'package:go_router/go_router.dart'; // Import go_router package for navigation.
@@ -42,23 +42,24 @@ class _MenuItemListScreenState extends State<MenuItemListScreen> {
     }).toList();
   }
 
-  @override
+   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
+    return MainScaffold(
+      title: 'Menu Items',
+
+      // back button on the left
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back), // Back button icon.
-          onPressed: () => context.push('/home'), // Navigate to home screen when pressed.
-        ),  
-        title: const Text('Menu Items'), // App bar title.
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add), // Add button icon.
-            onPressed: () => context.push('/add-menu-item'), // Navigate to add menu item screen when pressed.
-          ),
-        ],
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => context.push('/home'),
       ),
+
+      // actions on the right
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.add),
+          onPressed: () => context.push('/add-menu-item'),
+        ),
+      ],
       body: Column(
         children: [
           Padding(

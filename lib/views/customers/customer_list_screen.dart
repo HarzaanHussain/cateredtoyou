@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
+import 'package:cateredtoyou/widgets/main_scaffold.dart';
 
 class CustomerListScreen extends StatefulWidget {
   const CustomerListScreen({super.key});
@@ -44,26 +45,22 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     }).toList();
   }
 
+@override
+Widget build(BuildContext context) {
+  return MainScaffold(
+    title: 'Customer View',               // ← your AppBar title
 
-  @override
-  Widget build(BuildContext context) {
+    leading: IconButton(                   // ← optional back button
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => context.push('/home'),
+    ),
 
-    return Scaffold(
-      bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.push('/home'),
-        ),
-        title: Text('Customer View'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => context.push('/add_customer'),
-          ),
-        ],
+    actions: [                             // ← optional AppBar actions
+      IconButton(
+        icon: const Icon(Icons.add),
+        onPressed: () => context.push('/add_customer'),
       ),
-
+    ],
       body: Column(
         children: [
 

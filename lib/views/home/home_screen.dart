@@ -6,10 +6,11 @@ import 'package:cateredtoyou/models/user_model.dart';
 import 'package:cateredtoyou/services/role_permissions.dart';
 import 'package:cateredtoyou/widgets/permission_widget.dart';
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
-import 'package:cateredtoyou/widgets/custom_app_bar.dart';
+import 'package:cateredtoyou/widgets/themed_app_bar.dart'; 
 import 'package:cateredtoyou/widgets/custom_drawer.dart';
 import 'package:cateredtoyou/widgets/urgent_tasks_widget.dart';
 import 'package:cateredtoyou/widgets/urgent_events_widget.dart';
+
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -21,8 +22,9 @@ class HomeScreen extends StatelessWidget {
     final rolePermissions = context.read<RolePermissions>();
 
     return Scaffold(
-      backgroundColor: Color(0xFFFAF9F6), // Set background color to orange
-      appBar: const CustomAppBar(title: 'CateredToYou'),
+    //  backgroundColor: Color(0xFFFAF9F6), // Set background color to orange
+      //appBar: const CustomAppBar(title: 'CateredToYou'),
+      appBar: const ThemedAppBar('CateredToYou'),
       drawer: const CustomDrawer(),
       bottomNavigationBar: const BottomToolbar(),
       body: SingleChildScrollView(

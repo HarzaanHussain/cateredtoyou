@@ -3,6 +3,11 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cateredtoyou/models/auth_model.dart';
 import 'package:cateredtoyou/widgets/permission_widget.dart';
+import 'package:cateredtoyou/widgets/gradient_header.dart';
+import 'package:cateredtoyou/services/theme_manager.dart';
+import 'package:cateredtoyou/widgets/gradient_app_bar.dart';   // ⬅️ gradient
+  
+
 
 class CustomDrawer extends StatelessWidget {
   const CustomDrawer({super.key});
@@ -15,21 +20,30 @@ class CustomDrawer extends StatelessWidget {
       child: SafeArea(
         child: Column(
           children: [
-            // Fixed height drawer header
-            Container(
-              height: 100,
-              width: double.infinity,
-              color: const Color(0xFFFBC72B),
-              padding: const EdgeInsets.all(16),
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'CateredToYou',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+           // ─── Drawer header (auto-palette) ───────────────────────────────────
+              Consumer<ThemeManager>(
+                builder: (context, tm, _) {
+                  // Royal-Blue → glossy gradient header; Honey → solid yellow
+                  return tm.preset == ThemePreset.royalBlue
+                      ? const GradientHeader(height: 100)         // ⬅️ uses the new widget
+                      : Container(
+                          height: 100,
+                          width: double.infinity,
+                          color: Theme.of(context).colorScheme.primary,
+                          padding: const EdgeInsets.all(16),
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'CateredToYou',
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        );
+                },
               ),
-            ),
+
+
 
             // Scrollable list of menu items
             Expanded(

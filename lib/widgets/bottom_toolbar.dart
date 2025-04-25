@@ -1,10 +1,7 @@
 import 'package:cateredtoyou/services/role_permissions.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cateredtoyou/widgets/permission_widget.dart';
 import 'package:provider/provider.dart';
-// You'll likely want to import your notification service
-// import 'package:cateredtoyou/services/notification_service.dart';
 
 class BottomToolbar extends StatefulWidget {
   const BottomToolbar({super.key});
@@ -14,134 +11,117 @@ class BottomToolbar extends StatefulWidget {
 }
 
 class _BottomToolbarState extends State<BottomToolbar> {
-  // This can be updated when notification status changes
   bool hasUnreadNotifications = false;
-  bool _hasEventPermission = true;
-  bool _hasDeliveryPermission = true;
-  bool _hasNotificationPermission = true;
-  bool _isInitialized = false;
 
-  // You might want to add this when you implement the notification feature
-  // late final NotificationService _notificationService;
+  bool _hasEventPermission       = true;
+  bool _hasDeliveryPermission    = true;
+  bool _hasNotificationPermission= true;
+  bool _isInitialized            = false;
 
   @override
   void initState() {
     super.initState();
     _loadPermissions();
-    // Setup notification listeners here later
-    // Example:
-    // _notificationService = NotificationService();
-    // _notificationService.unreadNotificationsStream.listen((hasUnread) {
-    //   setState(() {
-    //     hasUnreadNotifications = hasUnread;
-    //   });
-    // });
-  }
-
-  @override
-  void dispose() {
-    // Clean up any listeners when disposed
-    // Example:
-    // _notificationService.dispose();
-    super.dispose();
+    // TODO: hook up NotificationService → hasUnreadNotifications
   }
 
   Future<void> _loadPermissions() async {
-    if(!mounted) return;
-    final rolePermissions = Provider.of<RolePermissions>(context, listen: false);
+    final role = context.read<RolePermissions>();
+    final eventPerm  = await role.hasPermission('manage_events');
+    final delivPerm  = await role.hasPermission('view_deliveries');
+    final notifPerm  = await role.hasPermission('manage_events');
 
-    final eventPermission = await rolePermissions.hasPermission("manage_events");
-    final deliveryPermission = await rolePermissions.hasPermission("view_deliveries");
-    final notificationPermission = await rolePermissions.hasPermission("manage_events");
-
-    if(mounted){
-      setState(() {
-        _hasEventPermission = eventPermission;
-        _hasDeliveryPermission = deliveryPermission;
-        _hasNotificationPermission = notificationPermission;
-        _isInitialized = true;
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      _hasEventPermission        = eventPerm;
+      _hasDeliveryPermission     = delivPerm;
+      _hasNotificationPermission = notifPerm;
+      _isInitialized             = true;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return BottomAppBar(
-      color: Color(0xFFFFC30B),
-      height: 70, // Further reduced from 70 to 68
+      color: scheme.primary,                // ← palette aware
+      height: 70,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          // Events button
-          _hasEventPermission
-            ? _buildNavItem(
-              context: context, 
-              icon: Icons.event_available, 
-              label: 'Events', 
-              onPressed: () => context.push('/events'),
-            )
-            : Opacity(
-                opacity: 0.3,
-                child: _buildNavItem(
-                  context: context, 
-                  icon: Icons.event_available, 
-                  label: 'Events', 
-                  onPressed: (){}
-                ),
-            ),
+          // Events
+          _buildPermittedNav(
+            hasPerm : _hasEventPermission,
+            context : context,
+            icon    : Icons.event_available,
+            label   : 'Events',
+            onTap   : () => context.push('/events'),
+          ),
 
-          // Calendar button
+          // Calendar (always allowed)
           _buildNavItem(
-            context: context,
-            icon: Icons.calendar_today,
-            label: 'Calendar',
+            context : context,
+            icon    : Icons.calendar_today,
+            label   : 'Calendar',
             onPressed: () => context.push('/calendar'),
           ),
 
-          // Home button (center, elevated)
-          _buildHomeButton(context),
+          // Home – floating circle
+          _buildHomeButton(context, scheme.primary),
 
-          // Deliveries button
-          _hasDeliveryPermission
-            ? _buildNavItem(
-              context: context, 
-              icon: Icons.route, 
-              label: 'Deliveries', 
-              onPressed: () => context.push('/deliveries'),
-            )
-            : Opacity(
-                opacity: 0.3,
-                child: _buildNavItem(
-                  context: context, 
-                  icon: Icons.route,
-                  label: 'Deliveries', 
-                  onPressed: (){}
-                ),
-            ),
+          // Deliveries
+          _buildPermittedNav(
+            hasPerm : _hasDeliveryPermission,
+            context : context,
+            icon    : Icons.route,
+            label   : 'Deliveries',
+            onTap   : () => context.push('/driver-deliveries'),
+          ),
 
-          // Notifications button
-          _hasNotificationPermission
-            ? _buildNavItem(
-              context: context, 
-              icon: Icons.notifications, 
-              label: 'Notifications', 
-              onPressed: () => context.push('/notifications'),
-            )
-            : Opacity(
-                opacity: 0.3,
-                child: _buildNavItem(
-                  context: context, 
-                  icon: Icons.notifications, 
-                  label: 'Notifications', 
-                  onPressed: (){}
-                ),
-            ),
+          // Notifications (show red dot if unread)
+          _buildPermittedNav(
+            hasPerm : _hasNotificationPermission,
+            context : context,
+            icon    : Icons.notifications,
+            label   : 'Notifications',
+            onTap   : () => context.push('/notifications'),
+            hasNotification: hasUnreadNotifications,
+          ),
         ],
       ),
     );
   }
 
-  // Helper method to build navigation items with icon and text
+  // Convenience wrapper to grey-out if no permission
+  Widget _buildPermittedNav({
+    required bool hasPerm,
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool hasNotification = false,
+  }) {
+    return hasPerm
+        ? _buildNavItem(
+            context: context,
+            icon: icon,
+            label: label,
+            onPressed: onTap,
+            hasNotification: hasNotification,
+          )
+        : Opacity(
+            opacity: .3,
+            child: _buildNavItem(
+              context: context,
+              icon: icon,
+              label: label,
+              onPressed: () {},                 // disabled
+            ),
+          );
+  }
+
+  // Generic item
   Widget _buildNavItem({
     required BuildContext context,
     required IconData icon,
@@ -152,40 +132,38 @@ class _BottomToolbarState extends State<BottomToolbar> {
     return InkWell(
       onTap: onPressed,
       child: Container(
-        width: 60, // Further reduced from 65
-        padding:
-            const EdgeInsets.symmetric(vertical: 4), // Further reduced padding
+        width: 60,
+        padding: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(icon, size: 20), // Further reduced from 22
+                Icon(icon, size: 20, color: Colors.white),
                 if (hasNotification)
                   Positioned(
                     top: -3,
                     right: -3,
                     child: Container(
-                      width: 8, // Further reduced notification dot
-                      height: 8, // Further reduced notification dot
+                      width: 8,
+                      height: 8,
                       decoration: BoxDecoration(
                         color: Colors.red,
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: Theme.of(context).scaffoldBackgroundColor,
-                          width: 1.0, // Reduced border width
+                          width: 1,
                         ),
                       ),
                     ),
                   ),
               ],
             ),
-            const SizedBox(height: 1), // Further reduced spacing
+            const SizedBox(height: 1),
             Text(
               label,
-              style: const TextStyle(fontSize: 9), // Further reduced from 10
-              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 9, color: Colors.white),
               overflow: TextOverflow.ellipsis,
             ),
           ],
@@ -194,18 +172,17 @@ class _BottomToolbarState extends State<BottomToolbar> {
     );
   }
 
-  // Special home button with different styling
-  Widget _buildHomeButton(BuildContext context) {
+  // Central Home FAB-style button
+  Widget _buildHomeButton(BuildContext context, Color bg) {
     return Container(
       width: 54,
       height: 54,
       decoration: BoxDecoration(
-        color: Color(0xFFFFC30B),
+        color: bg,                            // ← palette aware
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            spreadRadius: 1,
+            color: Colors.black.withOpacity(.2),
             blurRadius: 3,
             offset: const Offset(0, 2),
           ),
@@ -214,36 +191,25 @@ class _BottomToolbarState extends State<BottomToolbar> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
+          customBorder: const CircleBorder(),
+          splashColor: Colors.white.withOpacity(.3),
+          highlightColor: Colors.white.withOpacity(.1),
           onTap: () {
-            // First pop back to root if there are any routes in stack
             while (Navigator.of(context).canPop()) {
               Navigator.of(context).pop();
             }
-            // Then use go_router to navigate to home
             context.go('/home');
           },
-          splashColor: Colors.white.withOpacity(0.3),
-          highlightColor: Colors.white.withOpacity(0.1),
-          customBorder: const CircleBorder(),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.home,
-                color: Colors.white,
-                size: 20,
-              ),
-              const SizedBox(height: 1),
-              Text(
-                'Home',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 8,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
+            children: const [
+              Icon(Icons.home, color: Colors.white, size: 20),
+              SizedBox(height: 1),
+              Text('Home',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w500)),
             ],
           ),
         ),

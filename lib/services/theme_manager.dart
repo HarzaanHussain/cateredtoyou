@@ -1,21 +1,33 @@
+// theme_manager.dart
+// Lightweight preset-based theme manager (no dark‑mode)
+// ─────────────────────────────────────────────────────
+
 import 'package:flutter/material.dart';
 
+/// Pre‑defined UI palettes your app can switch between.
+/// Extend the enum if you add more colour schemes later.
+enum ThemePreset {
+  honey,
+  royalBlue,
+}
 
+/// Holds the active [ThemePreset] and notifies listeners when it changes.
+///
+/// Usage:
+/// ```dart
+/// final tm = context.read<ThemeManager>();
+/// tm.setPreset(ThemePreset.royalBlue);
+/// ```
+class ThemeManager with ChangeNotifier {
+  ThemePreset _preset = ThemePreset.honey;
 
-//lightweight theme manager for dark mode 
-class ThemeManager extends ChangeNotifier {
-  bool _isDarkMode = false;
-  
-  // Getter for the current dark mode status.
-  bool get isDarkMode => _isDarkMode;
-  
-  // Getter that returns the current ThemeMode.
-  ThemeMode get themeMode => _isDarkMode ? ThemeMode.dark : ThemeMode.light;
-  
-  // Toggle the dark mode flag and notify listeners so MaterialApp rebuilds.
-  void toggleTheme(bool value) {
-    _isDarkMode = value;
-    notifyListeners();
+  ThemePreset get preset => _preset;
+
+  /// Call this to change the global theme.
+  void setPreset(ThemePreset value) {
+    if (_preset == value) return; // no‑op if unchanged
+    _preset = value;
+    notifyListeners(); // triggers rebuild of MaterialApp
   }
 }
 

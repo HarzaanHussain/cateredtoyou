@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart'; // Importing GoRouter package for nav
 import 'package:cateredtoyou/models/user_model.dart'; // Importing UserModel class from models.
 import 'package:cateredtoyou/services/staff_service.dart'; // Importing StaffService class for staff-related operations.
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
+import 'package:cateredtoyou/widgets/main_scaffold.dart';
 
 /// A screen that displays a list of staff members and allows searching, adding, and editing staff.
 class StaffListScreen extends StatefulWidget {
@@ -48,26 +49,25 @@ class _StaffListScreenState extends State<StaffListScreen> {
     }).toList();
   }
 
-  @override
+       @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // backgroundColor: const Color(0xFFFBC72B), // Yellow background
-      bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back), // Back button icon.
-          onPressed: () =>
-              context.push('/home'), // Navigate to home screen when pressed.
-        ),
-        title: const Text('Staff Management'), // Title of the app bar.
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add), // Add button icon.
-            onPressed: () => context.push(
-                '/add-staff'), // Navigate to add staff screen when pressed.
-          ),
-        ],
+    return MainScaffold(
+      title: 'Staff Management',
+
+      // ⬅ back button
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => context.push('/home'),
       ),
+
+      // ➕ add-staff button
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.add),
+          onPressed: () => context.push('/add-staff'),
+        ),
+      ],
+
       body: Column(
         children: [
           Padding(
