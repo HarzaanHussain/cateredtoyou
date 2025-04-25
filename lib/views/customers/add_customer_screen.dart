@@ -6,7 +6,7 @@ import 'package:cateredtoyou/widgets/custom_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-
+import 'package:cateredtoyou/widgets/main_scaffold.dart';
 class AddCustomerScreen extends StatefulWidget {
   const AddCustomerScreen({super.key});
 
@@ -111,13 +111,13 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
       }
     }
   }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
-        title: const Text('Add Customer'),
+    return MainScaffold(
+      title: 'Add Customer',
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => context.pop(),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

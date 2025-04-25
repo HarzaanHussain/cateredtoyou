@@ -6,6 +6,7 @@ import 'package:cateredtoyou/models/inventory_item_model.dart'; // Importing the
 import 'package:cateredtoyou/services/inventory_service.dart'; // Importing the inventory service for CRUD operations.
 import 'package:cateredtoyou/widgets/custom_button.dart'; // Importing custom button widget.
 import 'package:cateredtoyou/widgets/custom_text_field.dart'; // Importing custom text field widget.
+import 'package:cateredtoyou/widgets/main_scaffold.dart';
 
 class InventoryEditScreen extends StatefulWidget { // Stateful widget for editing inventory items.
   final InventoryItem? item; // Optional inventory item to edit.
@@ -122,11 +123,12 @@ class _InventoryEditScreenState extends State<InventoryEditScreen> { // State cl
   @override
   Widget build(BuildContext context) { // Building the UI.
     final isEditing = widget.item != null; // Checking if editing or adding new item.
+ return MainScaffold(
+      title: isEditing ? 'Edit Item' : 'Add Item',
 
-    return Scaffold(
-      bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
-        title: Text(isEditing ? 'Edit Item' : 'Add Item'), // Setting app bar title.
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => context.pop(),
       ),
       body: SingleChildScrollView( // Wrapping content in scroll view.
         padding: const EdgeInsets.all(16.0), // Adding padding.

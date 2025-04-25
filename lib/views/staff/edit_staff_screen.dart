@@ -9,6 +9,7 @@ import 'package:cateredtoyou/services/staff_service.dart'; // Importing StaffSer
 import 'package:cateredtoyou/widgets/custom_button.dart'; // Importing custom button widget.
 import 'package:cateredtoyou/widgets/custom_text_field.dart'; // Importing custom text field widget.
 import 'package:cateredtoyou/utils/validators.dart'; // Importing validators for form validation.
+import 'package:cateredtoyou/widgets/main_scaffold.dart';
 
 class EditStaffScreen extends StatefulWidget {
   // Stateful widget for editing staff details.
@@ -238,55 +239,56 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
     );
   }
 
-  @override
+   @override
   Widget build(BuildContext context) {
-    final isActive =
-        widget.staff.employmentStatus == 'active'; // Check if staff is active.
+    final isActive = widget.staff.employmentStatus == 'active';
 
-    return Scaffold(
-      bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
-      title: Text('Edit ${widget.staff.fullName}'), // Display the full name of the staff member being edited in the app bar title.
+    return MainScaffold(
+      title: 'Edit ${widget.staff.fullName}',
+
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => context.pop(),
+      ),
+
       actions: [
         StreamBuilder<UserModel?>(
-        stream: context
-          .read<AuthService>()
-          .authStateChanges
-          .asyncMap((user) async {
-          if (user == null) return null;
-          final doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-          if (!doc.exists) return null;
-          return UserModel.fromMap(doc.data()!);
-        }),
-        builder: (context, snapshot) {
-          final canManagePermissions =
-            ['admin', 'client', 'manager'].contains(snapshot.data?.role); // Check if the current user has permission to manage staff permissions.
-
-          return Row(
-          children: [
-            if (canManagePermissions)
-            IconButton(
-              icon: const Icon(Icons.security),
-              tooltip: 'Manage Permissions', // Tooltip for the manage permissions button.
-              onPressed: () => context.push(
-              '/staff/${widget.staff.uid}/permissions',
-              extra: widget.staff, // Navigate to the manage permissions screen with the staff member's details.
-              ),
-            ),
-            IconButton(
-            icon: const Icon(Icons.key),
-            onPressed: _isLoading ? null : _handleResetPassword, // Disable the button if loading, otherwise handle password reset.
-            tooltip: 'Reset Password', // Tooltip for the reset password button.
-            ),
-          ],
-          );
-        },
+          stream: context
+              .read<AuthService>()
+              .authStateChanges
+              .asyncMap((user) async {
+            if (user == null) return null;
+            final doc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
+            if (!doc.exists) return null;
+            return UserModel.fromMap(doc.data()!);
+          }),
+          builder: (context, snapshot) {
+            final canManagePermissions = ['admin', 'client', 'manager']
+                .contains(snapshot.data?.role);
+            return Row(
+              children: [
+                if (canManagePermissions)
+                  IconButton(
+                    icon: const Icon(Icons.security),
+                    tooltip: 'Manage Permissions',
+                    onPressed: () => context.push(
+                      '/staff/${widget.staff.uid}/permissions',
+                      extra: widget.staff,
+                    ),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.key),
+                  tooltip: 'Reset Password',
+                  onPressed: _isLoading ? null : _handleResetPassword,
+                ),
+              ],
+            );
+          },
         ),
       ],
-      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0), // Set padding for the body.
         child: Form(

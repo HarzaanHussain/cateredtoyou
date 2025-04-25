@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart'; // Importing go_router package for na
 import 'package:cateredtoyou/models/inventory_item_model.dart'; // Importing inventory item model
 import 'package:cateredtoyou/services/inventory_service.dart'; // Importing inventory service
 import 'package:cateredtoyou/widgets/custom_button.dart'; // Importing custom button widget
+import 'package:cateredtoyou/widgets/main_scaffold.dart';
 
 class InventoryListScreen extends StatefulWidget { // Defining a stateful widget for inventory list screen
   const InventoryListScreen({super.key}); // Constructor with optional key
@@ -134,20 +135,16 @@ class _InventoryListScreenState extends State<InventoryListScreen> { // State cl
       ),
     );
   }
-
   @override
-  Widget build(BuildContext context) { // Build method for widget
-    return Scaffold( // Scaffold widget for basic material design layout
-      bottomNavigationBar: BottomToolbar(),
-      appBar: AppBar( // App bar for the screen
-        title: const Text('Inventory Management'), // Title of the app bar
-        actions: [
-          IconButton( // Button to add new inventory item
-            icon: const Icon(Icons.add), // Icon for the button
-            onPressed: () => context.push('/add-inventory'), // Navigate to add inventory screen on press
-          ),
-        ],
-      ),
+  Widget build(BuildContext context) {
+    return MainScaffold(
+      title: 'Inventory Management',
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.add),
+          onPressed: () => context.push('/add-inventory'),
+        ),
+      ],
       body: Column( // Column to arrange widgets vertically
         children: [
           Padding( // Padding for search and filter section
