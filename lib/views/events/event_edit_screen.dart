@@ -817,15 +817,12 @@ class _EventEditScreenState extends State<EventEditScreen> {
           key: _formKey,
           child: Column(
             children: [
-              // Progress indicator
               LinearProgressIndicator(
                 value: (_currentPage + 1) / 3,
                 backgroundColor: Colors.grey[300],
-                valueColor: AlwaysStoppedAnimation<Color>(
-                    Theme.of(context).primaryColor),
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE6A700)),
+                minHeight: 4,
               ),
-
-              // Step indicator
               Padding(
                 padding:
                     const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
@@ -840,8 +837,6 @@ class _EventEditScreenState extends State<EventEditScreen> {
                   ],
                 ),
               ),
-
-              // Form pages
               Expanded(
                 child: PageView(
                   controller: _pageController,
@@ -858,8 +853,6 @@ class _EventEditScreenState extends State<EventEditScreen> {
                   ],
                 ),
               ),
-
-              // Navigation buttons
               _buildNavButtons(),
             ],
           ),
@@ -872,49 +865,164 @@ class _EventEditScreenState extends State<EventEditScreen> {
     final isActive = _currentPage >= step;
     final isCurrentStep = _currentPage == step;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            color: isActive ? Theme.of(context).primaryColor : Colors.grey[300],
-            borderRadius: BorderRadius.circular(15),
-            border: isCurrentStep
-                ? Border.all(color: Theme.of(context).primaryColor, width: 3)
-                : null,
-          ),
-          child: Center(
-            child: Text(
-              '${step + 1}',
-              style: TextStyle(
-                color: isActive ? Colors.white : Colors.black54,
-                fontWeight: FontWeight.bold,
+    return GestureDetector(
+      onTap:
+          isActive || step == _currentPage + 1 ? () => _goToPage(step) : null,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 35,
+            height: 35,
+            decoration: BoxDecoration(
+              color:
+                  isActive ? Theme.of(context).primaryColor : Colors.grey[300],
+              borderRadius: BorderRadius.circular(17.5),
+              border: isCurrentStep
+                  ? Border.all(color: Theme.of(context).primaryColor, width: 3)
+                  : null,
+              boxShadow: isActive
+                  ? [
+                      BoxShadow(
+                        color: Theme.of(context).primaryColor.withOpacity(0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: MouseRegion(
+              cursor: (isActive || step == _currentPage + 1)
+                  ? SystemMouseCursors.click
+                  : SystemMouseCursors.basic,
+              child: Center(
+                child: Text(
+                  '${step + 1}',
+                  style: TextStyle(
+                    color: isActive ? Colors.white : Colors.black54,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isCurrentStep ? FontWeight.bold : FontWeight.normal,
-            color:
-                isCurrentStep ? Theme.of(context).primaryColor : Colors.black54,
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isCurrentStep ? FontWeight.bold : FontWeight.normal,
+              color: isCurrentStep
+                  ? Theme.of(context).primaryColor
+                  : Colors.black54,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
+  }
+
+  void _goToPage(int pageIndex) {
+    if (_currentPage < pageIndex) {
+      bool canProceed = true;
+
+      for (int i = _currentPage; i < pageIndex; i++) {
+        if (!_validateSpecificPage(i)) {
+          canProceed = false;
+          break;
+        }
+      }
+
+      if (!canProceed) {
+        return;
+      }
+    }
+
+    _pageController.animateToPage(
+      pageIndex,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  bool _validateSpecificPage(int pageIndex) {
+    switch (pageIndex) {
+      case 0:
+        if (_nameController.text.isEmpty ||
+            _descriptionController.text.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please fill in all required fields')),
+          );
+          return false;
+        }
+        if (_selectedCustomerId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please select a customer')),
+          );
+          return false;
+        }
+        return true;
+
+      case 1:
+        if (_locationController.text.isEmpty ||
+            _guestCountController.text.isEmpty ||
+            _minStaffController.text.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please fill in all required fields')),
+          );
+          return false;
+        }
+
+        try {
+          final guestCount = int.parse(_guestCountController.text);
+          if (guestCount < 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Guest count must be a positive number')),
+            );
+            return false;
+          }
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Guest count must be a valid number')),
+          );
+          return false;
+        }
+
+        try {
+          final minStaff = int.parse(_minStaffController.text);
+          if (minStaff < 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Minimum staff must be a positive number')),
+            );
+            return false;
+          }
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Minimum staff must be a valid number')),
+          );
+          return false;
+        }
+
+        return true;
+
+      default:
+        return true;
+    }
   }
 
   Widget _buildStepConnector(bool isActive) {
     return Container(
-      width: 30,
-      height: 2,
-      color: isActive ? Theme.of(context).primaryColor : Colors.grey[300],
-      margin: const EdgeInsets.symmetric(horizontal: 4),
+      width: 40,
+      height: 4,
+      decoration: BoxDecoration(
+        color: isActive ? Theme.of(context).primaryColor : Colors.grey[300],
+        borderRadius: BorderRadius.circular(2),
+      ),
+      margin: const EdgeInsets.symmetric(horizontal: 8),
     );
   }
 }
