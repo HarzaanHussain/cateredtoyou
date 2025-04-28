@@ -866,8 +866,8 @@ class _EventEditScreenState extends State<EventEditScreen> {
     final isCurrentStep = _currentPage == step;
 
     return GestureDetector(
-      onTap:
-          isActive || step == _currentPage + 1 ? () => _goToPage(step) : null,
+      // Make all steps clickable, regardless of current page
+      onTap: step != _currentPage ? () => _goToPage(step) : null,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -892,7 +892,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
                   : null,
             ),
             child: MouseRegion(
-              cursor: (isActive || step == _currentPage + 1)
+              cursor: step != _currentPage
                   ? SystemMouseCursors.click
                   : SystemMouseCursors.basic,
               child: Center(
@@ -924,21 +924,33 @@ class _EventEditScreenState extends State<EventEditScreen> {
   }
 
   void _goToPage(int pageIndex) {
-    if (_currentPage < pageIndex) {
-      bool canProceed = true;
-
+    // If going forward, validate all pages in between
+    if (pageIndex > _currentPage) {
+      // Loop through and validate each page between current and target
       for (int i = _currentPage; i < pageIndex; i++) {
         if (!_validateSpecificPage(i)) {
-          canProceed = false;
-          break;
-        }
-      }
+          // Show a more specific error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please complete page ${i + 1} before proceeding'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
 
-      if (!canProceed) {
-        return;
+          // Navigate to the first page that needs attention instead of staying on current page
+          if (i != _currentPage) {
+            _pageController.animateToPage(
+              i,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
+          }
+          return;
+        }
       }
     }
 
+    // If no validation issues or going backward, proceed to the target page
     _pageController.animateToPage(
       pageIndex,
       duration: const Duration(milliseconds: 300),
