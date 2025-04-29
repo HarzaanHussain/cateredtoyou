@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -388,6 +389,7 @@ class _SplitViewManifestScreenState extends State<SplitViewManifestScreen> {
     // If screen is too small, redirect to the tabbed view
     if (isSmallScreen) {
       return Scaffold(
+        bottomNavigationBar: const BottomToolbar(),
         appBar: AppBar(
           title: const Text('Manifest Details'),
         ),

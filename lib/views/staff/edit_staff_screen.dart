@@ -1,4 +1,5 @@
 import 'package:cateredtoyou/services/auth_service.dart';
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
 import 'package:provider/provider.dart'; // Importing Provider package for state management.
@@ -243,6 +244,7 @@ class _EditStaffScreenState extends State<EditStaffScreen> {
         widget.staff.employmentStatus == 'active'; // Check if staff is active.
 
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
       title: Text('Edit ${widget.staff.fullName}'), // Display the full name of the staff member being edited in the app bar title.
       actions: [

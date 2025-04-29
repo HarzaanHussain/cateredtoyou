@@ -1,5 +1,6 @@
 
 import 'package:cateredtoyou/models/vehicle_model.dart'; // Import the Vehicle model.
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore for database interactions.
 import 'package:flutter/material.dart'; // Import Flutter material design components.
 import 'package:go_router/go_router.dart'; // Import GoRouter for navigation.
@@ -24,6 +25,7 @@ class VehicleDetailsScreen extends StatelessWidget {
     final colorScheme = theme.colorScheme; // Get the current color scheme.
 
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       /// App bar with the vehicle's make and model as the title.
       appBar: AppBar(
         title: Text('${vehicle.make} ${vehicle.model}'), // Display vehicle's make and model in the app bar.

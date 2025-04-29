@@ -107,7 +107,7 @@ class _BottomToolbarState extends State<BottomToolbar> {
               context: context, 
               icon: Icons.route, 
               label: 'Deliveries', 
-              onPressed: () => context.push('/driver-deliveries'),
+              onPressed: () => context.push('/deliveries'),
             )
             : Opacity(
                 opacity: 0.3,

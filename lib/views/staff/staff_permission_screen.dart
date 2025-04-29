@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
 import 'package:provider/provider.dart'; // Importing Provider package for state management.
 import 'package:cateredtoyou/services/role_permissions.dart'; // Importing custom service for role permissions.
@@ -143,6 +144,7 @@ class _UserPermissionsScreenState extends State<UserPermissionsScreen> { // Stat
     }
 
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         title: Text('Edit ${widget.user.fullName}\'s Permissions'), // Displaying user name in app bar.
         actions: [

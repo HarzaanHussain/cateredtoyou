@@ -1,4 +1,5 @@
 import 'package:cateredtoyou/views/tasks/task_staff_assignment_widget.dart';
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -104,6 +105,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         title: StreamBuilder<DocumentSnapshot>(
           stream: FirebaseFirestore.instance

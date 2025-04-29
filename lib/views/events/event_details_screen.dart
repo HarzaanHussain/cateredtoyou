@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components
 import 'package:provider/provider.dart'; // Importing provider package for state management
 import 'package:go_router/go_router.dart'; // Importing go_router package for navigation
@@ -23,6 +24,7 @@ class EventDetailsScreen extends StatelessWidget {
     final timeFormat = DateFormat('h:mm a'); // Time format for displaying times
 
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         title: const Text('Event Details'), // AppBar title
         leading: IconButton(

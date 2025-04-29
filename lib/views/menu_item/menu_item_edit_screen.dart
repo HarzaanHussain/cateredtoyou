@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
 import 'package:provider/provider.dart'; // Importing provider package for state management.
 import 'package:go_router/go_router.dart'; // Importing go_router package for navigation.
@@ -173,6 +174,7 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
     final isEditing = widget.menuItem != null; // Check if editing.
 
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         title: Text(isEditing ? 'Edit Menu Item' : 'Create Menu Item'), // Set app bar title.
       ),

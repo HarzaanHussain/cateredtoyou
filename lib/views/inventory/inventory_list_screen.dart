@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components
 import 'package:provider/provider.dart'; // Importing provider package for state management
 import 'package:go_router/go_router.dart'; // Importing go_router package for navigation
@@ -137,6 +138,7 @@ class _InventoryListScreenState extends State<InventoryListScreen> { // State cl
   @override
   Widget build(BuildContext context) { // Build method for widget
     return Scaffold( // Scaffold widget for basic material design layout
+      bottomNavigationBar: BottomToolbar(),
       appBar: AppBar( // App bar for the screen
         title: const Text('Inventory Management'), // Title of the app bar
         actions: [
