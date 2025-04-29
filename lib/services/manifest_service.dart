@@ -34,7 +34,6 @@ class ManifestService extends ChangeNotifier {
         yield []; // Yield an empty list
         return; // Return from the method
       }
-
       yield* _firestore // Query Firestore for manifests
           .collection('manifests') // Access the 'manifests' collection
           .where('organizationId',

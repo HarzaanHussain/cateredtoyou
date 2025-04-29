@@ -234,6 +234,7 @@ class _ManifestScreenState extends State<ManifestScreen> with SingleTickerProvid
                   }
 
                   var manifests = snapshot.data ?? [];
+
                   
                   if (manifests.isEmpty) {
                     return Center(
