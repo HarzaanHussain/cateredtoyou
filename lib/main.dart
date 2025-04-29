@@ -227,11 +227,16 @@ class MyApp extends StatelessWidget {
                 const TextStyle(fontSize: 14, color: Colors.black54),
               ),
               switchTheme: SwitchThemeData(
-                thumbColor: WidgetStateProperty.resolveWith<Color>(
-                      (states) => Colors.white,
-                ),
-                trackColor: WidgetStateProperty.all(const Color(0xFFD4AF37)),
-                overlayColor: WidgetStateProperty.all(const Color(0xFFD4AF37)),
+                thumbColor: MaterialStateProperty.resolveWith((states) {
+                  return states.contains(MaterialState.selected)
+                      ? Colors.white     // Thumb when ON
+                      : Colors.black;     // Thumb when OFF
+                }),
+                trackColor: MaterialStateProperty.resolveWith((states) {
+                  return states.contains(MaterialState.selected)
+                      ? Color(0xFFD4AF37) // Track when ON (gold)
+                      : Colors.white;       // Track when OFF
+                }),
               ),
             ),
             routerConfig: appRouter.router,
