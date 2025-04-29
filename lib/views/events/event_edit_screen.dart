@@ -426,7 +426,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
                           ? 'Next'
                           : (widget.event == null
                               ? 'Create Event'
-                              : 'Update Event'),
+                              : 'Confirm'),
                       style: _currentPage == 2
                           ? const TextStyle(
                               fontSize: 13) // Smaller font size for longer text
