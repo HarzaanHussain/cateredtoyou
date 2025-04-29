@@ -825,7 +825,7 @@ class _EventEditScreenState extends State<EventEditScreen> {
               ),
               Padding(
                 padding:
-                    const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                    const EdgeInsets.symmetric(vertical: 18.0, horizontal: 16.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
