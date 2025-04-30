@@ -1,4 +1,5 @@
 import 'package:cateredtoyou/views/manifest/widgets/partial_quantity_selector.dart';
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -828,93 +829,7 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen>
             ),
         ],
       ),
-      bottomNavigationBar: _buildBottomBar(isSmallScreen),
-    );
-  }
-
-  Widget _buildBottomBar(bool isSmallScreen) {
-    return BottomAppBar(
-      elevation: 8,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Selected items count
-            Expanded(
-              flex: 2,
-              child: Consumer<ManifestService>(
-                builder: (context, manifestService, child) {
-                  return StreamBuilder<Manifest?>(
-                    stream: manifestService.getManifestById(widget.manifestId),
-                    builder: (context, snapshot) {
-                      final manifest = snapshot.data;
-                      if (manifest == null) return const SizedBox.shrink();
-
-                      // Count selected items
-                      final selectedCount = _selectedItems.entries
-                          .where((entry) => entry.value)
-                          .length;
-
-                      return Text(
-                        selectedCount == 0
-                            ? 'No items selected'
-                            : '$selectedCount items selected',
-                        style: TextStyle(
-                          fontWeight: selectedCount > 0
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          fontSize: 14,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-
-            // Fixed size spacer
-            const SizedBox(width: 8),
-
-            // Action buttons with fixed width
-            if (_selectedItems.values.contains(true))
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextButton(
-                    child: const Text('Clear'),
-                    onPressed: () {
-                      setState(() {
-                        _selectedItems.clear();
-                        _showVehicleSelectorOverlay = false;
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  // FIXED BUTTON - Specified width to avoid infinite constraints
-                  SizedBox(
-                    width: isSmallScreen ? 100 : 150,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                      ),
-                      icon: Icon(
-                        Icons.local_shipping,
-                        size: isSmallScreen ? 14 : 18,
-                      ),
-                      label: Text(
-                        isSmallScreen ? 'Load' : 'Load to Vehicle',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onPressed: _showVehicleSelection,
-                    ),
-                  ),
-                ],
-              ),
-          ],
-        ),
-      ),
+      bottomNavigationBar: const BottomToolbar(),
     );
   }
 

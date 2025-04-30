@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
 import 'package:provider/provider.dart'; // Importing provider package for state management.
 import 'package:go_router/go_router.dart'; // Importing go_router package for navigation.
@@ -123,6 +124,7 @@ class _InventoryEditScreenState extends State<InventoryEditScreen> { // State cl
     final isEditing = widget.item != null; // Checking if editing or adding new item.
 
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         title: Text(isEditing ? 'Edit Item' : 'Add Item'), // Setting app bar title.
       ),

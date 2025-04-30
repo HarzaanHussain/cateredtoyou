@@ -1,5 +1,6 @@
 import 'package:cateredtoyou/models/vehicle_model.dart'; // Importing the vehicle model
 import 'package:cateredtoyou/services/vehicle_service.dart'; // Importing the vehicle service
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components
 import 'package:go_router/go_router.dart'; // Importing GoRouter for navigation
 import 'package:provider/provider.dart'; // Importing Provider for state management
@@ -52,6 +53,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     final isEditing = widget.vehicle != null; // Checking if the form is in editing mode
     
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         title: Text(isEditing ? 'Edit Vehicle' : 'Add Vehicle'), // Setting the title based on editing mode
       ),

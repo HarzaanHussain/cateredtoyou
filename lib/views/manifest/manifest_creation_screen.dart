@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -155,6 +156,7 @@ class _ManifestCreationScreenState extends State<ManifestCreationScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         title: const Text('Create Manifest'),
       ),

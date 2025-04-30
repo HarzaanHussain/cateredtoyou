@@ -1,5 +1,6 @@
 import 'package:cateredtoyou/services/customer_service.dart';
 import 'package:cateredtoyou/utils/validators.dart';
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:cateredtoyou/widgets/custom_button.dart';
 import 'package:cateredtoyou/widgets/custom_text_field.dart';
 import 'package:flutter/material.dart';
@@ -114,6 +115,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         title: const Text('Add Customer'),
       ),

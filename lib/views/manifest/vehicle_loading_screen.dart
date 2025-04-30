@@ -1,5 +1,6 @@
 // Update your VehicleLoadingScreen to enhance support for partial item loading
 
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -467,6 +468,7 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
 
     if (_isLoading) {
       return Scaffold(
+        bottomNavigationBar: const BottomToolbar(),
         appBar: AppBar(
           title: const Text('Vehicle Loading'),
         ),
@@ -478,6 +480,7 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
 
     if (_vehicle == null) {
       return Scaffold(
+        bottomNavigationBar: const BottomToolbar(),
         appBar: AppBar(
           title: const Text('Vehicle Loading'),
         ),
@@ -504,6 +507,7 @@ class _VehicleLoadingScreenState extends State<VehicleLoadingScreen> {
     }
 
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
         title: Text('${_vehicle!.make} ${_vehicle!.model} Loading'),
         actions: [
