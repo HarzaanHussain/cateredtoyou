@@ -97,7 +97,7 @@ class ManifestItem {
   }
 
   /// Converts Stage enum to string
-  static String _stageToString(Stage stage) {
+  static String stageToString(Stage stage) {
     return stage.toString().split('.').last;
   }
 
@@ -142,7 +142,7 @@ class ManifestItem {
       'itemName': itemName,
       'originalAmount': originalAmount,
       'currentAmount': currentAmount,
-      'currentStage': _stageToString(currentStage),
+      'currentStage': stageToString(currentStage),
       'status': _statusToString(status),
       'assignedAmount': assignedAmount,
       'loadedAmount': loadedAmount,
