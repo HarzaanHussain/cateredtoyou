@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
 import 'package:provider/provider.dart'; // Importing provider package for state management.
 import 'package:go_router/go_router.dart'; // Importing go_router package for navigation.
@@ -8,7 +9,8 @@ import 'package:cateredtoyou/services/inventory_service.dart'; // Importing Inve
 import 'package:cateredtoyou/widgets/custom_button.dart'; // Importing custom button widget.
 import 'package:cateredtoyou/widgets/custom_text_field.dart'; // Importing custom text field widget.
 
-class MenuItemEditScreen extends StatefulWidget { // Stateful widget for editing or creating menu items.
+class MenuItemEditScreen extends StatefulWidget {
+  // Stateful widget for editing or creating menu items.
   final MenuItem? menuItem; // Optional menu item to edit.
 
   const MenuItemEditScreen({
@@ -17,16 +19,20 @@ class MenuItemEditScreen extends StatefulWidget { // Stateful widget for editing
   });
 
   @override
-  State<MenuItemEditScreen> createState() => _MenuItemEditScreenState(); // Creating state for the widget.
+  State<MenuItemEditScreen> createState() =>
+      _MenuItemEditScreenState(); // Creating state for the widget.
 }
 
 class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
   final _formKey = GlobalKey<FormState>(); // Key for form validation.
   final _nameController = TextEditingController(); // Controller for name input.
-  final _descriptionController = TextEditingController(); // Controller for description input.
-  final _priceController = TextEditingController(); // Controller for price input.
+  final _descriptionController =
+      TextEditingController(); // Controller for description input.
+  final _priceController =
+      TextEditingController(); // Controller for price input.
   late MenuItemType _selectedType; // Variable to store selected menu item type.
-  final Map<String, double> _inventoryRequirements = {}; // Map to store inventory requirements.
+  final Map<String, double> _inventoryRequirements =
+      {}; // Map to store inventory requirements.
   bool _isLoading = false; // Loading state for async operations.
   String? _error; // Variable to store error messages.
 
@@ -34,14 +40,17 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
   void initState() {
     super.initState();
     final menuItem = widget.menuItem; // Getting the menu item from widget.
-    if (menuItem != null) { // If editing an existing menu item.
+    if (menuItem != null) {
+      // If editing an existing menu item.
       _nameController.text = menuItem.name; // Set name.
       _descriptionController.text = menuItem.description; // Set description.
       _priceController.text = menuItem.price.toString(); // Set price.
       _selectedType = menuItem.type; // Set type.
-      _inventoryRequirements.addAll(menuItem.inventoryRequirements); // Set inventory requirements.
+      _inventoryRequirements.addAll(
+          menuItem.inventoryRequirements); // Set inventory requirements.
     } else {
-      _selectedType = MenuItemType.mainCourse; // Default type for new menu item.
+      _selectedType =
+          MenuItemType.mainCourse; // Default type for new menu item.
     }
   }
 
@@ -53,7 +62,8 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
     super.dispose();
   }
 
-  void _addInventoryItem(InventoryItem item) { // Function to add inventory item.
+  void _addInventoryItem(InventoryItem item) {
+    // Function to add inventory item.
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -66,8 +76,10 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
                 labelText: 'Quantity Required', // Label for quantity input.
                 border: OutlineInputBorder(),
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true), // Input type for quantity.
-              validator: (value) { // Validator for quantity input.
+              keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true), // Input type for quantity.
+              validator: (value) {
+                // Validator for quantity input.
                 if (value == null || value.isEmpty) {
                   return 'Please enter a quantity'; // Error if empty.
                 }
@@ -80,11 +92,13 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
                 }
                 return null;
               },
-              onChanged: (value) { // On change handler for quantity input.
+              onChanged: (value) {
+                // On change handler for quantity input.
                 final quantity = double.tryParse(value);
                 if (quantity != null && quantity > 0) {
                   setState(() {
-                    _inventoryRequirements[item.id] = quantity; // Update inventory requirements.
+                    _inventoryRequirements[item.id] =
+                        quantity; // Update inventory requirements.
                   });
                 }
               },
@@ -105,13 +119,15 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
     );
   }
 
-  void _removeInventoryItem(String itemId) { // Function to remove inventory item.
+  void _removeInventoryItem(String itemId) {
+    // Function to remove inventory item.
     setState(() {
       _inventoryRequirements.remove(itemId); // Remove item from requirements.
     });
   }
 
-  Future<void> _handleSubmit() async { // Function to handle form submission.
+  Future<void> _handleSubmit() async {
+    // Function to handle form submission.
     if (!_formKey.currentState!.validate()) return; // Validate form.
 
     setState(() {
@@ -120,27 +136,34 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
     });
 
     try {
-      final menuItemService = context.read<MenuItemService>(); // Get menu item service.
+      final menuItemService =
+          context.read<MenuItemService>(); // Get menu item service.
       final price = double.parse(_priceController.text); // Parse price.
 
-      if (widget.menuItem == null) { // If creating new menu item.
+      if (widget.menuItem == null) {
+        // If creating new menu item.
         await menuItemService.createMenuItem(
           name: _nameController.text.trim(), // Get name.
           description: _descriptionController.text.trim(), // Get description.
           type: _selectedType, // Get type.
           price: price, // Get price.
-          inventoryRequirements: _inventoryRequirements, // Get inventory requirements.
+          inventoryRequirements:
+              _inventoryRequirements, // Get inventory requirements.
         );
-      } else { // If updating existing menu item.
+      } else {
+        // If updating existing menu item.
         final updatedMenuItem = widget.menuItem!.copyWith(
           name: _nameController.text.trim(), // Get updated name.
-          description: _descriptionController.text.trim(), // Get updated description.
+          description:
+              _descriptionController.text.trim(), // Get updated description.
           type: _selectedType, // Get updated type.
           price: price, // Get updated price.
-          inventoryRequirements: _inventoryRequirements, // Get updated inventory requirements.
+          inventoryRequirements:
+              _inventoryRequirements, // Get updated inventory requirements.
         );
 
-        await menuItemService.updateMenuItem(updatedMenuItem); // Update menu item.
+        await menuItemService
+            .updateMenuItem(updatedMenuItem); // Update menu item.
       }
 
       if (mounted) {
@@ -173,8 +196,11 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
     final isEditing = widget.menuItem != null; // Check if editing.
 
     return Scaffold(
+      bottomNavigationBar: const BottomToolbar(),
       appBar: AppBar(
-        title: Text(isEditing ? 'Edit Menu Item' : 'Create Menu Item'), // Set app bar title.
+        title: Text(isEditing
+            ? 'Edit Menu Item'
+            : 'Create Menu Item'), // Set app bar title.
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -187,7 +213,8 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
                 controller: _nameController, // Set name controller.
                 label: 'Item Name', // Set label.
                 prefixIcon: Icons.restaurant_menu, // Set prefix icon.
-                validator: (value) { // Validator for name input.
+                validator: (value) {
+                  // Validator for name input.
                   if (value == null || value.isEmpty) {
                     return 'Please enter an item name'; // Error if empty.
                   }
@@ -196,11 +223,13 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
               ),
               const SizedBox(height: 16),
               CustomTextField(
-                controller: _descriptionController, // Set description controller.
+                controller:
+                    _descriptionController, // Set description controller.
                 label: 'Description', // Set label.
                 prefixIcon: Icons.description, // Set prefix icon.
                 maxLines: 3, // Set max lines.
-                validator: (value) { // Validator for description input.
+                validator: (value) {
+                  // Validator for description input.
                   if (value == null || value.isEmpty) {
                     return 'Please enter a description'; // Error if empty.
                   }
@@ -215,13 +244,16 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.category), // Set prefix icon.
                 ),
-                items: MenuItemType.values.map((type) { // Map menu item types to dropdown items.
+                items: MenuItemType.values.map((type) {
+                  // Map menu item types to dropdown items.
                   return DropdownMenuItem(
                     value: type,
-                    child: Text(type.toString().split('.').last), // Display type name.
+                    child: Text(
+                        type.toString().split('.').last), // Display type name.
                   );
                 }).toList(),
-                onChanged: (value) { // On change handler for type selection.
+                onChanged: (value) {
+                  // On change handler for type selection.
                   if (value != null) {
                     setState(() {
                       _selectedType = value; // Update selected type.
@@ -234,8 +266,10 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
                 controller: _priceController, // Set price controller.
                 label: 'Price', // Set label.
                 prefixIcon: Icons.attach_money, // Set prefix icon.
-                keyboardType: const TextInputType.numberWithOptions(decimal: true), // Input type for price.
-                validator: (value) { // Validator for price input.
+                keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true), // Input type for price.
+                validator: (value) {
+                  // Validator for price input.
                   if (value == null || value.isEmpty) {
                     return 'Please enter a price'; // Error if empty.
                   }
@@ -253,40 +287,51 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
               Text(
                 'Inventory Requirements',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               const SizedBox(height: 8),
               StreamBuilder<List<InventoryItem>>(
-                stream: context.read<InventoryService>().getInventoryItems(), // Stream of inventory items.
+                stream: context
+                    .read<InventoryService>()
+                    .getInventoryItems(), // Stream of inventory items.
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
-                    return const Text('Error loading inventory items'); // Error message.
+                    return const Text(
+                        'Error loading inventory items'); // Error message.
                   }
 
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator()); // Loading indicator.
+                    return const Center(
+                        child:
+                            CircularProgressIndicator()); // Loading indicator.
                   }
 
-                  final inventoryItems = snapshot.data ?? []; // Get inventory items.
+                  final inventoryItems =
+                      snapshot.data ?? []; // Get inventory items.
                   return Column(
                     children: [
-                      ...inventoryItems.map((item) { // Map inventory items to list tiles.
-                        final quantity = _inventoryRequirements[item.id]; // Get required quantity.
+                      ...inventoryItems.map((item) {
+                        // Map inventory items to list tiles.
+                        final quantity = _inventoryRequirements[
+                            item.id]; // Get required quantity.
                         return Card(
                           child: ListTile(
                             title: Text(item.name), // Display item name.
                             subtitle: quantity != null
-                                ? Text('Required: $quantity ${item.unit}') // Display required quantity.
+                                ? Text(
+                                    'Required: $quantity ${item.unit}') // Display required quantity.
                                 : null,
                             trailing: quantity != null
                                 ? IconButton(
                                     icon: const Icon(Icons.delete),
-                                    onPressed: () => _removeInventoryItem(item.id), // Remove item.
+                                    onPressed: () => _removeInventoryItem(
+                                        item.id), // Remove item.
                                   )
                                 : IconButton(
                                     icon: const Icon(Icons.add),
-                                    onPressed: () => _addInventoryItem(item), // Add item.
+                                    onPressed: () =>
+                                        _addInventoryItem(item), // Add item.
                                   ),
                           ),
                         );
@@ -309,8 +354,11 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
                   ),
                 ),
               CustomButton(
-                label: isEditing ? 'Update Menu Item' : 'Create Menu Item', // Set button label.
-                onPressed: _isLoading ? null : _handleSubmit, // Handle button press.
+                label: isEditing
+                    ? 'Update Menu Item'
+                    : 'Create Menu Item', // Set button label.
+                onPressed:
+                    _isLoading ? null : _handleSubmit, // Handle button press.
                 isLoading: _isLoading, // Set loading state.
               ),
             ],
