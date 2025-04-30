@@ -43,9 +43,9 @@ class MenuItem {
       'name': name, // Name of the menu item
       'description': description, // Description of the menu item
       'type': type.toString().split('.').last, // Type of the menu item as a string
-      'price': price, // Price of the menu item
+      'price': price.toDouble(), // Price of the menu item
       'organizationId': organizationId, // Organization ID
-      'inventoryRequirements': inventoryRequirements, // Inventory requirements
+      'inventoryRequirements': inventoryRequirements.map((k, v) => MapEntry(k, v.toDouble())),
       'createdAt': Timestamp.fromDate(createdAt), // Creation timestamp as Firestore Timestamp
       'updatedAt': Timestamp.fromDate(updatedAt), // Update timestamp as Firestore Timestamp
       'createdBy': createdBy, // Creator ID
@@ -54,40 +54,22 @@ class MenuItem {
 
   // Factory constructor to create a MenuItem instance from a map
   factory MenuItem.fromMap(Map<String, dynamic> map, String docId) {
-  // Convert price safely
-  final dynamic rawPrice = map['price'] ?? 0;
-  final double price = rawPrice is int ? rawPrice.toDouble() : (rawPrice as num).toDouble();
-  
-  // Convert inventory requirements safely
-  final Map<String, dynamic> rawInventory = map['inventoryRequirements'] ?? {};
-  final Map<String, double> inventory = {};
-  
-  rawInventory.forEach((key, value) {
-    if (value is int) {
-      inventory[key] = value.toDouble();
-    } else if (value is double) {
-      inventory[key] = value;
-    } else {
-      inventory[key] = 0.0; // Default for unexpected types
-    }
-  });
-  
-  return MenuItem(
-    id: docId,
-    name: map['name'] ?? '',
-    description: map['description'] ?? '',
-    type: MenuItemType.values.firstWhere(
-      (type) => type.toString().split('.').last == map['type'],
-      orElse: () => MenuItemType.other,
-    ),
-    price: price,
-    organizationId: map['organizationId'] ?? '',
-    inventoryRequirements: inventory,
-    createdAt: (map['createdAt'] as Timestamp).toDate(),
-    updatedAt: (map['updatedAt'] as Timestamp).toDate(),
-    createdBy: map['createdBy'] ?? '',
-  );
-}
+    return MenuItem(
+      id: docId, // Document ID from Firestore
+      name: map['name'] ?? '', // Name from map or empty string if null
+      description: map['description'] ?? '', // Description from map or empty string if null
+      type: MenuItemType.values.firstWhere(
+            (type) => type.toString().split('.').last == map['type'], // Type from map or default to 'other'
+        orElse: () => MenuItemType.other,
+      ),
+      price: (map['price'] ?? 0).toDouble(), // Price from map or 0 if null
+      organizationId: map['organizationId'] ?? '', // Organization ID from map or empty string if null
+      inventoryRequirements: Map<String, double>.from(map['inventoryRequirements'] ?? {}), // Inventory requirements from map or empty map if null
+      createdAt: (map['createdAt'] as Timestamp).toDate(), // Creation timestamp from map
+      updatedAt: (map['updatedAt'] as Timestamp).toDate(), // Update timestamp from map
+      createdBy: map['createdBy'] ?? '', // Creator ID from map or empty string if null
+    );
+  }
 
   // Method to create a copy of MenuItem instance with updated fields
   MenuItem copyWith({
