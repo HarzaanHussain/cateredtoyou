@@ -446,6 +446,7 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -527,6 +528,7 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w600,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
           Text(
@@ -534,6 +536,7 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -621,55 +624,62 @@ class _DeliveryInfoCardState extends State<DeliveryInfoCard> {
               ),
             ),
 
+            // FIX: Row that was causing overflow
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          _timeLeft,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: _isDelayed
-                                ? theme.colorScheme.error
-                                : theme.colorScheme.onSurface,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        if (widget.route.status != 'cancelled' && widget.route.status != 'completed')
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: statusColor.withAlpha((0.15 * 255).toInt()),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: statusColor.withAlpha((0.5 * 255).toInt())),
-                            ),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
                             child: Text(
-                              statusLabel,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: statusColor,
-                                fontWeight: FontWeight.w600,
+                              _timeLeft,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: _isDelayed
+                                    ? theme.colorScheme.error
+                                    : theme.colorScheme.onSurface,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (widget.route.status != 'cancelled' && widget.route.status != 'completed')
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withAlpha((0.15 * 255).toInt()),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: statusColor.withAlpha((0.5 * 255).toInt())),
+                              ),
+                              child: Text(
+                                statusLabel,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: statusColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.route.status == 'pending' 
-                        ? 'Scheduled for ${DateFormat('h:mm a').format(widget.route.startTime)}'
-                        : 'Estimated arrival at ${DateFormat('h:mm a').format(widget.route.estimatedEndTime)}',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.route.status == 'pending' 
+                          ? 'Scheduled for ${DateFormat('h:mm a').format(widget.route.startTime)}'
+                          : 'Estimated arrival at ${DateFormat('h:mm a').format(widget.route.estimatedEndTime)}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
                 StatusChip(status: widget.route.status),
               ],
