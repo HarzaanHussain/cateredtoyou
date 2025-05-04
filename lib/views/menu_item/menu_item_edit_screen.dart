@@ -8,6 +8,7 @@ import 'package:cateredtoyou/services/menu_item_service.dart'; // Importing Menu
 import 'package:cateredtoyou/services/inventory_service.dart'; // Importing InventoryService for inventory management.
 import 'package:cateredtoyou/widgets/custom_button.dart'; // Importing custom button widget.
 import 'package:cateredtoyou/widgets/custom_text_field.dart'; // Importing custom text field widget.
+import 'package:cateredtoyou/widgets/main_scaffold.dart';
 
 class MenuItemEditScreen extends StatefulWidget {
   // Stateful widget for editing or creating menu items.
@@ -195,13 +196,12 @@ class _MenuItemEditScreenState extends State<MenuItemEditScreen> {
   Widget build(BuildContext context) {
     final isEditing = widget.menuItem != null; // Check if editing.
 
-    return Scaffold(
-      bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
-        title: Text(isEditing
+    return MainScaffold(
+     
+        title: isEditing
             ? 'Edit Menu Item'
-            : 'Create Menu Item'), // Set app bar title.
-      ),
+            : 'Create Menu Item',// Set app bar title.
+      
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(

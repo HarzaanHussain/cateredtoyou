@@ -115,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Image.asset(
                           'assets/Adobefile.png',
                           fit: BoxFit.contain,
-                           alignment: const Alignment(-1.5, 0),   // 👈 shift ~15 % to the right
+                           alignment: const Alignment(-1.5, 0),   //  shift ~15 % to the left
                         ),
                       ),
                     ),
