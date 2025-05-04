@@ -97,19 +97,33 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+      return Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('Welcome Back',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center),
-                const SizedBox(height: 32),
+           FractionallySizedBox(
+              alignment: Alignment.center,   // 🆕 keep it in the middle
+                      widthFactor: 0.5,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 170),
+                        child: Image.asset(
+                          'assets/Adobefile.png',
+                          fit: BoxFit.contain,
+                           alignment: const Alignment(-1.5, 0),   // 👈 shift ~15 % to the right
+                        ),
+                      ),
+                    ),
+           const SizedBox(height: 16),
+               /* const Text('Welcome Back',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center), */
+                const SizedBox(height: 24),  
                 CustomTextField(
                   controller: _emailController,
                   label: 'Email',
@@ -133,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   onFieldSubmitted: (_) => _handleLogin(), // Trigger login on enter key
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 CustomButton(
                   label: 'Login',
                   onPressed: _isLoading ? null : _handleLogin,
@@ -144,12 +158,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: _isForgotPasswordLoading ? null : _handleForgotPassword,
                   child: _isForgotPasswordLoading
                       ? const CircularProgressIndicator(strokeWidth: 2)
-                      : const Text('Forgot Password?'),
+                      
+                      :Text ('Forgot Password?',   style: TextStyle(
+                      color: Colors.black,   // brighter, higher‑contrast
+                      fontWeight: FontWeight.w600,
+                    ),), 
+                                        
                 ),
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () => context.push('/register'),
-                  child: const Text("Don't have an account? Register"),
+                  child:Text("Don't have an account? Register",   style: TextStyle(
+                  color: Colors.black,   // brighter, higher‑contrast
+                  fontWeight: FontWeight.w600,
+                ),),
                 ),
               ],
             ),

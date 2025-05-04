@@ -83,7 +83,7 @@ flutter:
 
   assets:
     - assets/splash_logo.png
-
+    - assets/Adobefile.png
 flutter_native_splash:
   color: "#FFC533"  # Background color
   image: assets/splash_logo.png  # Logo file
