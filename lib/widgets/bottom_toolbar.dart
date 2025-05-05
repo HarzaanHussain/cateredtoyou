@@ -2,6 +2,7 @@ import 'package:cateredtoyou/services/role_permissions.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:cateredtoyou/services/theme_manager.dart'; 
 
 class BottomToolbar extends StatefulWidget {
   const BottomToolbar({super.key});
@@ -43,9 +44,17 @@ class _BottomToolbarState extends State<BottomToolbar> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+     final tm     = context.watch<ThemeManager>();
+
+       
+    final Color barColor = tm.preset == ThemePreset.royalBlue
+        ? const Color(0xFF0B3E8C)           // professional, darker brand blue
+        : scheme.primary;                   // whatever the theme already defines
+
 
     return BottomAppBar(
-      color: scheme.primary,                // ← palette aware
+      elevation:8,
+      color: barColor,               // ← palette aware
       height: 70,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
