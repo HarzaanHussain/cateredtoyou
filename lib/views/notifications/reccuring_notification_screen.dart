@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/widgets/themed_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:cateredtoyou/models/reccuring_notification_model.dart';
 import 'package:cateredtoyou/services/notification_service.dart';
@@ -56,8 +57,8 @@ class _UnifiedNotificationScreenState extends State<UnifiedNotificationScreen> w
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Notification'),
+      appBar: ThemedAppBar(
+       const Text('Create Notification'),
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

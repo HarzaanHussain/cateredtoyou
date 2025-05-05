@@ -2,6 +2,7 @@ import 'package:cateredtoyou/models/customer_model.dart';
 import 'package:cateredtoyou/utils/auto_complete.dart';
 import 'package:cateredtoyou/widgets/event_metadata_selection.dart';
 import 'package:cateredtoyou/widgets/staff_assignment.dart';
+import 'package:cateredtoyou/widgets/themed_app_bar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
@@ -809,8 +810,8 @@ class _EventEditScreenState extends State<EventEditScreen> {
     final isEditing = widget.event != null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isEditing ? 'Edit Event' : 'Create Event'),
+      appBar: ThemedAppBar(
+         Text(isEditing ? 'Edit Event' : 'Create Event'),
       ),
       body: SafeArea(
         child: Form(

@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/widgets/themed_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:provider/provider.dart';
@@ -47,7 +48,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(title: const Text('Calendar')),
+      appBar: ThemedAppBar(const Text('Calendar')),
       body: StreamBuilder<List<Event>>(
         stream: context.read<EventService>().getEvents(),
         builder: (context, snapshot) {

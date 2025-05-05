@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:cateredtoyou/models/notification_model.dart';
 import 'package:cateredtoyou/services/notification_service.dart';
+import 'package:cateredtoyou/widgets/themed_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -213,8 +214,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
     return Scaffold(
       bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
-        title: const Text('Notifications'),
+      appBar: ThemedAppBar(
+        const Text('Notifications'),
         actions: [
           if (hasUnread)
             IconButton(

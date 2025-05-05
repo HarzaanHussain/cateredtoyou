@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/widgets/themed_app_bar.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components.
 import 'package:provider/provider.dart'; // Importing provider package for state management.
 import 'package:go_router/go_router.dart'; // Importing go_router package for navigation.
@@ -91,12 +92,12 @@ class _EventListScreenState extends State<EventListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
+      appBar: ThemedAppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back), // Back button icon.
           onPressed: () => context.push('/home'), // Navigate to home screen when pressed.
         ),  
-        title: const Text('Events'),
+         const Text('Events'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),

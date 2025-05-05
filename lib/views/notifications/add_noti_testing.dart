@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/widgets/themed_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:cateredtoyou/services/notification_service.dart';
 import 'package:intl/intl.dart';
@@ -191,8 +192,8 @@ class _CreateNotificationPageState extends State<CreateNotificationPage> {
     final String contentType = _screenController.text.replaceAll('-', ' ');
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Notification'),
+      appBar: ThemedAppBar(
+         const Text('Create Notification'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
