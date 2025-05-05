@@ -8,6 +8,7 @@ import 'package:cateredtoyou/services/vehicle_service.dart';
 import 'package:cateredtoyou/views/delivery/widgets/delivery_map.dart';
 import 'package:cateredtoyou/views/delivery/widgets/delivery_map_controller.dart';
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
+import 'package:cateredtoyou/widgets/themed_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_map/flutter_map.dart';
@@ -1061,8 +1062,8 @@ class _DeliveryFormScreenState extends State<DeliveryFormScreen> with AutomaticK
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
     
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Delivery'),
+      appBar: ThemedAppBar(
+         const Text('Create Delivery'), // Set the app bar title.
       ),
       body: Form(
         key: _formKey,

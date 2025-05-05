@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:cateredtoyou/widgets/themed_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
@@ -1454,8 +1455,8 @@ class _TrackDeliveryScreenState extends State<TrackDeliveryScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_currentRoute?.metadata?['eventName'] ?? 'Track Delivery'),
+      appBar: ThemedAppBar(
+        Text(_currentRoute?.metadata?['eventName'] ?? 'Track Delivery'),
         actions: [
           IconButton(
             icon: const Icon(Icons.my_location),

@@ -24,7 +24,7 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
     //  backgroundColor: Color(0xFFFAF9F6), // Set background color to orange
       //appBar: const CustomAppBar(title: 'CateredToYou'),
-      appBar: const ThemedAppBar('CateredToYou'),
+      appBar: const ThemedAppBar(Text('CateredToYou')),
       drawer: const CustomDrawer(),
       bottomNavigationBar: const BottomToolbar(),
       body: SingleChildScrollView(

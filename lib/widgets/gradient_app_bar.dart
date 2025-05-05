@@ -8,26 +8,32 @@ class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.leading,          // ← NEW
     this.actions,
     this.bottom,
+    this.elevation = 0,
     super.key,
   });
 
-  final String title;
+  final Widget title;
   final Widget? leading;   // ← NEW
   final List<Widget>? actions;
    final PreferredSizeWidget? bottom; 
+   final double elevation;
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Size get preferredSize =>  Size.fromHeight(   kToolbarHeight +
+        (bottom?.preferredSize.height ?? 0),
+      );
 
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      title: Text(title),
+      title: title,
       leading: leading,    // ← NEW
       actions: actions,
       bottom: bottom, 
-      backgroundColor: Colors.transparent,
-      elevation: 0,
+     // backgroundColor: Colors.transparent,
+     backgroundColor: const Color(0xFF0D47A1),
+      elevation: elevation,
+      //elevation: 0,
       flexibleSpace: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(

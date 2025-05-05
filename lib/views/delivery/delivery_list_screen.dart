@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/widgets/themed_app_bar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -19,8 +20,8 @@ class DeliveryListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       bottomNavigationBar: const BottomToolbar(),
-      appBar: AppBar(
-        title: const Text('Deliveries'),
+      appBar: ThemedAppBar(
+        const Text('Deliveries'),
         actions: [
           FutureBuilder<bool>(
             future: isManagementUser(context),

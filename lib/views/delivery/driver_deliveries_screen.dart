@@ -1,3 +1,4 @@
+import 'package:cateredtoyou/widgets/themed_app_bar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -116,8 +117,8 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> with Wi
       child: Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
         bottomNavigationBar: const BottomToolbar(),
-        appBar: AppBar(
-          title: const Text('My Deliveries'),
+        appBar: ThemedAppBar(
+          const Text('My Deliveries'),
           actions: [
             if (_hasManagePermission)
               IconButton(

@@ -1,4 +1,5 @@
 import 'package:cateredtoyou/views/manifest/manifest_creation_screen.dart';
+import 'package:cateredtoyou/widgets/themed_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cateredtoyou/services/manifest_service.dart';
@@ -55,8 +56,8 @@ class _ManifestScreenState extends State<ManifestScreen> with SingleTickerProvid
       length: 3,
       child: Scaffold(
         bottomNavigationBar: const BottomToolbar(),
-        appBar: AppBar(
-          title: const Text('Catering Management'),
+        appBar: ThemedAppBar(
+           const Text('Catering Management'),
           elevation: 2,
           bottom: const TabBar(
             labelColor: Colors.black,        // <- selected tab text color

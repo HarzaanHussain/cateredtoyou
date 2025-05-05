@@ -1,5 +1,6 @@
 import 'package:cateredtoyou/views/manifest/widgets/partial_quantity_selector.dart';
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
+import 'package:cateredtoyou/widgets/themed_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -628,8 +629,8 @@ class _ManifestDetailScreenState extends State<ManifestDetailScreen>
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
+      appBar: ThemedAppBar(
+         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [

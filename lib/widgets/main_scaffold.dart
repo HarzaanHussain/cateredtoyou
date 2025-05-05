@@ -25,7 +25,7 @@ class MainScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: ThemedAppBar(           // pass to ThemedAppBar
-        title,
+        Text(title),
         leading: leading,             // ← NEW
         actions: actions,
       ),

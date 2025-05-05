@@ -1,4 +1,5 @@
 import 'package:cateredtoyou/widgets/bottom_toolbar.dart';
+import 'package:cateredtoyou/widgets/themed_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -390,8 +391,8 @@ class _SplitViewManifestScreenState extends State<SplitViewManifestScreen> {
     if (isSmallScreen) {
       return Scaffold(
         bottomNavigationBar: const BottomToolbar(),
-        appBar: AppBar(
-          title: const Text('Manifest Details'),
+        appBar: ThemedAppBar(
+           const Text('Manifest Details'),
         ),
         body: const Center(
           child: Text('This view requires a larger screen'),
@@ -400,8 +401,8 @@ class _SplitViewManifestScreenState extends State<SplitViewManifestScreen> {
     }
     
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
+      appBar: ThemedAppBar(
+         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [

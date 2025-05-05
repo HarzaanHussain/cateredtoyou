@@ -10,15 +10,20 @@ class ThemedAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.leading,          // ← NEW
     this.actions,
     this.bottom,
+    this.elevation = 0,
   });
 
-  final String title;
+  final Widget title;
   final Widget? leading;   // ← NEW
   final List<Widget>? actions;
-    final PreferredSizeWidget? bottom; 
+  final PreferredSizeWidget? bottom; 
+  final double elevation; 
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Size get preferredSize => Size.fromHeight(
+      kToolbarHeight +          // 56
+        (bottom?.preferredSize.height ?? 0),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -30,12 +35,14 @@ class ThemedAppBar extends StatelessWidget implements PreferredSizeWidget {
             leading: leading,         // ← NEW
             actions: actions,
             bottom: bottom,
+            elevation: elevation,
           )
         : AppBar(
-            title: Text(title),
+            title: title,
             leading: leading,         // ← NEW
             actions: actions,
              bottom: bottom,
+             elevation: elevation,
           );
   }
 }
