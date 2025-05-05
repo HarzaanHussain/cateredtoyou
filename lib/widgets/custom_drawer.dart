@@ -132,12 +132,20 @@ class CustomDrawer extends StatelessWidget {
         required String label,
         required String route,
       }) {
-    return PermissionWidget(
+         return Padding(                                     // ← NEW wrapper
+    padding: EdgeInsets.symmetric(vertical: 2), // 4 px top & bottom
+    child: PermissionWidget(
       permissionId: permissionId,
       child: ListTile(
         contentPadding: const EdgeInsets.only(left: 16, right: 0),
         leading: Icon(icon),
-        title: Text(label),
+        title: Text(
+        label,
+        style: Theme.of(context)
+            .textTheme
+            .titleMedium!
+            .copyWith(fontSize: 18),  // bump here
+      ),
         trailing: const Padding(
           padding: EdgeInsets.only(right: 12.0), // Move arrow closer to edge
           child: SizedBox(
@@ -150,6 +158,7 @@ class CustomDrawer extends StatelessWidget {
           ),
         ),
         onTap: () => context.push(route),
+      ),
       ),
     );
   }
