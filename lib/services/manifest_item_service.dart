@@ -2,989 +2,350 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cateredtoyou/models/manifest_item_model.dart';
-import '../models/event_model.dart';
 import 'organization_service.dart';
-import 'event_service.dart';
+import 'package:cateredtoyou/models/organization_model.dart';
 
-/// Primary service for managing all manifest item operations across all stages
+/// Primary service for database operations related to manifest items
 class ManifestItemService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final OrganizationService _organizationService;
-  final EventService? _eventService; // Optional to avoid circular dependency
 
-  ManifestItemService(this._organizationService, [this._eventService]);
+  ManifestItemService(this._organizationService);
 
   // Collection reference
   CollectionReference<Map<String, dynamic>> get _manifestItemsCollection =>
       _firestore.collection('manifestItems');
 
   //
-  // Core CRUD operations
+  // Core Stream Queries (Read operations)
   //
 
   /// Get all manifest items for an event
-  Stream<List<ManifestItem>> getManifestItemsByEvent(String eventId) async* {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        yield [];
-        return;
-      }
-
-      final organization = await _organizationService
-          .getCurrentUserOrganization();
-      if (organization == null) {
-        yield [];
-        return;
-      }
-
-      yield* _manifestItemsCollection
-          .where('eventId', isEqualTo: eventId)
-          .where('organizationId', isEqualTo: organization.id)
-          .snapshots()
-          .map((snapshot) =>
-          snapshot.docs
-              .map((doc) => ManifestItem.fromFirestore(doc))
-              .toList());
-    } catch (e) {
-      debugPrint('Error getting manifest items by event: $e');
-      yield [];
-    }
+  Stream<List<ManifestItem>> getManifestItemsByEvent(String eventId) {
+    return _safeStream(
+        'getting manifest items by event',
+            () async {
+          final (_, org) = await _requireUserAndOrg();
+          return _baseEventQuery(eventId, org.id)
+              .snapshots()
+              .map((snapshot) =>
+              snapshot.docs
+                  .map((doc) => ManifestItem.fromFirestore(doc))
+                  .toList());
+        },
+        []);
   }
 
   /// Get all manifest items assigned to a vehicle
-  Stream<List<ManifestItem>> getManifestItemsByVehicle(
-      String vehicleId) async* {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        yield [];
-        return;
-      }
-
-      final organization = await _organizationService
-          .getCurrentUserOrganization();
-      if (organization == null) {
-        yield [];
-        return;
-      }
-
-      yield* _manifestItemsCollection
-          .where('vehicleId', isEqualTo: vehicleId)
-          .where('organizationId', isEqualTo: organization.id)
-          .snapshots()
-          .map((snapshot) =>
-          snapshot.docs
-              .map((doc) => ManifestItem.fromFirestore(doc))
-              .toList());
-    } catch (e) {
-      debugPrint('Error getting manifest items by vehicle: $e');
-      yield [];
-    }
+  Stream<List<ManifestItem>> getManifestItemsByVehicle(String vehicleId) {
+    return _safeStream(
+        'getting manifest items by vehicle',
+            () async {
+          final (_, org) = await _requireUserAndOrg();
+          return _manifestItemsCollection
+              .where('vehicleId', isEqualTo: vehicleId)
+              .where('organizationId', isEqualTo: org.id)
+              .snapshots()
+              .map((snapshot) =>
+              snapshot.docs
+                  .map((doc) => ManifestItem.fromFirestore(doc))
+                  .toList());
+        },
+        []);
   }
 
   /// Get manifest items by stage for an event
-  Stream<List<ManifestItem>> getManifestItemsByStage(String eventId,
-      Stage stage) async* {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        yield [];
-        return;
-      }
-
-      final organization = await _organizationService
-          .getCurrentUserOrganization();
-      if (organization == null) {
-        yield [];
-        return;
-      }
-
-      yield* _manifestItemsCollection
-          .where('eventId', isEqualTo: eventId)
-          .where('organizationId', isEqualTo: organization.id)
-          .where('currentStage', isEqualTo: ManifestItem.stageToString(stage))
-          .snapshots()
-          .map((snapshot) =>
-          snapshot.docs
-              .map((doc) => ManifestItem.fromFirestore(doc))
-              .toList());
-    } catch (e) {
-      debugPrint('Error getting manifest items by stage: $e');
-      yield [];
-    }
-  }
-
-  /// Create a new manifest item
-  Future<ManifestItem> createManifestItem(ManifestItem item) async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
-
-      final organization = await _organizationService
-          .getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
-
-      final userDoc = await _firestore.collection('users')
-          .doc(currentUser.uid)
-          .get();
-      if (!userDoc.exists) {
-        throw 'User data not found';
-      }
-
-      // ID might be provided or generated by Firestore
-      final String docId = item.id.isEmpty ? _manifestItemsCollection
-          .doc()
-          .id : item.id;
-
-      // Create a new item with the current timestamp and user
-      final updatedItem = ManifestItem(
-        id: docId,
-        eventId: item.eventId,
-        itemId: item.itemId,
-        itemName: item.itemName,
-        originalAmount: item.originalAmount,
-        currentAmount: item.currentAmount,
-        currentStage: item.currentStage,
-        status: item.status,
-        assignedAmount: item.assignedAmount,
-        loadedAmount: item.loadedAmount,
-        vehicleId: item.vehicleId,
-        lastUpdatedBy: currentUser.uid,
-        lastUpdatedAt: DateTime.now(),
-        organizationId: organization.id,
-        notes: item.notes,
-      );
-
-      // Save to Firestore
-      await _manifestItemsCollection.doc(docId).set(updatedItem.toMap());
-
-      notifyListeners();
-      return updatedItem;
-    } catch (e) {
-      debugPrint('Error creating manifest item: $e');
-      rethrow;
-    }
-  }
-
-  /// Update an existing manifest item
-  Future<void> updateManifestItem(ManifestItem item) async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
-
-      final organization = await _organizationService
-          .getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
-
-      // Verify item exists and belongs to this organization
-      final docSnapshot = await _manifestItemsCollection.doc(item.id).get();
-      if (!docSnapshot.exists) {
-        throw 'Manifest item not found';
-      }
-
-      final existingItem = ManifestItem.fromFirestore(docSnapshot);
-      if (existingItem.organizationId != organization.id) {
-        throw 'Manifest item belongs to another organization';
-      }
-
-      // Update with current user and timestamp
-      final updatedItem = item.copyWith(
-        lastUpdatedBy: currentUser.uid,
-        lastUpdatedAt: DateTime.now(),
-      );
-
-      await _manifestItemsCollection.doc(item.id).update(updatedItem.toMap());
-
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Error updating manifest item: $e');
-      rethrow;
-    }
-  }
-
-  /// Delete a manifest item
-  Future<void> deleteManifestItem(String itemId) async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
-
-      final organization = await _organizationService
-          .getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
-
-      // Verify item exists and belongs to this organization
-      final docSnapshot = await _manifestItemsCollection.doc(itemId).get();
-      if (!docSnapshot.exists) {
-        throw 'Manifest item not found';
-      }
-
-      final existingItem = ManifestItem.fromFirestore(docSnapshot);
-      if (existingItem.organizationId != organization.id) {
-        throw 'Manifest item belongs to another organization';
-      }
-
-      await _manifestItemsCollection.doc(itemId).delete();
-
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Error deleting manifest item: $e');
-      rethrow;
-    }
-  }
-
-  //
-  // Prep Stage Methods
-  //
-
-  /// Generates manifest items from an event's menu items
-  Future<List<ManifestItem>> generateManifestItemsFromEvent(
-      String eventId) async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
-
-      final organization = await _organizationService
-          .getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
-
-      // Get the event to access its menu items
-      final event = _eventService != null
-          ? await _eventService!.getEventById(eventId)
-          : null;
-
-      if (event == null) {
-        throw 'Event not found';
-      }
-
-      // Check if there are already manifest items for this event
-      final existingItems = await _firestore
-          .collection('manifestItems')
-          .where('eventId', isEqualTo: eventId)
-          .get();
-
-      if (existingItems.docs.isNotEmpty) {
-        throw 'Manifest items already exist for this event';
-      }
-
-      final List<ManifestItem> createdItems = [];
-      final now = DateTime.now();
-
-      // Create a manifest item for each menu item
-      for (final EventMenuItem menuItem in event.menuItems) {
-        final newItem = ManifestItem(
-          id: '',
-          // Will be generated by createManifestItem
-          eventId: eventId,
-          itemId: menuItem.menuItemId,
-          itemName: menuItem.name,
-          originalAmount: menuItem.quantity,
-          currentAmount: menuItem.quantity,
-          currentStage: Stage.prep,
-          status: ItemStatus.raw,
-          assignedAmount: 0,
-          loadedAmount: 0,
-          vehicleId: null,
-          lastUpdatedBy: currentUser.uid,
-          lastUpdatedAt: now,
-          organizationId: organization.id,
-          notes: menuItem.specialInstructions,
-        );
-
-        final createdItem = await createManifestItem(newItem);
-        createdItems.add(createdItem);
-      }
-
-      // Also create manifest items for supplies if needed
-      for (final EventSupply supply in event.supplies) {
-        final newItem = ManifestItem(
-          id: '',
-          // Will be generated by createManifestItem
-          eventId: eventId,
-          itemId: supply.inventoryId,
-          itemName: '${supply.name} (${supply.unit})',
-          originalAmount: supply.quantity.toInt(),
-          currentAmount: supply.quantity.toInt(),
-          currentStage: Stage.prep,
-          status: ItemStatus.raw,
-          assignedAmount: 0,
-          loadedAmount: 0,
-          vehicleId: null,
-          lastUpdatedBy: currentUser.uid,
-          lastUpdatedAt: now,
-          organizationId: organization.id,
-          notes: null,
-        );
-
-        final createdItem = await createManifestItem(newItem);
-        createdItems.add(createdItem);
-      }
-
-      notifyListeners();
-      return createdItems;
-    } catch (e) {
-      debugPrint('Error generating manifest items from event: $e');
-      rethrow;
-    }
-  }
-
-  /// Updates the preparation status and quantities of items
-  Future<void> updateItemPrep(String itemId, ItemStatus status,
-      int amount) async {
-    try {
-      await updateItemStatus(itemId, status, amount);
-
-      // Get the updated item to check if we need to advance the stage
-      final itemSnapshot = await _firestore.collection('manifestItems').doc(
-          itemId).get();
-
-      if (itemSnapshot.exists) {
-        final item = ManifestItem.fromFirestore(itemSnapshot);
-
-        // If the item is service-ready, advance to assign stage
-        if (status == ItemStatus.serviceReady &&
-            item.currentStage == Stage.prep) {
-          final updatedItem = item.copyWith(
-            currentStage: Stage.assign,
-          );
-
-          await updateManifestItem(updatedItem);
-        }
-      }
-
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Error updating item prep: $e');
-      rethrow;
-    }
-  }
-
-  /// Gets all items for an event regardless of stage, but filtered for the prep view
-  Stream<List<ManifestItem>> getAllItemsForPrepView(String eventId) async* {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        yield [];
-        return;
-      }
-
-      final organization = await _organizationService
-          .getCurrentUserOrganization();
-      if (organization == null) {
-        yield [];
-        return;
-      }
-
-      // We want items from both prep and assign stages
-      yield* _firestore
-          .collection('manifestItems')
-          .where('eventId', isEqualTo: eventId)
-          .where('organizationId', isEqualTo: organization.id)
-          .where('currentStage', whereIn: [
-        ManifestItem.stageToString(Stage.prep),
-        ManifestItem.stageToString(Stage.assign)
-      ])
-          .snapshots()
-          .map((snapshot) =>
-          snapshot.docs
-              .map((doc) => ManifestItem.fromFirestore(doc))
-              .toList());
-    } catch (e) {
-      debugPrint('Error getting items for prep view: $e');
-      yield [];
-    }
-  }
-
-  //
-  // Assign Stage Methods
-  //
-
-  /// Assign multiple items to a vehicle with specified amounts
-  Future<void> assignItemsToVehicle(List<String> itemIds,
-      String vehicleId,
-      List<int> amounts,) async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
-
-      final organization = await _organizationService
-          .getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
-
-      // Validate input lists have the same length
-      if (itemIds.length != amounts.length) {
-        throw 'Item IDs and amounts must have the same length';
-      }
-
-      // Validate vehicle exists and belongs to organization
-      final vehicleDoc = await _firestore.collection('vehicles')
-          .doc(vehicleId)
-          .get();
-      if (!vehicleDoc.exists) {
-        throw 'Vehicle not found';
-      }
-
-      final vehicleData = vehicleDoc.data() as Map<String, dynamic>;
-      if (vehicleData['organizationId'] != organization.id) {
-        throw 'Vehicle belongs to another organization';
-      }
-
-      // Use a batch to update all items
-      final batch = _firestore.batch();
-      final now = DateTime.now();
-
-      // Process each item
-      for (int i = 0; i < itemIds.length; i++) {
-        final String itemId = itemIds[i];
-        final int amount = amounts[i];
-
-        final itemDoc = await _firestore.collection('manifestItems')
-            .doc(itemId)
-            .get();
-        if (!itemDoc.exists) {
-          continue; // Skip items that don't exist
-        }
-
-        final item = ManifestItem.fromFirestore(itemDoc);
-
-        // Validate amount doesn't exceed current amount
-        if (amount > item.currentAmount) {
-          continue; // Skip items with invalid amounts
-        }
-
-        // If assigning partial amount, we need to split the item
-        if (amount < item.currentAmount) {
-          // Split will be handled by the service method
-          await assignToVehicle(itemId, vehicleId, amount);
-        } else {
-          // Assign full amount - update in batch
-          final updatedItem = item.copyWith(
-            vehicleId: vehicleId,
-            assignedAmount: amount,
-            currentStage: Stage.assign,
-            lastUpdatedBy: currentUser.uid,
-            lastUpdatedAt: now,
-          );
-
-          batch.update(
-            _firestore.collection('manifestItems').doc(itemId),
-            updatedItem.toMap(),
-          );
-        }
-      }
-
-      // Commit all batched operations
-      await batch.commit();
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Error assigning items to vehicle: $e');
-      rethrow;
-    }
+  Stream<List<ManifestItem>> getManifestItemsByStage(String eventId, Stage stage) {
+    return _safeStream(
+        'getting manifest items by stage',
+            () async {
+          final (_, org) = await _requireUserAndOrg();
+          return _baseEventQuery(eventId, org.id)
+              .where('currentStage', isEqualTo: ManifestItem.stageToString(stage))
+              .snapshots()
+              .map((snapshot) =>
+              snapshot.docs
+                  .map((doc) => ManifestItem.fromFirestore(doc))
+                  .toList());
+        },
+        []);
   }
 
   /// Get all items that can be assigned (prep and assign stages)
-  Stream<List<ManifestItem>> getAssignableItems(String eventId) async* {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        yield [];
-        return;
-      }
-
-      final organization = await _organizationService
-          .getCurrentUserOrganization();
-      if (organization == null) {
-        yield [];
-        return;
-      }
-
-      yield* _firestore
-          .collection('manifestItems')
-          .where('eventId', isEqualTo: eventId)
-          .where('organizationId', isEqualTo: organization.id)
-          .where('currentStage', whereIn: [
-        ManifestItem.stageToString(Stage.prep),
-        ManifestItem.stageToString(Stage.assign)
-      ])
-          .snapshots()
-          .map((snapshot) =>
-          snapshot.docs
-              .map((doc) => ManifestItem.fromFirestore(doc))
-              .toList());
-    } catch (e) {
-      debugPrint('Error getting assignable items: $e');
-      yield [];
-    }
+  Stream<List<ManifestItem>> getAssignableItemsForEvent(String eventId) {
+    return _safeStream(
+        'getting assignable items',
+            () async {
+          final (_, org) = await _requireUserAndOrg();
+          final baseQuery = _baseEventQuery(eventId, org.id);
+          return _stageFilteredQuery(baseQuery, [Stage.prep, Stage.assign])
+              .snapshots()
+              .map((snapshot) =>
+              snapshot.docs
+                  .map((doc) => ManifestItem.fromFirestore(doc))
+                  .toList());
+        },
+        []);
   }
 
   /// Get items grouped by vehicle for an event
-  Stream<Map<String, List<ManifestItem>>> getItemsByVehicle(
-      String eventId) async* {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        yield {};
-        return;
-      }
+  Stream<Map<String, List<ManifestItem>>> getItemsByVehicle(String eventId) {
+    return _safeStream(
+        'getting items by vehicle',
+            () async {
+          final (_, org) = await _requireUserAndOrg();
 
-      final organization = await _organizationService
-          .getCurrentUserOrganization();
-      if (organization == null) {
-        yield {};
-        return;
-      }
+          // Get all items for this event that have a vehicleId
+          return _baseEventQuery(eventId, org.id)
+              .where('vehicleId', isNull: false)
+              .snapshots()
+              .map((snapshot) {
+            final items = snapshot.docs
+                .map((doc) => ManifestItem.fromFirestore(doc))
+                .toList();
 
-      // Get all items for this event that have a vehicleId
-      yield* _firestore
-          .collection('manifestItems')
-          .where('eventId', isEqualTo: eventId)
-          .where('organizationId', isEqualTo: organization.id)
-          .where('vehicleId', isNull: false)
-          .snapshots()
-          .map((snapshot) {
-        final items = snapshot.docs.map((doc) =>
-            ManifestItem.fromFirestore(doc)).toList();
+            // Group items by vehicleId
+            final Map<String, List<ManifestItem>> groupedItems = {};
 
-        // Group items by vehicleId
-        final Map<String, List<ManifestItem>> groupedItems = {};
-
-        for (final item in items) {
-          if (item.vehicleId != null) {
-            if (!groupedItems.containsKey(item.vehicleId)) {
-              groupedItems[item.vehicleId!] = [];
+            for (final item in items) {
+              if (item.vehicleId != null) {
+                if (!groupedItems.containsKey(item.vehicleId)) {
+                  groupedItems[item.vehicleId!] = [];
+                }
+                groupedItems[item.vehicleId!]!.add(item);
+              }
             }
-            groupedItems[item.vehicleId!]!.add(item);
-          }
-        }
 
-        return groupedItems;
-      });
-    } catch (e) {
-      debugPrint('Error getting items by vehicle: $e');
-      yield {};
-    }
-  }
-
-  //
-  // Load Stage Methods
-  //
-
-  /// Mark multiple items as loaded with specified amounts
-  Future<void> markItemsAsLoaded(List<String> itemIds,
-      List<int> amounts) async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
-
-      final organization = await _organizationService
-          .getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
-
-      // Validate input lists have the same length
-      if (itemIds.length != amounts.length) {
-        throw 'Item IDs and amounts must have the same length';
-      }
-
-      // Use a batch to update all items
-      final batch = _firestore.batch();
-      final now = DateTime.now();
-
-      // Track warnings to return to the caller
-      final List<String> warnings = [];
-
-      // Process each item
-      for (int i = 0; i < itemIds.length; i++) {
-        final String itemId = itemIds[i];
-        final int amount = amounts[i];
-
-        final itemDoc = await _firestore.collection('manifestItems')
-            .doc(itemId)
-            .get();
-        if (!itemDoc.exists) {
-          continue; // Skip items that don't exist
-        }
-
-        final item = ManifestItem.fromFirestore(itemDoc);
-
-        // Check if item is still in prep stage
-        if (item.currentStage == Stage.prep) {
-          warnings.add(
-              'Warning: Item "${item.itemName}" is still in prep stage');
-        }
-
-        // Validate if assigned to a vehicle
-        if (item.vehicleId == null) {
-          warnings.add(
-              'Warning: Item "${item.itemName}" is not assigned to a vehicle');
-          continue;
-        }
-
-        // Check if loading amount exceeds assigned amount
-        if (amount > item.assignedAmount) {
-          warnings.add('Warning: Loading more "${item
-              .itemName}" than assigned (${amount} > ${item.assignedAmount})');
-        }
-
-        // If loading partial amount, we need to split the item
-        if (amount < item.assignedAmount) {
-          // Split will be handled by the service method
-          await markAsLoaded(itemId, amount);
-        } else {
-          // Load full amount - update in batch
-          final updatedItem = item.copyWith(
-            loadedAmount: amount,
-            currentStage: Stage.load,
-            lastUpdatedBy: currentUser.uid,
-            lastUpdatedAt: now,
-          );
-
-          batch.update(
-            _firestore.collection('manifestItems').doc(itemId),
-            updatedItem.toMap(),
-          );
-        }
-      }
-
-      // Commit all batched operations
-      await batch.commit();
-
-      // Return warnings if any
-      if (warnings.isNotEmpty) {
-        debugPrint('Loading warnings: ${warnings.join(', ')}');
-      }
-
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Error marking items as loaded: $e');
-      rethrow;
-    }
+            return groupedItems;
+          });
+        },
+        {});
   }
 
   /// Get loadable items for a specific vehicle
-  Stream<List<ManifestItem>> getLoadableItemsForVehicle(
-      String vehicleId) async* {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        yield [];
-        return;
-      }
+  Stream<List<ManifestItem>> getLoadableItemsForVehicle(String vehicleId) {
+    return _safeStream(
+        'getting loadable items for vehicle',
+            () async {
+          final (_, org) = await _requireUserAndOrg();
 
-      final organization = await _organizationService
-          .getCurrentUserOrganization();
-      if (organization == null) {
-        yield [];
-        return;
-      }
-
-      yield* _firestore
-          .collection('manifestItems')
-          .where('vehicleId', isEqualTo: vehicleId)
-          .where('organizationId', isEqualTo: organization.id)
-          .where('currentStage', whereIn: [
-        ManifestItem.stageToString(Stage.assign),
-        ManifestItem.stageToString(Stage.load)
-      ])
-          .snapshots()
-          .map((snapshot) =>
-          snapshot.docs
-              .map((doc) => ManifestItem.fromFirestore(doc))
-              .toList());
-    } catch (e) {
-      debugPrint('Error getting loadable items for vehicle: $e');
-      yield [];
-    }
+          return _manifestItemsCollection
+              .where('vehicleId', isEqualTo: vehicleId)
+              .where('organizationId', isEqualTo: org.id)
+              .where('currentStage', whereIn: [
+            ManifestItem.stageToString(Stage.assign),
+            ManifestItem.stageToString(Stage.prep)
+          ])
+              .snapshots()
+              .map((snapshot) =>
+              snapshot.docs
+                  .map((doc) => ManifestItem.fromFirestore(doc))
+                  .toList());
+        },
+        []);
   }
 
   /// Get all loadable items grouped by event within a vehicle
-  Stream<Map<String, List<ManifestItem>>> getLoadableItemsByEvent(
-      String vehicleId) async* {
-    try {
-      final items = await getLoadableItemsForVehicle(vehicleId).first;
+  Stream<Map<String, List<ManifestItem>>> getLoadableItemsByEvent(String vehicleId) {
+    return _safeStream(
+        'getting loadable items by event',
+            () async {
+          final items = await getLoadableItemsForVehicle(vehicleId).first;
 
-      // Group items by event
-      final Map<String, List<ManifestItem>> groupedItems = {};
+          // Group items by event
+          final Map<String, List<ManifestItem>> groupedItems = {};
 
-      for (final item in items) {
-        if (!groupedItems.containsKey(item.eventId)) {
-          groupedItems[item.eventId] = [];
-        }
-        groupedItems[item.eventId]!.add(item);
-      }
+          for (final item in items) {
+            if (!groupedItems.containsKey(item.eventId)) {
+              groupedItems[item.eventId] = [];
+            }
+            groupedItems[item.eventId]!.add(item);
+          }
 
-      yield groupedItems;
-    } catch (e) {
-      debugPrint('Error getting loadable items by event: $e');
-      yield {};
-    }
+          return Stream.value(groupedItems);
+        },
+        {});
   }
 
-  /// Mark all items for a vehicle as loaded
-  Future<void> markAllVehicleItemsAsLoaded(String vehicleId) async {
+  //
+  // Batch CRUD Operations
+  //
+
+  /// Batch create manifest items
+  Future<List<ManifestItem>> batchCreateManifestItems(List<ManifestItem> items) async {
     try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
+      final (user, org) = await _requireUserAndOrg();
+
+      if (items.isEmpty) {
+        return [];
       }
 
-      // Get all assigned items for this vehicle
-      final itemsSnapshot = await _firestore
-          .collection('manifestItems')
-          .where('vehicleId', isEqualTo: vehicleId)
-          .where(
-          'currentStage', isEqualTo: ManifestItem.stageToString(Stage.assign))
-          .get();
-
-      if (itemsSnapshot.docs.isEmpty) {
-        return; // No items to load
-      }
-
-      final List<String> itemIds = [];
-      final List<int> amounts = [];
-
-      for (final doc in itemsSnapshot.docs) {
-        final item = ManifestItem.fromFirestore(doc);
-        itemIds.add(item.id);
-        amounts.add(item.assignedAmount);
-      }
-
-      // Mark all as loaded
-      await markItemsAsLoaded(itemIds, amounts);
-
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Error marking all vehicle items as loaded: $e');
-      rethrow;
-    }
-  }
-
-  /// Advance all loaded items to delivery stage
-  Future<void> advanceToDeliveryStage(String vehicleId) async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
-
-      // Get all loaded items for this vehicle
-      final itemsSnapshot = await _firestore
-          .collection('manifestItems')
-          .where('vehicleId', isEqualTo: vehicleId)
-          .where(
-          'currentStage', isEqualTo: ManifestItem.stageToString(Stage.load))
-          .get();
-
-      if (itemsSnapshot.docs.isEmpty) {
-        return; // No items to advance
-      }
-
-      // Use a batch to update all items
       final batch = _firestore.batch();
+      final List<ManifestItem> createdItems = [];
       final now = DateTime.now();
 
-      for (final doc in itemsSnapshot.docs) {
-        final item = ManifestItem.fromFirestore(doc);
+      for (final item in items) {
+        final docRef = _manifestItemsCollection.doc(item.id.isEmpty ? null : item.id);
 
-        final updatedItem = item.copyWith(
-          currentStage: Stage.deliver,
-          lastUpdatedBy: currentUser.uid,
+        final newItem = ManifestItem(
+          id: docRef.id,
+          eventId: item.eventId,
+          itemId: item.itemId,
+          itemName: item.itemName,
+          originalAmount: item.originalAmount,
+          currentAmount: item.currentAmount,
+          currentStage: item.currentStage,
+          status: item.status,
+          assignedAmount: item.assignedAmount,
+          loadedAmount: item.loadedAmount,
+          vehicleId: item.vehicleId,
+          lastUpdatedBy: user.uid,
           lastUpdatedAt: now,
+          organizationId: org.id,
+          notes: item.notes,
         );
 
-        batch.update(doc.reference, updatedItem.toMap());
+        batch.set(docRef, newItem.toMap());
+        createdItems.add(newItem);
       }
 
-      // Commit all batched operations
       await batch.commit();
-
       notifyListeners();
+      return createdItems;
     } catch (e) {
-      debugPrint('Error advancing to delivery stage: $e');
+      debugPrint('Error batch creating manifest items: $e');
       rethrow;
     }
   }
 
-  //
-  // Specialized workflow methods
-  //
-
-  /// Update the status of an item and its quantity
-  Future<void> updateItemStatus(String itemId, ItemStatus status,
-      int amount) async {
+  /// Batch update manifest items with common fields
+  Future<void> batchUpdateManifestItems(
+      List<String> itemIds,
+      Map<String, dynamic> updates
+      ) async {
     try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
+      final (user, org) = await _requireUserAndOrg();
+
+      if (itemIds.isEmpty) {
+        return;
       }
 
-      // Get the item
-      final docSnapshot = await _manifestItemsCollection.doc(itemId).get();
-      if (!docSnapshot.exists) {
-        throw 'Manifest item not found';
-      }
+      // Add audit fields
+      updates['lastUpdatedBy'] = user.uid;
+      updates['lastUpdatedAt'] = FieldValue.serverTimestamp();
 
-      final item = ManifestItem.fromFirestore(docSnapshot);
+      final batch = _firestore.batch();
 
-      // Validate amount
-      if (amount > item.originalAmount) {
-        throw 'Amount cannot exceed original amount';
-      }
-
-      // Update the item
-      final updatedItem = item.copyWith(
-        status: status,
-        currentAmount: amount,
-        lastUpdatedBy: currentUser.uid,
-        lastUpdatedAt: DateTime.now(),
+      // Get all items to verify org ownership
+      final itemDocs = await Future.wait(
+          itemIds.map((id) => _manifestItemsCollection.doc(id).get())
       );
 
-      // If the current amount is now 0, delete the item
-      if (updatedItem.currentAmount == 0) {
-        await deleteManifestItem(itemId);
-      } else {
-        await _manifestItemsCollection.doc(itemId).update(updatedItem.toMap());
+      for (final doc in itemDocs) {
+        if (!doc.exists) continue;
+
+        final item = ManifestItem.fromFirestore(doc);
+
+        // Skip items from other organizations
+        if (item.organizationId != org.id) continue;
+
+        batch.update(doc.reference, updates);
       }
 
+      await batch.commit();
       notifyListeners();
     } catch (e) {
-      debugPrint('Error updating item status: $e');
+      debugPrint('Error batch updating manifest items: $e');
       rethrow;
     }
   }
 
-  /// Assign an item to a vehicle with a specified amount
-  Future<void> assignToVehicle(String itemId, String vehicleId,
-      int amount) async {
+  /// Batch delete manifest items
+  Future<void> batchDeleteManifestItems(List<String> itemIds) async {
     try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
+      final (_, org) = await _requireUserAndOrg();
+
+      if (itemIds.isEmpty) {
+        return;
       }
 
-      // Get the item
-      final docSnapshot = await _manifestItemsCollection.doc(itemId).get();
-      if (!docSnapshot.exists) {
-        throw 'Manifest item not found';
+      // Get all items to verify org ownership
+      final itemDocs = await Future.wait(
+          itemIds.map((id) => _manifestItemsCollection.doc(id).get())
+      );
+
+      final batch = _firestore.batch();
+
+      for (final doc in itemDocs) {
+        if (!doc.exists) continue;
+
+        final item = ManifestItem.fromFirestore(doc);
+
+        // Skip items from other organizations
+        if (item.organizationId != org.id) continue;
+
+        batch.delete(doc.reference);
       }
 
-      final item = ManifestItem.fromFirestore(docSnapshot);
+      await batch.commit();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error batch deleting manifest items: $e');
+      rethrow;
+    }
+  }
 
-      // Validate assignment amount
-      if (amount > item.currentAmount) {
-        throw 'Assignment amount cannot exceed current amount';
-      }
+  /// Transactional update of a manifest item
+  Future<ManifestItem> transactionalUpdateManifestItem(ManifestItem item) async {
+    try {
+      final (user, org) = await _requireUserAndOrg();
 
-      // If assigning partial amount, split the item
-      if (amount < item.currentAmount) {
-        await splitItem(
-            itemId, amount, vehicleId: vehicleId, newStage: Stage.assign);
-      } else {
-        // Assign full amount
+      return await _firestore.runTransaction<ManifestItem>((transaction) async {
+        // Get the current state
+        final docRef = _manifestItemsCollection.doc(item.id);
+        final docSnapshot = await transaction.get(docRef);
+
+        if (!docSnapshot.exists) {
+          throw 'Manifest item not found';
+        }
+
+        final currentItem = ManifestItem.fromFirestore(docSnapshot);
+
+        // Verify ownership
+        if (currentItem.organizationId != org.id) {
+          throw 'Item belongs to another organization';
+        }
+
+        // Update with audit fields
         final updatedItem = item.copyWith(
-          vehicleId: vehicleId,
-          assignedAmount: amount,
-          currentStage: Stage.assign,
-          lastUpdatedBy: currentUser.uid,
+          lastUpdatedBy: user.uid,
           lastUpdatedAt: DateTime.now(),
         );
 
-        await _manifestItemsCollection.doc(itemId).update(updatedItem.toMap());
-      }
-
-      notifyListeners();
+        transaction.update(docRef, updatedItem.toMap());
+        return updatedItem;
+      });
     } catch (e) {
-      debugPrint('Error assigning item to vehicle: $e');
+      debugPrint('Error in transactional update: $e');
       rethrow;
     }
   }
 
-  /// Mark an item as loaded with a specified amount
-  Future<void> markAsLoaded(String itemId, int amount) async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
-
-      // Get the item
-      final docSnapshot = await _manifestItemsCollection.doc(itemId).get();
-      if (!docSnapshot.exists) {
-        throw 'Manifest item not found';
-      }
-
-      final item = ManifestItem.fromFirestore(docSnapshot);
-
-      // Validate load amount
-      if (amount > item.assignedAmount) {
-        throw 'Load amount cannot exceed assigned amount';
-      }
-
-      // If loading partial amount, split the item
-      if (amount < item.assignedAmount) {
-        await splitItem(itemId, amount, newStage: Stage.load);
-      } else {
-        // Load full amount
-        final updatedItem = item.copyWith(
-          loadedAmount: amount,
-          currentStage: Stage.load,
-          lastUpdatedBy: currentUser.uid,
-          lastUpdatedAt: DateTime.now(),
-        );
-
-        await _manifestItemsCollection.doc(itemId).update(updatedItem.toMap());
-      }
-
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Error marking item as loaded: $e');
-      rethrow;
-    }
-  }
-
-  /// Split an item into two separate items
-  /// Returns the newly created item
-  Future<List<ManifestItem>> splitItem(String itemId,
+  /// Split an item into two separate items (transactional)
+  Future<List<ManifestItem>> splitItem(
+      String itemId,
       int splitAmount, {
         String? vehicleId,
         Stage? newStage,
       }) async {
     try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
+      final (user, _) = await _requireUserAndOrg();
 
       // Run as a transaction to ensure consistency
-      return await _firestore.runTransaction<List<ManifestItem>>((
-          transaction) async {
+      return await _firestore.runTransaction<List<ManifestItem>>((transaction) async {
         // Get the item
-        final docSnapshot = await transaction.get(
-            _manifestItemsCollection.doc(itemId));
+        final docSnapshot = await transaction.get(_manifestItemsCollection.doc(itemId));
         if (!docSnapshot.exists) {
           throw 'Manifest item not found';
         }
@@ -1013,7 +374,7 @@ class ManifestItemService extends ChangeNotifier {
               : 0,
           loadedAmount: newStage == Stage.load ? splitAmount : 0,
           vehicleId: vehicleId,
-          lastUpdatedBy: currentUser.uid,
+          lastUpdatedBy: user.uid,
           lastUpdatedAt: DateTime.now(),
           organizationId: item.organizationId,
           notes: item.notes,
@@ -1023,7 +384,7 @@ class ManifestItemService extends ChangeNotifier {
         final remainingAmount = item.currentAmount - splitAmount;
         final updatedOriginalItem = item.copyWith(
           currentAmount: remainingAmount,
-          lastUpdatedBy: currentUser.uid,
+          lastUpdatedBy: user.uid,
           lastUpdatedAt: DateTime.now(),
         );
 
@@ -1034,8 +395,10 @@ class ManifestItemService extends ChangeNotifier {
         if (remainingAmount <= 0) {
           transaction.delete(_manifestItemsCollection.doc(itemId));
         } else {
-          transaction.update(_manifestItemsCollection.doc(itemId),
-              updatedOriginalItem.toMap());
+          transaction.update(
+              _manifestItemsCollection.doc(itemId),
+              updatedOriginalItem.toMap()
+          );
         }
 
         // Return both items - first is the updated original, second is the new split item
@@ -1047,17 +410,132 @@ class ManifestItemService extends ChangeNotifier {
     }
   }
 
-  /// Get real-time streams for manifest items
-  Stream<List<ManifestItem>> streamManifestItemsByEvent(String eventId) {
-    return getManifestItemsByEvent(eventId);
+  /// Process batch item updates with custom handling logic
+  Future<void> processBatchItemUpdate(
+      List<String> itemIds,
+      List<int> amounts,
+      Future<void> Function(ManifestItem, int, WriteBatch) processItem,
+      ) async {
+    try {
+      final (_, org) = await _requireUserAndOrg();
+
+      // Validate input lists have the same length
+      if (itemIds.length != amounts.length) {
+        throw 'Item IDs and amounts must have the same length';
+      }
+
+      if (itemIds.isEmpty) {
+        return;
+      }
+
+      // Get all items to process
+      final itemDocs = await Future.wait(
+          itemIds.map((id) => _manifestItemsCollection.doc(id).get())
+      );
+
+      // Create a batch for operations that don't need splitting
+      final batch = _firestore.batch();
+
+      // Process each item according to the provided function
+      for (int i = 0; i < itemDocs.length; i++) {
+        final doc = itemDocs[i];
+        if (!doc.exists) continue;
+
+        final item = ManifestItem.fromFirestore(doc);
+
+        // Skip items from other organizations
+        if (item.organizationId != org.id) continue;
+
+        final amount = amounts[i];
+
+        // Apply the custom processing function
+        await processItem(item, amount, batch);
+      }
+
+      // Commit the batch if not empty
+      if (batch.length > 0) {
+        await batch.commit();
+      }
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error processing batch item update: $e');
+      rethrow;
+    }
   }
 
-  Stream<List<ManifestItem>> streamManifestItemsByVehicle(String vehicleId) {
-    return getManifestItemsByVehicle(vehicleId);
+  //
+  // Authentication and validation helpers
+  //
+
+  /// Validates user is authenticated and returns the user object
+  Future<User> _requireUser() async {
+    final user = _auth.currentUser;
+    if (user == null) throw 'Not authenticated';
+    return user;
   }
 
-  Stream<List<ManifestItem>> streamManifestItemsByStage(String eventId,
-      Stage stage) {
-    return getManifestItemsByStage(eventId, stage);
+  /// Validates and returns the current user's organization
+  Future<Organization> _requireOrganization() async {
+    final org = await _organizationService.getCurrentUserOrganization();
+    if (org == null) throw 'Organization not found';
+    return org;
+  }
+
+  /// Validates both user and organization in one call
+  Future<(User, Organization)> _requireUserAndOrg() async {
+    final user = await _requireUser();
+    final org = await _requireOrganization();
+    return (user, org); // Dart 3.0 tuples
+  }
+
+  /// Validates item exists and returns it
+  Future<ManifestItem> getItem(String itemId) async {
+    final docSnapshot = await _manifestItemsCollection.doc(itemId).get();
+    if (!docSnapshot.exists) {
+      throw 'Manifest item not found';
+    }
+    return ManifestItem.fromFirestore(docSnapshot);
+  }
+
+  /// Validates item belongs to organization and returns it
+  Future<ManifestItem> validateItemOwnership(String itemId, String orgId) async {
+    final item = await getItem(itemId);
+    if (item.organizationId != orgId) {
+      throw 'Manifest item belongs to another organization';
+    }
+    return item;
+  }
+
+  //
+  // Query helpers
+  //
+
+  /// Creates a base query for event items with organization filtering
+  Query<Map<String, dynamic>> _baseEventQuery(String eventId, String orgId) {
+    return _manifestItemsCollection
+        .where('eventId', isEqualTo: eventId)
+        .where('organizationId', isEqualTo: orgId);
+  }
+
+  /// Creates a query for items in specific stages
+  Query<Map<String, dynamic>> _stageFilteredQuery(
+      Query<Map<String, dynamic>> baseQuery, List<Stage> stages) {
+    final stageStrings = stages.map(ManifestItem.stageToString).toList();
+    return baseQuery.where('currentStage', whereIn: stageStrings);
+  }
+
+  /// Helper for safer stream generation with consistent error handling
+  Stream<T> _safeStream<T>(
+      String operationName,
+      Future<Stream<T>> Function() streamFunction,
+      T defaultValue
+      ) async* {
+    try {
+      yield* await streamFunction();
+    } catch (e) {
+      debugPrint('Error $operationName: $e');
+      yield defaultValue;
+    }
   }
 }
