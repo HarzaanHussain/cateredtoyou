@@ -24,7 +24,7 @@ class ManifestItem {
   final int originalAmount;      // Total planned quantity for event (never changes)
   int currentAmount;             // Current quantity this document represents
   Stage currentStage;            // Current workflow stage
-  ItemStatus status;             // Item preparation status
+  ItemStatus? status;             // Item preparation status
   int assignedAmount;            // Amount assigned to a vehicle
   int loadedAmount;              // Amount confirmed loaded
   String? vehicleId;             // Reference to vehicle (if assigned)
@@ -41,7 +41,7 @@ class ManifestItem {
     required this.originalAmount,
     required this.currentAmount,
     required this.currentStage,
-    required this.status,
+    this.status,
     required this.assignedAmount,
     required this.loadedAmount,
     this.vehicleId,
@@ -61,8 +61,8 @@ class ManifestItem {
       itemName: data['itemName'] ?? '',
       originalAmount: data['originalAmount'] ?? 0,
       currentAmount: data['currentAmount'] ?? 0,
-      currentStage: _stageFromString(data['currentStage']),
-      status: _statusFromString(data['status']),
+      currentStage: stageFromString(data['currentStage']),
+      status: _statusFromString(data['status'] ?? ''),
       assignedAmount: data['assignedAmount'] ?? 0,
       loadedAmount: data['loadedAmount'] ?? 0,
       vehicleId: data['vehicleId'],
@@ -82,8 +82,8 @@ class ManifestItem {
       itemName: map['itemName'] ?? '',
       originalAmount: map['originalAmount'] ?? 0,
       currentAmount: map['currentAmount'] ?? 0,
-      currentStage: _stageFromString(map['currentStage']),
-      status: _statusFromString(map['status']),
+      currentStage: stageFromString(map['currentStage']),
+      status: _statusFromString(map['status'] ?? ''),
       assignedAmount: map['assignedAmount'] ?? 0,
       loadedAmount: map['loadedAmount'] ?? 0,
       vehicleId: map['vehicleId'],
@@ -102,37 +102,25 @@ class ManifestItem {
   }
 
   /// Converts string to Stage enum
-  static Stage _stageFromString(String? stageStr) {
-    if (stageStr == null) return Stage.prep;
-
-    try {
-      return Stage.values.firstWhere(
-            (e) => e.toString().split('.').last == stageStr,
-        orElse: () => Stage.prep,
-      );
-    } catch (_) {
-      return Stage.prep;
-    }
+  static Stage stageFromString(String? stageStr) {
+    return Stage.values.firstWhere(
+          (e) => e.toString().split('.').last == stageStr,
+      orElse: () => throw ArgumentError('Invalid stage string: $stageStr'),
+    );
   }
 
   /// Converts ItemStatus enum to string
-  static String _statusToString(ItemStatus status) {
+  static String statusToString(ItemStatus status) {
     return status.toString().split('.').last;
   }
 
   /// Converts string to ItemStatus enum
-  static ItemStatus _statusFromString(String? statusStr) {
-    if (statusStr == null) return ItemStatus.raw;
-
-    try {
-      return ItemStatus.values.firstWhere(
-            (e) => e.toString().split('.').last == statusStr,
-        orElse: () => ItemStatus.raw,
-      );
-    } catch (_) {
-      return ItemStatus.raw;
-    }
-  }
+static ItemStatus _statusFromString(String statusStr) {
+  return ItemStatus.values.firstWhere(
+    (e) => e.toString().split('.').last == statusStr,
+    orElse: () => throw ArgumentError('Invalid status string: $statusStr'),
+  );
+}
 
   /// Converts this ManifestItem to a Firestore-compatible map
   Map<String, dynamic> toMap() {
@@ -143,7 +131,7 @@ class ManifestItem {
       'originalAmount': originalAmount,
       'currentAmount': currentAmount,
       'currentStage': stageToString(currentStage),
-      'status': _statusToString(status),
+      'status': statusToString(status!),
       'assignedAmount': assignedAmount,
       'loadedAmount': loadedAmount,
       'vehicleId': vehicleId,
