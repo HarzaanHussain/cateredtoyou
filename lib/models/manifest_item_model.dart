@@ -162,7 +162,7 @@ static ItemStatus _statusFromString(String statusStr) {
     bool clearNotes = false,
   }) {
     return ManifestItem(
-      id: this.id,
+      id: id,
       eventId: eventId ?? this.eventId,
       itemId: itemId ?? this.itemId,
       itemName: itemName ?? this.itemName,

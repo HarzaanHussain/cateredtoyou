@@ -143,11 +143,22 @@ class ManifestItemService extends ChangeNotifier {
           .id : item.id;
 
       // Create a new item with the current timestamp and user
-      final updatedItem = item.copyWith(
+      final updatedItem = ManifestItem(
         id: docId,
-        organizationId: organization.id,
+        eventId: item.eventId,
+        itemId: item.itemId,
+        itemName: item.itemName,
+        originalAmount: item.originalAmount,
+        currentAmount: item.currentAmount,
+        currentStage: item.currentStage,
+        status: item.status,
+        assignedAmount: item.assignedAmount,
+        loadedAmount: item.loadedAmount,
+        vehicleId: item.vehicleId,
         lastUpdatedBy: currentUser.uid,
         lastUpdatedAt: DateTime.now(),
+        organizationId: organization.id,
+        notes: item.notes,
       );
 
       // Save to Firestore
