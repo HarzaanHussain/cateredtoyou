@@ -183,20 +183,22 @@ class VehicleCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             SizedBox(
-                              width: 80, // Fixed width
-                              child: TextButton.icon(
-                                icon: const Icon(Icons.visibility_outlined, size: 16),
-                                label: const Text('View'),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => VehicleLoadingScreen(
-                                        vehicleId: vehicle.id,
+                              width: 80,
+                              child: FittedBox(
+                                child: TextButton.icon(
+                                  icon: const Icon(Icons.visibility_outlined, size: 16),
+                                  label: const Text('View'),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => VehicleLoadingScreen(
+                                          vehicleId: vehicle.id,
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                },
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                           ],
