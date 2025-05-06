@@ -1,7 +1,6 @@
 import 'package:cateredtoyou/services/role_permissions.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cateredtoyou/widgets/permission_widget.dart';
 import 'package:provider/provider.dart';
 // You'll likely want to import your notification service
 // import 'package:cateredtoyou/services/notification_service.dart';
@@ -47,12 +46,15 @@ class _BottomToolbarState extends State<BottomToolbar> {
   }
 
   Future<void> _loadPermissions() async {
+    
     if(!mounted) return;
     final rolePermissions = Provider.of<RolePermissions>(context, listen: false);
 
-    final eventPermission = await rolePermissions.hasPermission("manage_events");
-    final deliveryPermission = await rolePermissions.hasPermission("view_deliveries");
-    final notificationPermission = await rolePermissions.hasPermission("manage_events");
+    final eventPermission = await rolePermissions.hasPermission("view_events");
+    var deliveryPermission = true;
+    final notificationPermission = true;
+    
+  
 
     if(mounted){
       setState(() {

@@ -33,6 +33,8 @@ import 'package:cateredtoyou/views/tasks/task_list_screen.dart'; // Importing Ta
 import 'package:cateredtoyou/views/vehicles/vehicle_details_screen.dart'; // Importing VehicleDetailsScreen widget
 import 'package:cateredtoyou/views/vehicles/vehicle_form_screen.dart'; // Importing VehicleFormScreen widget
 import 'package:cateredtoyou/views/vehicles/vehicle_list_screen.dart'; // Importing VehicleListScreen widget
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart'; // Importing Flutter material package for UI components
 import 'package:go_router/go_router.dart'; // Importing GoRouter package for routing
 import 'package:cateredtoyou/models/auth_model.dart'; // Importing AuthModel for authentication state
@@ -159,20 +161,19 @@ class AppRouter {
         },
       ),
       GoRoute(
-        path: '/inventory/:itemId',
-        builder: (context, state) {
-          final itemId = state.pathParameters['itemId']!;
-          return ContentByIdLoader(
-            contentType: 'inventory',
-            contentId: itemId,
-            loadingTitle: 'Loading Inventory Item',
-          );
-        },
-        redirect: (context, state){
-          if (!authModel.isAuthenticated) return '/login';
-          return null;
-        }
-      ),
+          path: '/inventory/:itemId',
+          builder: (context, state) {
+            final itemId = state.pathParameters['itemId']!;
+            return ContentByIdLoader(
+              contentType: 'inventory',
+              contentId: itemId,
+              loadingTitle: 'Loading Inventory Item',
+            );
+          },
+          redirect: (context, state) {
+            if (!authModel.isAuthenticated) return '/login';
+            return null;
+          }),
       GoRoute(
         path: '/events', // Path for event list route
         builder: (context, state) =>
@@ -346,9 +347,44 @@ class AppRouter {
         },
       ),
       GoRoute(
-        path: '/deliveries', // Path for deliveries list route
-        builder: (context, state) =>
-            const DeliveryListScreen(), // Building DeliveryListScreen widget
+        path: '/deliveries',
+        redirect: (context, state) async {
+          // Check if user is authenticated
+          if (!authModel.isAuthenticated) {
+            return '/login';
+          }
+
+          // Get current user for role check
+          final currentUser = FirebaseAuth.instance.currentUser;
+          if (currentUser == null) {
+            return '/login';
+          }
+
+          // Get user document to check role
+          try {
+            final userDoc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUser.uid)
+                .get();
+
+            if (!userDoc.exists) {
+              return '/login';
+            }
+
+            final userRole = userDoc.data()?['role'] as String?;
+
+            // Management roles go to list view, others go to driver view
+            if (['admin', 'client', 'manager'].contains(userRole)) {
+              return null; // Continue to DeliveryListScreen
+            } else {
+              return '/driver-deliveries'; // Redirect to DriverDeliveriesScreen
+            }
+          } catch (e) {
+            // On error, default to driver deliveries view
+            return '/driver-deliveries';
+          }
+        },
+        builder: (context, state) => const DeliveryListScreen(),
       ),
       GoRoute(
         path: '/add-delivery', // Path for add delivery route
@@ -377,17 +413,17 @@ class AppRouter {
         },
       ),
       GoRoute(
-  path: '/settings',
-  name: 'settings',
-  builder: (context, state) => const AppSettingsScreen(),
-  redirect: (context, state) {
-    if (!authModel.isAuthenticated) {
-      // If user is not authenticated
-      return '/login'; // Redirect to login
-    }
-    return null; // No redirection if authenticated
-  },
-),
+        path: '/settings',
+        name: 'settings',
+        builder: (context, state) => const AppSettingsScreen(),
+        redirect: (context, state) {
+          if (!authModel.isAuthenticated) {
+            // If user is not authenticated
+            return '/login'; // Redirect to login
+          }
+          return null; // No redirection if authenticated
+        },
+      ),
     ],
 
     errorBuilder: (context, state) => Material(
