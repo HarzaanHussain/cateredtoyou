@@ -18,7 +18,8 @@ class MenuItem {
   final MenuItemType type; // Type of the menu item
   final double price; // Price of the menu item
   final String organizationId; // ID of the organization that owns the menu item
-  final Map<String, double> inventoryRequirements; // Inventory requirements for the menu item
+  final Map<String, double>
+      inventoryRequirements; // Inventory requirements for the menu item
   final DateTime createdAt; // Timestamp when the menu item was created
   final DateTime updatedAt; // Timestamp when the menu item was last updated
   final String createdBy; // ID of the user who created the menu item
@@ -42,32 +43,55 @@ class MenuItem {
     return {
       'name': name, // Name of the menu item
       'description': description, // Description of the menu item
-      'type': type.toString().split('.').last, // Type of the menu item as a string
-      'price': price.toDouble(), // Price of the menu item
+      'type':
+          type.toString().split('.').last, // Type of the menu item as a string
+      'price': price, // Price of the menu item
       'organizationId': organizationId, // Organization ID
-      'inventoryRequirements': inventoryRequirements.map((k, v) => MapEntry(k, v.toDouble())),
-      'createdAt': Timestamp.fromDate(createdAt), // Creation timestamp as Firestore Timestamp
-      'updatedAt': Timestamp.fromDate(updatedAt), // Update timestamp as Firestore Timestamp
+      'inventoryRequirements': inventoryRequirements, // Inventory requirements
+      'createdAt': Timestamp.fromDate(
+          createdAt), // Creation timestamp as Firestore Timestamp
+      'updatedAt': Timestamp.fromDate(
+          updatedAt), // Update timestamp as Firestore Timestamp
       'createdBy': createdBy, // Creator ID
     };
   }
 
   // Factory constructor to create a MenuItem instance from a map
   factory MenuItem.fromMap(Map<String, dynamic> map, String docId) {
+    // Convert price safely
+    final dynamic rawPrice = map['price'] ?? 0;
+    final double price =
+        rawPrice is int ? rawPrice.toDouble() : (rawPrice as num).toDouble();
+
+    // Convert inventory requirements safely
+    final Map<String, dynamic> rawInventory =
+        map['inventoryRequirements'] ?? {};
+    final Map<String, double> inventory = {};
+
+    rawInventory.forEach((key, value) {
+      if (value is int) {
+        inventory[key] = value.toDouble();
+      } else if (value is double) {
+        inventory[key] = value;
+      } else {
+        inventory[key] = 0.0; // Default for unexpected types
+      }
+    });
+
     return MenuItem(
-      id: docId, // Document ID from Firestore
-      name: map['name'] ?? '', // Name from map or empty string if null
-      description: map['description'] ?? '', // Description from map or empty string if null
+      id: docId,
+      name: map['name'] ?? '',
+      description: map['description'] ?? '',
       type: MenuItemType.values.firstWhere(
-            (type) => type.toString().split('.').last == map['type'], // Type from map or default to 'other'
+        (type) => type.toString().split('.').last == map['type'],
         orElse: () => MenuItemType.other,
       ),
-      price: (map['price'] ?? 0).toDouble(), // Price from map or 0 if null
-      organizationId: map['organizationId'] ?? '', // Organization ID from map or empty string if null
-      inventoryRequirements: Map<String, double>.from(map['inventoryRequirements'] ?? {}), // Inventory requirements from map or empty map if null
-      createdAt: (map['createdAt'] as Timestamp).toDate(), // Creation timestamp from map
-      updatedAt: (map['updatedAt'] as Timestamp).toDate(), // Update timestamp from map
-      createdBy: map['createdBy'] ?? '', // Creator ID from map or empty string if null
+      price: price,
+      organizationId: map['organizationId'] ?? '',
+      inventoryRequirements: inventory,
+      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      updatedAt: (map['updatedAt'] as Timestamp).toDate(),
+      createdBy: map['createdBy'] ?? '',
     );
   }
 
@@ -77,16 +101,22 @@ class MenuItem {
     String? description, // Optional new description
     MenuItemType? type, // Optional new type
     double? price, // Optional new price
-    Map<String, double>? inventoryRequirements, // Optional new inventory requirements
+    Map<String, double>?
+        inventoryRequirements, // Optional new inventory requirements
   }) {
     return MenuItem(
       id: id, // Retain existing ID
-      name: name ?? this.name, // Use new name if provided, otherwise retain existing
-      description: description ?? this.description, // Use new description if provided, otherwise retain existing
-      type: type ?? this.type, // Use new type if provided, otherwise retain existing
-      price: price ?? this.price, // Use new price if provided, otherwise retain existing
+      name: name ??
+          this.name, // Use new name if provided, otherwise retain existing
+      description: description ??
+          this.description, // Use new description if provided, otherwise retain existing
+      type: type ??
+          this.type, // Use new type if provided, otherwise retain existing
+      price: price ??
+          this.price, // Use new price if provided, otherwise retain existing
       organizationId: organizationId, // Retain existing organization ID
-      inventoryRequirements: inventoryRequirements ?? this.inventoryRequirements, // Use new inventory requirements if provided, otherwise retain existing
+      inventoryRequirements: inventoryRequirements ??
+          this.inventoryRequirements, // Use new inventory requirements if provided, otherwise retain existing
       createdAt: createdAt, // Retain existing creation timestamp
       updatedAt: DateTime.now(), // Update timestamp to current time
       createdBy: createdBy, // Retain existing creator ID
