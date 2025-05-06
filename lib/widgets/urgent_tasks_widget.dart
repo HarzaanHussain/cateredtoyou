@@ -1,4 +1,5 @@
 // File: lib/widgets/urgent_tasks_widget.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cateredtoyou/models/task_model.dart';
@@ -6,7 +7,6 @@ import 'package:cateredtoyou/services/task_service.dart';
 import 'package:cateredtoyou/views/tasks/task_detail_screen.dart';
 import 'package:cateredtoyou/views/tasks/task_list_screen.dart';
 import 'package:intl/intl.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class UrgentTasksWidget extends StatelessWidget {
   const UrgentTasksWidget({super.key});
@@ -139,14 +139,47 @@ class UrgentTasksWidget extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    task.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          task.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
+                                  if (task.eventId.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    StreamBuilder<DocumentSnapshot>(
+                                      stream: FirebaseFirestore.instance
+                                          .collection('events')
+                                          .doc(task.eventId)
+                                          .snapshots(),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.hasData &&
+                                            snapshot.data!.exists) {
+                                          final eventData = snapshot.data!
+                                              .data() as Map<String, dynamic>?;
+                                          return Text(
+                                            '[${eventData?['name'] ?? 'Unknown Event'}]',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.blue[700],
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          );
+                                        }
+                                        return const SizedBox.shrink();
+                                      },
+                                    ),
+                                  ],
                                   const SizedBox(height: 4),
                                   Row(
                                     children: [
