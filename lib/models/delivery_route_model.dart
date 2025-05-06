@@ -145,7 +145,10 @@ class DeliveryRoute {
   String get activeDriverId => currentDriver ?? driverId;
   
   // Check if the given user is the active driver
-  bool isActiveDriver(String userId) => activeDriverId == userId;
+  bool isActiveDriver(String userId){
+      return currentDriver == userId;
+
+  } 
   
   // Check if this is a reassigned delivery (current driver differs from original)
   bool get isReassigned => currentDriver != null && currentDriver != driverId;

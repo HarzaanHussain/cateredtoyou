@@ -76,56 +76,51 @@ class DeliveryRouteService extends ChangeNotifier {
   }
 
   // Get deliveries that the current user can access as a driver
-  Stream<List<DeliveryRoute>> getAccessibleDriverRoutes() async* {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        yield [];
-        return;
-      }
-
-      final organization =
-          await _organizationService.getCurrentUserOrganization();
-      if (organization == null) {
-        yield [];
-        return;
-      }
-
-      // First, check if the user has the broader view_deliveries permission
-      final hasViewPermission =
-          await _rolePermissions.hasPermission('view_deliveries');
-
-      if (hasViewPermission) {
-        // If they have view_deliveries permission, they can see all pending deliveries
-        // This is useful for managers/admins who may need to reassign deliveries
-        yield* _firestore
-            .collection('delivery_routes')
-            .where('organizationId', isEqualTo: organization.id)
-            .where('status', whereIn: ['pending', 'in_progress'])
-            .snapshots()
-            .map((snapshot) => snapshot.docs
-                .map((doc) => DeliveryRoute.fromMap(doc.data(), doc.id))
-                .toList());
-      } else {
-        // Otherwise, only show deliveries where this user is the driver or current driver
-        yield* _firestore
-            .collection('delivery_routes')
-            .where('organizationId', isEqualTo: organization.id)
-            .where(Filter.or(
-              Filter('driverId', isEqualTo: currentUser.uid),
-              Filter('currentDriver', isEqualTo: currentUser.uid),
-            ))
-            .where('status', whereIn: ['pending', 'in_progress'])
-            .snapshots()
-            .map((snapshot) => snapshot.docs
-                .map((doc) => DeliveryRoute.fromMap(doc.data(), doc.id))
-                .toList());
-      }
-    } catch (e) {
-      debugPrint('Error getting accessible driver routes: $e');
+Stream<List<DeliveryRoute>> getAccessibleDriverRoutes() async* {
+  try {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
       yield [];
+      return;
     }
+
+    final organization = await _organizationService.getCurrentUserOrganization();
+    if (organization == null) {
+      yield [];
+      return;
+    }
+
+    // Permission check
+    final hasViewPermission = await _rolePermissions.hasPermission('view_deliveries');
+
+    if (hasViewPermission) {
+      // Management users see all deliveries
+      yield* _firestore
+          .collection('delivery_routes')
+          .where('organizationId', isEqualTo: organization.id)
+          .where('status', whereIn: ['pending', 'in_progress'])
+          .snapshots()
+          .map((snapshot) => snapshot.docs
+              .map((doc) => DeliveryRoute.fromMap(doc.data(), doc.id))
+              .toList());
+    } else {
+      // Simple solution: ONLY show deliveries where currentDriver matches the user ID
+      // This is the cleanest approach and avoids filter logic issues
+      yield* _firestore
+          .collection('delivery_routes')
+          .where('organizationId', isEqualTo: organization.id)
+          .where('currentDriver', isEqualTo: currentUser.uid)
+          .where('status', whereIn: ['pending', 'in_progress'])
+          .snapshots()
+          .map((snapshot) => snapshot.docs
+              .map((doc) => DeliveryRoute.fromMap(doc.data(), doc.id))
+              .toList());
+    }
+  } catch (e) {
+    debugPrint('Error getting accessible driver routes: $e');
+    yield [];
   }
+}
 
   // Initialize route metrics when creating a new route
   Future<void> initializeRouteMetrics(String routeId) async {
