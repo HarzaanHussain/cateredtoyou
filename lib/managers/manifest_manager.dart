@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/manifest_item_model.dart';
 import '../models/event_model.dart';
+import '../models/organization_model.dart';
 import '../services/manifest_item_service.dart';
 import '../services/organization_service.dart';
 import '../services/event_service.dart';
@@ -15,24 +16,85 @@ class ManifestManager {
   final OrganizationService _organizationService;
   final EventService _eventService;
 
+  // Helper member variables to reduce repeated lookups
+  User? _cachedUser;
+  Organization? _cachedOrganization;
+
   ManifestManager(
       this._manifestItemService,
       this._organizationService,
       this._eventService,
       );
 
+  //
+  // Authentication and validation helpers
+  //
+
+  /// Get the current authenticated user
+  Future<User> _requireUser() async {
+    // Use cached user if available
+    if (_cachedUser != null) {
+      return _cachedUser!;
+    }
+
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw 'Not authenticated';
+    }
+
+    _cachedUser = user;
+    return user;
+  }
+
+  /// Get current user's organization
+  Future<Organization> _requireOrganization() async {
+    // Use cached organization if available
+    if (_cachedOrganization != null) {
+      return _cachedOrganization!;
+    }
+
+    final organization = await _organizationService.getCurrentUserOrganization();
+    if (organization == null) {
+      throw 'Organization not found';
+    }
+
+    _cachedOrganization = organization;
+    return organization;
+  }
+
+  /// Get both user and organization in one call
+  Future<(User, Organization)> _requireUserAndOrg() async {
+    final user = await _requireUser();
+    final organization = await _requireOrganization();
+    return (user, organization);
+  }
+
+  /// Validate vehicle ownership
+  Future<void> _validateVehicle(String vehicleId, String organizationId) async {
+    final vehicleDoc = await _firestore.collection('vehicles')
+        .doc(vehicleId)
+        .get();
+
+    if (!vehicleDoc.exists) {
+      throw 'Vehicle not found';
+    }
+
+    final vehicleData = vehicleDoc.data() as Map<String, dynamic>;
+    if (vehicleData['organizationId'] != organizationId) {
+      throw 'Vehicle belongs to another organization';
+    }
+  }
+
+  /// Clear any cached authentication data
+  void clearCache() {
+    _cachedUser = null;
+    _cachedOrganization = null;
+  }
+
   /// Generates manifest items from an event's menu items and supplies
   Future<List<ManifestItem>> generateManifestItemsFromEvent(String eventId) async {
     try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
-
-      final organization = await _organizationService.getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
+      final (user, organization) = await _requireUserAndOrg();
 
       // Get the event to access its menu items
       final event = await _eventService.getEventById(eventId);
@@ -67,7 +129,7 @@ class ManifestManager {
           assignedAmount: 0,
           loadedAmount: 0,
           vehicleId: null,
-          lastUpdatedBy: currentUser.uid,
+          lastUpdatedBy: user.uid,
           lastUpdatedAt: now,
           organizationId: organization.id,
           notes: menuItem.specialInstructions,
@@ -90,7 +152,7 @@ class ManifestManager {
           assignedAmount: 0,
           loadedAmount: 0,
           vehicleId: null,
-          lastUpdatedBy: currentUser.uid,
+          lastUpdatedBy: user.uid,
           lastUpdatedAt: now,
           organizationId: organization.id,
           notes: null,
@@ -110,15 +172,7 @@ class ManifestManager {
   /// Deletes all manifest items for an event
   Future<void> deleteManifestItemsForEvent(String eventId) async {
     try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
-
-      final organization = await _organizationService.getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
+      final (_, organization) = await _requireUserAndOrg();
 
       // Get all items for this event
       final querySnapshot = await _firestore
@@ -142,22 +196,15 @@ class ManifestManager {
     }
   }
 
-  /// Batch update status/quantity for multiple items and advance stage if appropriate
-  Future<void> updatePrep(
+  /// Update status/quantity for multiple items and advance stage if appropriate
+  /// Returns a map of item IDs to success/failure status
+  Future<Map<String, bool>> updatePrep(
       List<String> itemIds,
       List<ItemStatus> statuses,
       List<int> amounts
       ) async {
     try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
-
-      final organization = await _organizationService.getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
+      final (user, organization) = await _requireUserAndOrg();
 
       // Validate lists
       if (itemIds.length != statuses.length || itemIds.length != amounts.length) {
@@ -165,7 +212,7 @@ class ManifestManager {
       }
 
       if (itemIds.isEmpty) {
-        return;
+        return {};
       }
 
       // Get all items
@@ -179,22 +226,32 @@ class ManifestManager {
         updates[itemIds[i]] = (statuses[i], amounts[i]);
       }
 
+      // Track results for each item
+      final Map<String, bool> results = {};
+
       // Prepare items for update or deletion
       final List<String> itemsToDelete = [];
       final List<ManifestItem> itemsToUpdate = [];
 
       for (final doc in itemDocs) {
-        if (!doc.exists) continue;
+        if (!doc.exists) {
+          results[doc.id] = false;
+          continue;
+        }
 
         final item = ManifestItem.fromFirestore(doc);
 
         // Org check
         if (item.organizationId != organization.id) {
+          results[item.id] = false;
           continue;
         }
 
         final update = updates[item.id];
-        if (update == null) continue;
+        if (update == null) {
+          results[item.id] = false;
+          continue;
+        }
 
         final (status, amount) = update;
 
@@ -202,6 +259,7 @@ class ManifestManager {
           debugPrint(
               'Warning: Amount $amount exceeds original amount ${item.originalAmount} and will be skipped.'
           );
+          results[item.id] = false;
           continue;
         }
 
@@ -214,43 +272,44 @@ class ManifestManager {
             currentAmount: amount,
             status: status,
             currentStage: item.currentStage == Stage.prep ? Stage.assign : item.currentStage,
+            lastUpdatedBy: user.uid,
+            lastUpdatedAt: DateTime.now(),
           );
 
           itemsToUpdate.add(updatedItem);
         }
       }
 
-      // Process deletes
+      // Process deletes (batching is OK for deletes)
       if (itemsToDelete.isNotEmpty) {
         await _manifestItemService.batchDeleteManifestItems(itemsToDelete);
+        for (final id in itemsToDelete) {
+          results[id] = true;
+        }
       }
 
       // Process updates through transactional updates
-      for (final item in itemsToUpdate) {
-        await _manifestItemService.transactionalUpdateManifestItem(item);
+      if (itemsToUpdate.isNotEmpty) {
+        final updateResults = await _manifestItemService.processMultipleItemUpdates(itemsToUpdate);
+        results.addAll(updateResults);
       }
+
+      return results;
     } catch (e) {
       debugPrint('Error in updatePrep: $e');
       rethrow;
     }
   }
 
-  /// Batch assign multiple items to a single vehicle
-  Future<void> assignItemsToVehicle(
+  /// Assign multiple items to a single vehicle
+  /// Returns a map of item IDs to success/failure status
+  Future<Map<String, bool>> assignItemsToVehicle(
       List<String> itemIds,
       List<int> amounts,
       String vehicleId,
       ) async {
     try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
-
-      final organization = await _organizationService.getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
+      final (user, organization) = await _requireUserAndOrg();
 
       // Validate lists have matching length
       if (itemIds.length != amounts.length) {
@@ -258,405 +317,378 @@ class ManifestManager {
       }
 
       if (itemIds.isEmpty) {
-        return;
+        return {};
       }
 
       // Validate vehicle exists and belongs to organization
-      final vehicleDoc = await _firestore.collection('vehicles')
-          .doc(vehicleId)
-          .get();
+      await _validateVehicle(vehicleId, organization.id);
 
-      if (!vehicleDoc.exists) {
-        throw 'Vehicle not found';
-      }
+      // Track results of all operations
+      final Map<String, bool> results = {};
 
-      final vehicleData = vehicleDoc.data() as Map<String, dynamic>;
-      if (vehicleData['organizationId'] != organization.id) {
-        throw 'Vehicle belongs to another organization';
-      }
+      // Process each item individually with transactions
+      for (int i = 0; i < itemIds.length; i++) {
+        final itemId = itemIds[i];
+        final amount = amounts[i];
 
-      // Process assign operations using the service's batch update processor
-      await _manifestItemService.processBatchItemUpdate(
-        itemIds,
-        amounts,
-            (item, amount, batch) async {
+        try {
+          // Get the item
+          final item = await _manifestItemService.getItem(itemId);
+
+          // Verify ownership
+          if (item.organizationId != organization.id) {
+            results[itemId] = false;
+            continue;
+          }
+
           // Skip invalid assignments
           if (amount <= 0 || amount > item.currentAmount) {
-            return;
+            results[itemId] = false;
+            continue;
           }
 
           // If assigning partial amount, split the item
           if (amount < item.currentAmount) {
-            await _manifestItemService.splitItem(
+            final splitResults = await _manifestItemService.splitItem(
               item.id,
               amount,
               vehicleId: vehicleId,
               newStage: Stage.load,
             );
+
+            results[itemId] = splitResults.isNotEmpty;
           } else {
             // Direct update for full amount assignment
             final updatedItem = item.copyWith(
               vehicleId: vehicleId,
               assignedAmount: amount,
               currentStage: Stage.load,
+              lastUpdatedBy: user.uid,
+              lastUpdatedAt: DateTime.now(),
             );
 
             await _manifestItemService.transactionalUpdateManifestItem(updatedItem);
+            results[itemId] = true;
           }
-        },
-      );
+        } catch (e) {
+          debugPrint('Error assigning item $itemId to vehicle: $e');
+          results[itemId] = false;
+        }
+      }
+
+      return results;
     } catch (e) {
       debugPrint('Error in assignItemsToVehicle: $e');
       rethrow;
     }
   }
 
-  /// Mark multiple items as loaded
-  Future<void> markItemsAsLoaded(
-      List<String> itemIds,
-      List<int> amounts
-      ) async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
+}
 
-      final organization = await _organizationService.getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
+// Validate if assigned to a vehicle
+if (item.vehicleId == null) {
+warnings.add('Warning: Item "${item.itemName}" is not assigned to a vehicle');
+return; // Skip this item
+}
 
-      // Validate lists have matching length
-      if (itemIds.length != amounts.length) {
-        throw 'Item IDs and amounts must have matching length';
-      }
+// Check if loading amount exceeds assigned amount
+if (amount > item.assignedAmount) {
+warnings.add(
+'Warning: Loading more "${item.itemName}" than assigned (${amount} > ${item.assignedAmount})'
+);
+}
 
-      // Track warnings
-      final List<String> warnings = [];
+// Skip invalid loads
+if (amount <= 0 || amount > item.assignedAmount) {
+return;
+}
 
-      // Process load operations using the service's batch update processor
-      await _manifestItemService.processBatchItemUpdate(
-        itemIds,
-        amounts,
-            (item, amount, batch) async {
-          // Check if item is still in prep stage
-          if (item.currentStage == Stage.prep) {
-            warnings.add('Warning: Item "${item.itemName}" is still in prep stage');
-          }
+// If loading partial amount, split the item
+if (amount < item.assignedAmount) {
+await _manifestItemService.splitItem(
+item.id,
+amount,
+newStage: Stage.deliver
+);
+} else {
+// Direct update for full amount loading
+final updatedItem = item.copyWith(
+loadedAmount: amount,
+currentStage: Stage.deliver,
+);
 
-          // Validate if assigned to a vehicle
-          if (item.vehicleId == null) {
-            warnings.add('Warning: Item "${item.itemName}" is not assigned to a vehicle');
-            return; // Skip this item
-          }
+await _manifestItemService.transactionalUpdateManifestItem(updatedItem);
+}
+},
+);
 
-          // Check if loading amount exceeds assigned amount
-          if (amount > item.assignedAmount) {
-            warnings.add(
-                'Warning: Loading more "${item.itemName}" than assigned (${amount} > ${item.assignedAmount})'
-            );
-          }
+// Print warnings if any
+if (warnings.isNotEmpty) {
+debugPrint('Loading warnings: ${warnings.join(', ')}');
+}
+} catch (e) {
+debugPrint('Error in markItemsAsLoaded: $e');
+rethrow;
+}
+}
 
-          // Skip invalid loads
-          if (amount <= 0 || amount > item.assignedAmount) {
-            return;
-          }
+/// Mark all items for a vehicle as loaded
+/// Returns a map of item IDs to success/failure status and a list of warnings
+Future<(Map<String, bool>, List<String>)> markAllVehicleItemsAsLoaded(String vehicleId) async {
+try {
+final (_, organization) = await _requireUserAndOrg();
 
-          // If loading partial amount, split the item
-          if (amount < item.assignedAmount) {
-            await _manifestItemService.splitItem(
-                item.id,
-                amount,
-                newStage: Stage.deliver
-            );
-          } else {
-            // Direct update for full amount loading
-            final updatedItem = item.copyWith(
-              loadedAmount: amount,
-              currentStage: Stage.deliver,
-            );
+// Get all assigned items for this vehicle
+final itemsSnapshot = await _firestore
+    .collection('manifestItems')
+    .where('vehicleId', isEqualTo: vehicleId)
+    .where('currentStage', isEqualTo: ManifestItem.stageToString(Stage.assign))
+    .where('organizationId', isEqualTo: organization.id)
+    .get();
 
-            await _manifestItemService.transactionalUpdateManifestItem(updatedItem);
-          }
-        },
-      );
+if (itemsSnapshot.docs.isEmpty) {
+return ({}, []); // No items to load
+}
 
-      // Print warnings if any
-      if (warnings.isNotEmpty) {
-        debugPrint('Loading warnings: ${warnings.join(', ')}');
-      }
-    } catch (e) {
-      debugPrint('Error in markItemsAsLoaded: $e');
-      rethrow;
-    }
-  }
+final List<String> itemIds = [];
+final List<int> amounts = [];
 
-  /// Mark all items for a vehicle as loaded
-  Future<void> markAllVehicleItemsAsLoaded(String vehicleId) async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
+for (final doc in itemsSnapshot.docs) {
+final item = ManifestItem.fromFirestore(doc);
+itemIds.add(item.id);
+amounts.add(item.assignedAmount);
+}
 
-      final organization = await _organizationService.getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
+// Use existing function to mark all as loaded
+return await markItemsAsLoaded(itemIds, amounts);
+} catch (e) {
+debugPrint('Error marking all vehicle items as loaded: $e');
+rethrow;
+}
+}
 
-      // Get all assigned items for this vehicle
-      final itemsSnapshot = await _firestore
-          .collection('manifestItems')
-          .where('vehicleId', isEqualTo: vehicleId)
-          .where('currentStage', isEqualTo: ManifestItem.stageToString(Stage.assign))
-          .where('organizationId', isEqualTo: organization.id)
-          .get();
+/// Advance all loaded items to delivery stage
+/// Returns a map of item IDs to success/failure status
+Future<Map<String, bool>> advanceToDeliveryStage(String vehicleId) async {
+try {
+final (user, organization) = await _requireUserAndOrg();
 
-      if (itemsSnapshot.docs.isEmpty) {
-        return; // No items to load
-      }
+// Get all loaded items for this vehicle
+final itemsSnapshot = await _firestore
+    .collection('manifestItems')
+    .where('vehicleId', isEqualTo: vehicleId)
+    .where('currentStage', isEqualTo: ManifestItem.stageToString(Stage.load))
+    .where('organizationId', isEqualTo: organization.id)
+    .get();
 
-      final List<String> itemIds = [];
-      final List<int> amounts = [];
+if (itemsSnapshot.docs.isEmpty) {
+return {}; // No items to advance
+}
 
-      for (final doc in itemsSnapshot.docs) {
-        final item = ManifestItem.fromFirestore(doc);
-        itemIds.add(item.id);
-        amounts.add(item.assignedAmount);
-      }
+// Track results
+final Map<String, bool> results = {};
 
-      // Use existing function to mark all as loaded
-      await markItemsAsLoaded(itemIds, amounts);
-    } catch (e) {
-      debugPrint('Error marking all vehicle items as loaded: $e');
-      rethrow;
-    }
-  }
+// Process each item individually with transactions
+for (final doc in itemsSnapshot.docs) {
+final item = ManifestItem.fromFirestore(doc);
 
-  /// Advance all loaded items to delivery stage
-  Future<void> advanceToDeliveryStage(String vehicleId) async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw 'Not authenticated';
-      }
+try {
+// Apply business logic: advance from load to deliver stage
+final updatedItem = item.copyWith(
+currentStage: Stage.deliver,
+lastUpdatedBy: user.uid,
+lastUpdatedAt: DateTime.now(),
+);
 
-      final organization = await _organizationService.getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
+await _manifestItemService.transactionalUpdateManifestItem(updatedItem);
+results[item.id] = true;
+} catch (e) {
+debugPrint('Error advancing item ${item.id} to delivery stage: $e');
+results[item.id] = false;
+}
+}
 
-      // Get all loaded items for this vehicle
-      final itemsSnapshot = await _firestore
-          .collection('manifestItems')
-          .where('vehicleId', isEqualTo: vehicleId)
-          .where('currentStage', isEqualTo: ManifestItem.stageToString(Stage.load))
-          .where('organizationId', isEqualTo: organization.id)
-          .get();
+return results;
+} catch (e) {
+debugPrint('Error advancing to delivery stage: $e');
+rethrow;
+}
+}
 
-      if (itemsSnapshot.docs.isEmpty) {
-        return; // No items to advance
-      }
+/// Get loadable items for a specific vehicle
+Stream<List<ManifestItem>> getLoadableItemsForVehicle(String vehicleId) {
+return _manifestItemService.getLoadableItemsForVehicle(vehicleId);
+}
 
-      // Prepare updates with business logic applied
-      final List<ManifestItem> itemsToUpdate = [];
+//
+// Helper methods for specific operations
+//
 
-      for (final doc in itemsSnapshot.docs) {
-        final item = ManifestItem.fromFirestore(doc);
+/// Update the status and quantity of a single item
+Future<void> updateItemStatus(String itemId, ItemStatus status, int amount) async {
+try {
+final organization = await _organizationService.getCurrentUserOrganization();
+if (organization == null) {
+throw 'Organization not found';
+}
 
-        // Apply business logic: advance from load to deliver stage
-        final updatedItem = item.copyWith(
-          currentStage: Stage.deliver,
-        );
+// Get the item
+final item = await _manifestItemService.getItem(itemId);
 
-        itemsToUpdate.add(updatedItem);
-      }
+// Verify ownership
+if (item.organizationId != organization.id) {
+throw 'Item belongs to another organization';
+}
 
-      // Update each item transactionally
-      for (final item in itemsToUpdate) {
-        await _manifestItemService.transactionalUpdateManifestItem(item);
-      }
-    } catch (e) {
-      debugPrint('Error advancing to delivery stage: $e');
-      rethrow;
-    }
-  }
+// Validate amount
+if (amount > item.originalAmount) {
+throw 'Amount cannot exceed original amount';
+}
 
-  /// Get loadable items for a specific vehicle
-  Stream<List<ManifestItem>> getLoadableItemsForVehicle(String vehicleId) {
-    return _manifestItemService.getLoadableItemsForVehicle(vehicleId);
-  }
+// If the amount is 0, delete the item
+if (amount == 0) {
+await _manifestItemService.batchDeleteManifestItems([itemId]);
+return;
+}
 
-  //
-  // Helper methods for specific operations
-  //
+// Update the item with new status and amount
+final updatedItem = item.copyWith(
+status: status,
+currentAmount: amount,
+);
 
-  /// Update the status and quantity of a single item
-  Future<void> updateItemStatus(String itemId, ItemStatus status, int amount) async {
-    try {
-      final organization = await _organizationService.getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
+await _manifestItemService.transactionalUpdateManifestItem(updatedItem);
+} catch (e) {
+debugPrint('Error updating item status: $e');
+rethrow;
+}
+}
 
-      // Get the item
-      final item = await _manifestItemService.getItem(itemId);
+/// Update the preparation status and advance to the next stage if applicable
+Future<void> updateItemPrep(String itemId, ItemStatus status, int amount) async {
+try {
+final organization = await _organizationService.getCurrentUserOrganization();
+if (organization == null) {
+throw 'Organization not found';
+}
 
-      // Verify ownership
-      if (item.organizationId != organization.id) {
-        throw 'Item belongs to another organization';
-      }
+// Get the item
+final item = await _manifestItemService.getItem(itemId);
 
-      // Validate amount
-      if (amount > item.originalAmount) {
-        throw 'Amount cannot exceed original amount';
-      }
+// Verify ownership
+if (item.organizationId != organization.id) {
+throw 'Item belongs to another organization';
+}
 
-      // If the amount is 0, delete the item
-      if (amount == 0) {
-        await _manifestItemService.batchDeleteManifestItems([itemId]);
-        return;
-      }
+// Apply business logic: update status and amount, and advance stage if in prep
+final updatedItem = item.copyWith(
+status: status,
+currentAmount: amount,
+currentStage: item.currentStage == Stage.prep ? Stage.assign : item.currentStage,
+);
 
-      // Update the item with new status and amount
-      final updatedItem = item.copyWith(
-        status: status,
-        currentAmount: amount,
-      );
+// If amount is now 0, delete the item
+if (amount == 0) {
+await _manifestItemService.batchDeleteManifestItems([itemId]);
+} else {
+await _manifestItemService.transactionalUpdateManifestItem(updatedItem);
+}
+} catch (e) {
+debugPrint('Error updating item prep: $e');
+rethrow;
+}
+}
 
-      await _manifestItemService.transactionalUpdateManifestItem(updatedItem);
-    } catch (e) {
-      debugPrint('Error updating item status: $e');
-      rethrow;
-    }
-  }
+/// Assign a single item to a vehicle with a specified amount
+Future<void> assignToVehicle(String itemId, String vehicleId, int amount) async {
+try {
+final organization = await _organizationService.getCurrentUserOrganization();
+if (organization == null) {
+throw 'Organization not found';
+}
 
-  /// Update the preparation status and advance to the next stage if applicable
-  Future<void> updateItemPrep(String itemId, ItemStatus status, int amount) async {
-    try {
-      final organization = await _organizationService.getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
+// Get the item
+final item = await _manifestItemService.getItem(itemId);
 
-      // Get the item
-      final item = await _manifestItemService.getItem(itemId);
+// Verify ownership
+if (item.organizationId != organization.id) {
+throw 'Item belongs to another organization';
+}
 
-      // Verify ownership
-      if (item.organizationId != organization.id) {
-        throw 'Item belongs to another organization';
-      }
+// Validate assignment amount
+if (amount > item.currentAmount) {
+throw 'Assignment amount cannot exceed current amount';
+}
 
-      // Apply business logic: update status and amount, and advance stage if in prep
-      final updatedItem = item.copyWith(
-        status: status,
-        currentAmount: amount,
-        currentStage: item.currentStage == Stage.prep ? Stage.assign : item.currentStage,
-      );
+// If assigning partial amount, split the item
+if (amount < item.currentAmount) {
+await _manifestItemService.splitItem(
+itemId,
+amount,
+vehicleId: vehicleId,
+newStage: Stage.assign
+);
+} else {
+// Assign full amount
+final updatedItem = item.copyWith(
+vehicleId: vehicleId,
+assignedAmount: amount,
+currentStage: Stage.assign,
+);
 
-      // If amount is now 0, delete the item
-      if (amount == 0) {
-        await _manifestItemService.batchDeleteManifestItems([itemId]);
-      } else {
-        await _manifestItemService.transactionalUpdateManifestItem(updatedItem);
-      }
-    } catch (e) {
-      debugPrint('Error updating item prep: $e');
-      rethrow;
-    }
-  }
+await _manifestItemService.transactionalUpdateManifestItem(updatedItem);
+}
+} catch (e) {
+debugPrint('Error assigning item to vehicle: $e');
+rethrow;
+}
+}
 
-  /// Assign a single item to a vehicle with a specified amount
-  Future<void> assignToVehicle(String itemId, String vehicleId, int amount) async {
-    try {
-      final organization = await _organizationService.getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
+/// Mark a single item as loaded with a specified amount
+Future<void> markAsLoaded(String itemId, int amount) async {
+try {
+final organization = await _organizationService.getCurrentUserOrganization();
+if (organization == null) {
+throw 'Organization not found';
+}
 
-      // Get the item
-      final item = await _manifestItemService.getItem(itemId);
+// Get the item
+final item = await _manifestItemService.getItem(itemId);
 
-      // Verify ownership
-      if (item.organizationId != organization.id) {
-        throw 'Item belongs to another organization';
-      }
+// Verify ownership
+if (item.organizationId != organization.id) {
+throw 'Item belongs to another organization';
+}
 
-      // Validate assignment amount
-      if (amount > item.currentAmount) {
-        throw 'Assignment amount cannot exceed current amount';
-      }
+// Validate the vehicleId exists
+if (item.vehicleId == null) {
+throw 'Item must be assigned to a vehicle first';
+}
 
-      // If assigning partial amount, split the item
-      if (amount < item.currentAmount) {
-        await _manifestItemService.splitItem(
-            itemId,
-            amount,
-            vehicleId: vehicleId,
-            newStage: Stage.assign
-        );
-      } else {
-        // Assign full amount
-        final updatedItem = item.copyWith(
-          vehicleId: vehicleId,
-          assignedAmount: amount,
-          currentStage: Stage.assign,
-        );
+// Validate load amount
+if (amount > item.assignedAmount) {
+throw 'Load amount cannot exceed assigned amount';
+}
 
-        await _manifestItemService.transactionalUpdateManifestItem(updatedItem);
-      }
-    } catch (e) {
-      debugPrint('Error assigning item to vehicle: $e');
-      rethrow;
-    }
-  }
+// If loading partial amount, split the item
+if (amount < item.assignedAmount) {
+await _manifestItemService.splitItem(
+itemId,
+amount,
+newStage: Stage.load
+);
+} else {
+// Load full amount
+final updatedItem = item.copyWith(
+loadedAmount: amount,
+currentStage: Stage.load,
+);
 
-  /// Mark a single item as loaded with a specified amount
-  Future<void> markAsLoaded(String itemId, int amount) async {
-    try {
-      final organization = await _organizationService.getCurrentUserOrganization();
-      if (organization == null) {
-        throw 'Organization not found';
-      }
-
-      // Get the item
-      final item = await _manifestItemService.getItem(itemId);
-
-      // Verify ownership
-      if (item.organizationId != organization.id) {
-        throw 'Item belongs to another organization';
-      }
-
-      // Validate the vehicleId exists
-      if (item.vehicleId == null) {
-        throw 'Item must be assigned to a vehicle first';
-      }
-
-      // Validate load amount
-      if (amount > item.assignedAmount) {
-        throw 'Load amount cannot exceed assigned amount';
-      }
-
-      // If loading partial amount, split the item
-      if (amount < item.assignedAmount) {
-        await _manifestItemService.splitItem(
-            itemId,
-            amount,
-            newStage: Stage.load
-        );
-      } else {
-        // Load full amount
-        final updatedItem = item.copyWith(
-          loadedAmount: amount,
-          currentStage: Stage.load,
-        );
-
-        await _manifestItemService.transactionalUpdateManifestItem(updatedItem);
-      }
-    } catch (e) {
-      debugPrint('Error marking item as loaded: $e');
-      rethrow;
-    }
-  }
+await _manifestItemService.transactionalUpdateManifestItem(updatedItem);
+}
+} catch (e) {
+debugPrint('Error marking item as loaded: $e');
+rethrow;
+}
+}
 }
